@@ -24,6 +24,45 @@ if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir);
 }
 
+// 清理临时文件功能
+function cleanupOldFiles() {
+    try {
+        const files = fs.readdirSync(outputDir);
+        const now = Date.now();
+        const maxAge = 24 * 60 * 60 * 1000; // 24小时，单位：毫秒
+        
+        let deletedCount = 0;
+        
+        files.forEach(file => {
+            const filePath = path.join(outputDir, file);
+            const stats = fs.statSync(filePath);
+            
+            // 如果文件超过24小时就删除
+            if (now - stats.mtime.getTime() > maxAge) {
+                try {
+                    fs.unlinkSync(filePath);
+                    deletedCount++;
+                    console.log(`删除过期文件: ${file}`);
+                } catch (error) {
+                    console.error(`删除文件失败 ${file}:`, error.message);
+                }
+            }
+        });
+        
+        if (deletedCount > 0) {
+            console.log(`清理完成，共删除 ${deletedCount} 个过期文件`);
+        }
+    } catch (error) {
+        console.error('清理临时文件时出错:', error.message);
+    }
+}
+
+// 立即执行一次清理
+cleanupOldFiles();
+
+// 设置定时清理：每2小时执行一次
+setInterval(cleanupOldFiles, 2 * 60 * 60 * 1000);
+
 // 首页路由 - 高校建筑面积缺口测算系统
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -89,30 +128,106 @@ app.post('/online-download', (req, res) => {
     try {
         const { schoolData, analysisResult } = req.body;
         
-        if (!schoolData || !analysisResult) {
+        if (!schoolData) {
             return res.status(400).json({ error: '缺少计算结果数据' });
         }
         
         // 生成Excel文件
         const timestamp = Date.now();
-        const fileName = `${schoolData['学校名称'] || '在线计算'}_建筑面积缺口测算报告_${timestamp}.xlsx`;
+        const fileName = `${schoolData['学校名称'] || '在线计算'}_建筑规模测算结果_${timestamp}.xlsx`;
         const filePath = path.join(outputDir, fileName);
+        
+        console.log('生成Excel文件:', fileName);
+        console.log('文件路径:', filePath);
         
         // 创建工作簿
         const wb = XLSX.utils.book_new();
         
-        // 创建详细数据（单个学校）
-        const detailData = [schoolData];
-        const detailSheet = XLSX.utils.json_to_sheet(detailData);
-        XLSX.utils.book_append_sheet(wb, detailSheet, "学校详细数据");
+        // 创建标准格式的测算结果表
+        const data = [
+            ['高校建筑规模测算结果'],
+            [],
+            ['测算年份', '', schoolData['年份'] || new Date().getFullYear()],
+            ['单位/学校(机构)名称(章)', schoolData['学校名称'] || '', '学校类型', schoolData['学校类型'] || ''],
+            [],
+            ['规划学生数'],
+            ['专科学生数(人)', schoolData['全日制专科生人数'] || 0, '本科学生数(人)', schoolData['全日制本专科生人数'] || 0],
+            ['硕士学生数(人)', schoolData['全日制硕士生人数'] || 0, '博士学生数(人)', schoolData['全日制博士生人数'] || 0],
+            ['本科留学生数(人)', schoolData['留学生本科生人数'] || 0, '硕士留学生数(人)', schoolData['留学生硕士生人数'] || 0],
+            ['博士留学生数(人)', schoolData['留学生博士生人数'] || 0],
+            [],
+            ['测算结果'],
+            ['用房类型', '规划建筑面积(㎡)', '现状建筑面积(㎡)', '建筑面积缺口(㎡)'],
+            ['教学及辅助用房', schoolData['总应配教学及辅助用房(A)'] || 0, schoolData['现有教学及辅助用房面积'] || 0, schoolData['教学及辅助用房缺口(A)'] || 0],
+            ['办公用房', schoolData['总应配办公用房(B)'] || 0, schoolData['现有办公用房面积'] || 0, schoolData['办公用房缺口(B)'] || 0],
+            ['后勤辅助用房', schoolData['总应配后勤辅助用房(D)'] || 0, schoolData['现有后勤辅助用房面积'] || 0, schoolData['后勤辅助用房缺口(D)'] || 0],
+            ['生活配套用房', schoolData['总应配学生宿舍(C1)'] + schoolData['总应配其他生活用房(C2)'] || 0, schoolData['现有生活用房总面积'] || 0, (schoolData['学生宿舍缺口(C1)'] || 0) + (schoolData['其他生活用房缺口(C2)'] || 0)],
+            ['其中:学生宿舍', schoolData['总应配学生宿舍(C1)'] || 0, schoolData['现有学生宿舍面积'] || 0, schoolData['学生宿舍缺口(C1)'] || 0],
+            ['其中:其他生活用房', schoolData['总应配其他生活用房(C2)'] || 0, schoolData['现有其他生活用房面积（计算）'] || 0, schoolData['其他生活用房缺口(C2)'] || 0],
+            [],
+            ['建筑面积总缺口(不含补助)(㎡)', '', '', schoolData['建筑面积总缺口（不含特殊补助）'] || 0],
+            ['补助建筑总面积(㎡)', '', '', schoolData['特殊补助总面积'] || 0],
+            ['建筑面积总缺口(含补助)(㎡)', '', '', schoolData['建筑面积总缺口（含特殊补助）'] || 0]
+        ];
         
-        // 创建分析结果工作表
-        const analysisData = [analysisResult];
-        const analysisSheet = XLSX.utils.json_to_sheet(analysisData);
-        XLSX.utils.book_append_sheet(wb, analysisSheet, "分析结果");
+        // 创建工作表
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        
+        // 设置列宽
+        ws['!cols'] = [
+            { wch: 25 }, // 第一列
+            { wch: 20 }, // 第二列  
+            { wch: 20 }, // 第三列
+            { wch: 20 }  // 第四列
+        ];
+        
+        // 合并单元格
+        const merges = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, // 标题行
+            { s: { r: 2, c: 1 }, e: { r: 2, c: 2 } }, // 测算年份值
+            { s: { r: 5, c: 0 }, e: { r: 5, c: 3 } }, // 规划学生数标题
+            { s: { r: 11, c: 0 }, e: { r: 11, c: 3 } }, // 测算结果标题
+        ];
+        
+        ws['!merges'] = merges;
+        
+        // 设置单元格样式（标题居中）
+        if (!ws['A1']) ws['A1'] = {};
+        ws['A1'].s = {
+            alignment: { horizontal: 'center', vertical: 'center' },
+            font: { bold: true, size: 14 }
+        };
+        
+        // 添加工作表到工作簿
+        XLSX.utils.book_append_sheet(wb, ws, "建筑规模测算结果");
+        
+        // 如果有特殊补助明细，创建特殊补助工作表
+        if (schoolData['特殊补助明细'] && Array.isArray(schoolData['特殊补助明细']) && schoolData['特殊补助明细'].length > 0) {
+            const subsidyData = [
+                ['特殊补助明细'],
+                [],
+                ['补助项目名称', '补助面积(㎡)']
+            ];
+            
+            schoolData['特殊补助明细'].forEach(item => {
+                subsidyData.push([item.name || '', item.area || 0]);
+            });
+            
+            const subsidyWs = XLSX.utils.aoa_to_sheet(subsidyData);
+            subsidyWs['!cols'] = [{ wch: 30 }, { wch: 15 }];
+            
+            // 合并标题
+            subsidyWs['!merges'] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }
+            ];
+            
+            XLSX.utils.book_append_sheet(wb, subsidyWs, "特殊补助明细");
+        }
         
         // 写入文件
         XLSX.writeFile(wb, filePath);
+        
+        console.log('Excel文件生成成功');
         
         // 返回下载URL
         const downloadUrl = `/download/${fileName}`;
@@ -150,13 +265,18 @@ app.get('/api/schools/latest', async (req, res) => {
         const { year, school } = req.query;
         const yearFilter = year && year !== 'all' ? parseInt(year) : null;
         const schoolFilter = school && school !== 'all' ? school : null;
+        
+        // 返回符合条件的每个学校的最新记录
         const schools = await dataService.getLatestSchoolRecords(yearFilter, schoolFilter);
+        
         res.json({ success: true, data: schools });
     } catch (error) {
-        console.error('获取学校最新数据失败:', error);
-        res.status(500).json({ success: false, error: '获取最新数据失败' });
+        console.error('获取学校数据失败:', error);
+        res.status(500).json({ success: false, error: '获取数据失败' });
     }
 });
+
+
 
 // 获取可用年份
 app.get('/api/years', async (req, res) => {
@@ -211,21 +331,21 @@ app.post('/api/batch-export', async (req, res) => {
     try {
         const { year, schoolType, exportType = 'all' } = req.body;
         
-        // 根据筛选条件获取数据
+        // 根据筛选条件获取数据 - 使用最新记录函数
         let schoolsData = [];
         
         if (exportType === 'filtered') {
-            // 按条件筛选导出
+            // 按条件筛选导出 - 只导出每个学校每个年份的最新记录
             const yearFilter = year && year !== 'all' ? parseInt(year) : null;
-            schoolsData = await dataService.getSchoolHistory(yearFilter);
+            schoolsData = await dataService.getLatestSchoolRecords(yearFilter);
             
             // 如果指定了学校类型，进一步筛选
             if (schoolType && schoolType !== 'all') {
                 schoolsData = schoolsData.filter(school => school.school_type === schoolType);
             }
         } else {
-            // 导出所有数据
-            schoolsData = await dataService.getSchoolHistory();
+            // 导出所有数据 - 只导出每个学校每个年份的最新记录
+            schoolsData = await dataService.getLatestSchoolRecords();
         }
         
         if (schoolsData.length === 0) {
@@ -528,12 +648,12 @@ function generateBatchExportExcel(schoolsData, filters = {}) {
                 '特殊补助总面积': specialSubsidyTotalArea,
                 '特殊补助项目数': specialSubsidies.length,
                 '特殊补助明细': specialSubsidyDetails,
-                '整体达标情况': school.total_gap >= 0 ? '达标' : '不达标',
-                '教学用房达标情况': school.teaching_gap >= 0 ? '达标' : '不达标',
-                '办公用房达标情况': school.office_gap >= 0 ? '达标' : '不达标',
-                '学生宿舍达标情况': school.dormitory_gap >= 0 ? '达标' : '不达标',
-                '其他生活用房达标情况': school.other_living_gap >= 0 ? '达标' : '不达标',
-                '后勤用房达标情况': school.logistics_gap >= 0 ? '达标' : '不达标'
+                '整体达标情况': school.total_gap <= 0 ? '达标' : '不达标',
+                '教学用房达标情况': school.teaching_gap <= 0 ? '达标' : '不达标',
+                '办公用房达标情况': school.office_gap <= 0 ? '达标' : '不达标',
+                '学生宿舍达标情况': school.dormitory_gap <= 0 ? '达标' : '不达标',
+                '其他生活用房达标情况': school.other_living_gap <= 0 ? '达标' : '不达标',
+                '后勤用房达标情况': school.logistics_gap <= 0 ? '达标' : '不达标'
             };
         });
         
@@ -591,7 +711,7 @@ function generateBatchSummaryData(schoolsData, filters) {
         totalRequiredArea += school.required_total_area || 0;
         totalGap += school.total_gap || 0;
         
-        if ((school.total_gap || 0) >= 0) {
+        if ((school.total_gap || 0) <= 0) {
             complianceCount++;
         }
     });
@@ -635,7 +755,7 @@ function generateTypeAnalysisData(schoolsData) {
         typeStats[type]['应配建筑总面积'] += school.required_total_area || 0;
         typeStats[type]['建筑面积总缺口'] += school.total_gap || 0;
         
-        if ((school.total_gap || 0) >= 0) {
+        if ((school.total_gap || 0) <= 0) {
             typeStats[type]['达标学校数']++;
         }
     });
@@ -763,20 +883,20 @@ function calculateBuildingAreaGap(data, specialSubsidyData = []) {
             area: item['补助面积（m²）']
         }));
         
-        // 计算面积缺口：现有面积 - 应配面积 （负值表示缺口）
+        // 计算面积缺口：应配面积 - 现有面积 （正值表示缺口）
         const areaGap = {
-            A: currentArea.A - totalRequiredArea.A,
-            B: currentArea.B - totalRequiredArea.B,
-            C1: currentArea.C1 - totalRequiredArea.C1,
-            C2: currentArea.C2 - totalRequiredArea.C2,
-            D: currentArea.D - totalRequiredArea.D
+            A: totalRequiredArea.A - currentArea.A,
+            B: totalRequiredArea.B - currentArea.B,
+            C1: totalRequiredArea.C1 - currentArea.C1,
+            C2: totalRequiredArea.C2 - currentArea.C2,
+            D: totalRequiredArea.D - currentArea.D
         };
         
-        // 计算总缺口（特殊补助减少缺口/增加盈余）
+        // 计算总缺口（特殊补助增加缺口）
         const totalCurrentArea = Object.values(currentArea).reduce((sum, area) => sum + area, 0);
         const totalRequiredAreaSum = Object.values(totalRequiredArea).reduce((sum, area) => sum + area, 0);
-        const totalGapBeforeSpecial = totalCurrentArea - totalRequiredAreaSum; // 现有面积 - 应配面积
-        const totalGap = totalGapBeforeSpecial + totalSpecialSubsidy; // 特殊补助减少缺口/增加盈余
+        const totalGapBeforeSpecial = totalRequiredAreaSum - totalCurrentArea; // 应配面积 - 现有面积
+        const totalGap = totalGapBeforeSpecial + totalSpecialSubsidy; // 特殊补助增加缺口
         const totalSubsidizedArea = Object.values(subsidizedArea).reduce((sum, area) => sum + area, 0);
         
         return {
@@ -826,12 +946,12 @@ function calculateBuildingAreaGap(data, specialSubsidyData = []) {
             '特殊补助明细': specialSubsidyDetails,
             '特殊补助项目数': specialSubsidyData.length,
             '补贴总面积': Math.round(totalSubsidizedArea),
-            '教学及辅助用房达标情况': areaGap.A >= 0 ? '达标' : '不达标',
-            '办公用房达标情况': areaGap.B >= 0 ? '达标' : '不达标',
-            '学生宿舍达标情况': areaGap.C1 >= 0 ? '达标' : '不达标',
-            '其他生活用房达标情况': areaGap.C2 >= 0 ? '达标' : '不达标',
-            '后勤辅助用房达标情况': areaGap.D >= 0 ? '达标' : '不达标',
-            '整体达标情况': totalGap >= 0 ? '达标' : '不达标'
+            '教学及辅助用房达标情况': areaGap.A <= 0 ? '达标' : '不达标',
+            '办公用房达标情况': areaGap.B <= 0 ? '达标' : '不达标',
+            '学生宿舍达标情况': areaGap.C1 <= 0 ? '达标' : '不达标',
+            '其他生活用房达标情况': areaGap.C2 <= 0 ? '达标' : '不达标',
+            '后勤辅助用房达标情况': areaGap.D <= 0 ? '达标' : '不达标',
+            '整体达标情况': totalGap <= 0 ? '达标' : '不达标'
         };
     } catch (error) {
         console.error('计算建筑面积缺口时出错:', error);
@@ -852,6 +972,18 @@ app.get('/download/:filename', (req, res) => {
             if (err) {
                 console.error('下载文件时出错:', err);
                 res.status(500).json({ error: '下载文件时出错' });
+            } else {
+                // 下载成功后，延迟10分钟删除文件
+                setTimeout(() => {
+                    try {
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                            console.log(`已删除下载完成的文件: ${filename}`);
+                        }
+                    } catch (deleteError) {
+                        console.error(`删除已下载文件失败 ${filename}:`, deleteError.message);
+                    }
+                }, 10 * 60 * 1000); // 10分钟后删除
             }
         });
     } else {

@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeOnlineForm();
 });
 
+// 全局变量存储完整的分析结果，用于下载功能
+let globalAnalysisResult = null;
+
 // 进度和结果显示函数
 function showProgress() {
     const progressSection = document.getElementById('progressSection');
@@ -206,12 +209,12 @@ function showAnalysisResults(analysisData) {
     const gapWithoutSubsidy = school['建筑面积总缺口（不含特殊补助）'] || 0;
     const gapWithSubsidy = school['建筑面积总缺口（含特殊补助）'] || 0;
     
-    // 计算含补助缺口和不含补助缺口的逻辑校正
+    // 计算含补助缺口和不含补助缺口的逻辑
     // 在这个系统中：
-    // - 负值表示缺口（面积不足）
-    // - 正值表示盈余（面积有剩余）
-    // - 缺口计算方式：现有面积 - 应配面积
-    // 特殊补助为正值时会加到缺口中，导致缺口减少（或盈余增加）
+    // - 正值表示缺口（面积不足）
+    // - 负值表示负缺口（面积有剩余）
+    // - 缺口计算方式：应配面积 - 现有面积
+    // 特殊补助为正值时会增加缺口
     const subsidyTotalArea = school['特殊补助总面积'] || 0;
     
     // 添加调试信息，查看计算过程
@@ -219,8 +222,8 @@ function showAnalysisResults(analysisData) {
     console.log('现有建筑总面积:', totalCurrentArea);
     console.log('应配建筑总面积:', totalRequiredArea);
     console.log('特殊补助总面积:', subsidyTotalArea);
-    console.log('不含补助缺口:', gapWithoutSubsidy, '(负值=缺口,正值=盈余)');
-    console.log('含补助缺口:', gapWithSubsidy, '(负值=缺口,正值=盈余)');
+    console.log('不含补助缺口:', gapWithoutSubsidy, '(正值=缺口,负值=负缺口)');
+    console.log('含补助缺口:', gapWithSubsidy, '(正值=缺口,负值=负缺口)');
     console.log('计算关系: 含补助缺口 = 不含补助缺口 + 特殊补助总面积');
     console.log('预期计算结果:', gapWithoutSubsidy + subsidyTotalArea);
     console.log('实际计算结果:', gapWithSubsidy);
@@ -243,12 +246,12 @@ function showAnalysisResults(analysisData) {
                 </div>
                 <div class="stat-card">
                     <h4>建筑面积总缺口（不含补助）</h4>
-                    <div class="stat-value">${gapWithoutSubsidy < 0 ? '-' : '+'}${formatNumber(Math.abs(gapWithoutSubsidy))}</div>
+                    <div class="stat-value">${gapWithoutSubsidy > 0 ? '+' : ''}${formatNumber(gapWithoutSubsidy)}</div>
                     <div class="stat-unit">平方米</div>
                 </div>
                 <div class="stat-card">
                     <h4>建筑面积总缺口（含补助）</h4>
-                    <div class="stat-value">${gapWithSubsidy < 0 ? '-' : '+'}${formatNumber(Math.abs(gapWithSubsidy))}</div>
+                    <div class="stat-value">${gapWithSubsidy > 0 ? '+' : ''}${formatNumber(gapWithSubsidy)}</div>
                     <div class="stat-unit">平方米</div>
                 </div>
             </div>
@@ -318,9 +321,9 @@ function showAnalysisResults(analysisData) {
                             <span>${formatNumber(area.required || 0)}㎡</span>
                         </div>
                         <div>
-                            <span>${gapValue >= 0 ? '盈余面积:' : '缺口面积:'}</span>
-                            <span class="${gapValue >= 0 ? 'surplus-highlight' : 'gap-highlight'}">
-                                ${gapValue >= 0 ? '+' : '-'}${formatNumber(Math.abs(gapValue))}㎡
+                            <span>缺口面积:</span>
+                            <span class="${gapValue > 0 ? 'gap-positive' : 'gap-negative'}">
+                                ${gapValue > 0 ? '+' : ''}${formatNumber(gapValue)}㎡
                             </span>
                         </div>
                     </div>
@@ -338,7 +341,7 @@ function showAnalysisResults(analysisData) {
     // 生成下载按钮区域
     const downloadHTML = `
         <div class="download-section">
-            <button class="download-link" onclick="downloadOnlineResult('${encodeURIComponent(JSON.stringify({schoolData: school}))}')">
+            <button class="download-link" onclick="downloadOnlineResult()">
                 下载完整分析报告 (Excel格式)
             </button>
         </div>
@@ -825,6 +828,9 @@ async function handleOnlineFormSubmit(event) {
 function displayOnlineCalculationResult(result) {
     console.log('开始显示在线计算结果:', result);
     
+    // 保存完整的结果数据供下载使用
+    globalAnalysisResult = result;
+    
     // 不显示学校信息，只显示分析结果
     console.log('显示分析结果，使用schoolData:', result.schoolData);
     showAnalysisResults([result.schoolData]);
@@ -876,7 +882,7 @@ function showOnlineResultDownload(result) {
                 <p style="color: #6b7280; margin-bottom: 25px; font-size: 1rem;">
                     已完成建筑面积缺口详细分析，请查看下方分析结果
                 </p>
-                <button class="download-link" onclick="downloadOnlineResult('${encodeURIComponent(JSON.stringify(result))}')">
+                <button class="download-link" onclick="downloadOnlineResult()">
                     下载完整分析报告 (Excel格式)
                 </button>
             </div>
@@ -885,9 +891,15 @@ function showOnlineResultDownload(result) {
 }
 
 // 下载在线计算结果
-async function downloadOnlineResult(resultDataStr) {
+async function downloadOnlineResult() {
     try {
-        const result = JSON.parse(decodeURIComponent(resultDataStr));
+        // 检查是否有保存的分析结果
+        if (!globalAnalysisResult) {
+            alert('没有可下载的分析结果，请先进行数据分析');
+            return;
+        }
+        
+        const result = globalAnalysisResult;
         
         // 发送到服务器生成Excel文件
         const response = await fetch('/online-download', {
@@ -897,7 +909,7 @@ async function downloadOnlineResult(resultDataStr) {
             },
             body: JSON.stringify({
                 schoolData: result.schoolData,
-                analysisResult: result.analysisResult
+                analysisResult: result.schoolData // 使用schoolData作为analysisResult，因为它包含了所有计算结果
             })
         });
         

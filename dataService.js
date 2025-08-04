@@ -185,7 +185,7 @@ async function getLatestSchoolRecords(year = null, schoolName = null) {
             FROM school_info si
             LEFT JOIN special_subsidies ss ON si.id = ss.school_info_id
             INNER JOIN (
-                SELECT school_name, MAX(created_at) as max_created_at
+                SELECT school_name, year, MAX(created_at) as max_created_at
                 FROM school_info
         `;
         
@@ -207,24 +207,22 @@ async function getLatestSchoolRecords(year = null, schoolName = null) {
         }
         
         query += `
-                GROUP BY school_name
+                GROUP BY school_name, year
             ) latest ON si.school_name = latest.school_name 
+                     AND si.year = latest.year
                      AND si.created_at = latest.max_created_at
         `;
         
         // 再次添加筛选条件到主查询
         if (whereConditions.length > 0) {
-            query += ' WHERE ' + whereConditions.map(() => '').join('').replace(/,$/, '');
-            whereConditions.forEach(condition => {
-                query += ' AND si.' + condition;
-            });
+            query += ' WHERE ' + whereConditions.map(condition => 'si.' + condition).join(' AND ');
             // 重复参数
             params = [...params, ...params];
         }
         
         query += `
             GROUP BY si.id
-            ORDER BY si.school_name ASC
+            ORDER BY si.year DESC, si.school_name ASC
         `;
         
         const [rows] = await pool.execute(query, params);
@@ -240,6 +238,61 @@ async function getLatestSchoolRecords(year = null, schoolName = null) {
         
     } catch (error) {
         console.error('获取最新学校记录失败:', error);
+        throw error;
+    }
+}
+
+// 获取所有学校记录（不限制为最新记录）
+async function getAllSchoolRecords(year = null, schoolName = null) {
+    const pool = await getPool();
+    
+    try {
+        let query = `
+            SELECT 
+                si.*,
+                GROUP_CONCAT(
+                    CONCAT('{"特殊用房补助名称":"', ss.subsidy_name, '","补助面积（m²）":', ss.subsidy_area, '}')
+                    SEPARATOR ','
+                ) as special_subsidies_json
+            FROM school_info si
+            LEFT JOIN special_subsidies ss ON si.id = ss.school_info_id
+        `;
+        
+        let params = [];
+        let whereConditions = [];
+        
+        if (year) {
+            whereConditions.push('si.year = ?');
+            params.push(year);
+        }
+        
+        if (schoolName) {
+            whereConditions.push('si.school_name = ?');
+            params.push(schoolName);
+        }
+        
+        if (whereConditions.length > 0) {
+            query += ' WHERE ' + whereConditions.join(' AND ');
+        }
+        
+        query += `
+            GROUP BY si.id
+            ORDER BY si.school_name ASC, si.year DESC, si.created_at DESC
+        `;
+        
+        const [rows] = await pool.execute(query, params);
+        
+        // 处理特殊补助数据
+        const results = rows.map(row => ({
+            ...row,
+            special_subsidies: row.special_subsidies_json ? 
+                `[${row.special_subsidies_json}]` : '[]'
+        }));
+        
+        return results;
+        
+    } catch (error) {
+        console.error('获取所有学校记录失败:', error);
         throw error;
     }
 }
@@ -444,6 +497,7 @@ module.exports = {
     saveSchoolInfo,
     getSchoolHistory,
     getLatestSchoolRecords,
+    getAllSchoolRecords,
     getAvailableYears,
     getSpecialSubsidies,
     getStatistics,

@@ -59,7 +59,6 @@
 ├── .env.example                   # 环境变量配置模板
 ├── .gitignore                     # Git版本控制忽略规则
 ├── README.md                      # 项目说明文档
-├── MySQL配置指南.md                 # 数据库详细配置指南
 │
 ├── public/                        # 前端静态资源目录
 │   ├── index.html                 # 主应用页面
@@ -93,7 +92,7 @@ npm install
 # 2. 复制环境配置文件
 cp .env.example .env
 
-# 3. 编辑环境配置（可选）
+# 3. 编辑环境配置
 nano .env
 ```
 

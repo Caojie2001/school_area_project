@@ -2855,27 +2855,33 @@
                     throw new Error('下载失败');
                 }
                 
-                // 获取文件名
-                const contentDisposition = response.headers.get('content-disposition');
-                let filename = '学校记录.xlsx';
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    if (filenameMatch && filenameMatch[1]) {
-                        filename = filenameMatch[1].replace(/['"]/g, '');
-                    }
+                // 解析JSON响应
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || '下载失败');
                 }
                 
-                // 创建下载链接
-                const blob = await response.blob();
+                // 将base64数据转换为二进制
+                const binaryString = atob(result.fileData);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                // 创建Blob并下载，完美支持中文文件名
+                const blob = new Blob([bytes], { type: result.mimeType });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                a.download = filename;
+                a.download = result.fileName; // 直接使用返回的中文文件名
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
+                
+                console.log('文件下载成功:', result.fileName);
                 
             } catch (error) {
                 console.error('下载失败:', error);

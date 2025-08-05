@@ -134,7 +134,11 @@ app.post('/online-download', (req, res) => {
         
         // 生成Excel文件
         const timestamp = Date.now();
-        const fileName = `${schoolData['学校名称'] || '在线计算'}_建筑规模测算结果_${timestamp}.xlsx`;
+        const schoolName = schoolData['学校名称'] || '在线计算';
+        const year = schoolData['年份'] || new Date().getFullYear();
+        
+        // 使用英文格式避免中文编码问题
+        const fileName = `OnlineCalculation_${year}_${timestamp}.xlsx`;
         const filePath = path.join(outputDir, fileName);
         
         console.log('生成Excel文件:', fileName);
@@ -191,12 +195,68 @@ app.post('/online-download', (req, res) => {
         
         ws['!merges'] = merges;
         
-        // 设置单元格样式（标题居中）
-        if (!ws['A1']) ws['A1'] = {};
-        ws['A1'].s = {
-            alignment: { horizontal: 'center', vertical: 'center' },
-            font: { bold: true, size: 14 }
+        // 定义边框样式
+        const borderStyle = {
+            top: { style: 'thin', color: { rgb: '000000' } },
+            bottom: { style: 'thin', color: { rgb: '000000' } },
+            left: { style: 'thin', color: { rgb: '000000' } },
+            right: { style: 'thin', color: { rgb: '000000' } }
         };
+        
+        // 设置单元格样式
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!ws[cellAddress]) ws[cellAddress] = { t: 's', v: '' };
+                if (!ws[cellAddress].s) ws[cellAddress].s = {};
+                
+                // 添加边框到所有单元格
+                ws[cellAddress].s.border = borderStyle;
+                
+                // 设置对齐方式
+                ws[cellAddress].s.alignment = { 
+                    horizontal: 'center', 
+                    vertical: 'center',
+                    wrapText: true 
+                };
+                
+                // 特殊行的样式设置
+                if (R === 0) { // 主标题
+                    ws[cellAddress].s.font = { bold: true, size: 16, color: { rgb: '000000' } };
+                    ws[cellAddress].s.fill = { 
+                        patternType: 'solid', 
+                        fgColor: { rgb: 'E6E6FA' } 
+                    };
+                } else if (R === 5 || R === 11) { // 小标题行
+                    ws[cellAddress].s.font = { bold: true, size: 12, color: { rgb: '000000' } };
+                    ws[cellAddress].s.fill = { 
+                        patternType: 'solid', 
+                        fgColor: { rgb: 'F0F8FF' } 
+                    };
+                } else if (R === 12) { // 表头行
+                    ws[cellAddress].s.font = { bold: true, size: 11, color: { rgb: '000000' } };
+                    ws[cellAddress].s.fill = { 
+                        patternType: 'solid', 
+                        fgColor: { rgb: 'F5F5F5' } 
+                    };
+                } else if (R >= 13 && R <= 20) { // 数据行
+                    ws[cellAddress].s.font = { size: 10 };
+                    if (R % 2 === 0) {
+                        ws[cellAddress].s.fill = { 
+                            patternType: 'solid', 
+                            fgColor: { rgb: 'FAFAFA' } 
+                        };
+                    }
+                } else if (R >= 21) { // 汇总行
+                    ws[cellAddress].s.font = { bold: true, size: 11, color: { rgb: '000000' } };
+                    ws[cellAddress].s.fill = { 
+                        patternType: 'solid', 
+                        fgColor: { rgb: 'FFE4E1' } 
+                    };
+                }
+            }
+        }
         
         // 添加工作表到工作簿
         XLSX.utils.book_append_sheet(wb, ws, "建筑规模测算结果");
@@ -220,6 +280,54 @@ app.post('/online-download', (req, res) => {
             subsidyWs['!merges'] = [
                 { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }
             ];
+            
+            // 为特殊补助工作表添加样式
+            const subsidyRange = XLSX.utils.decode_range(subsidyWs['!ref']);
+            for (let R = subsidyRange.s.r; R <= subsidyRange.e.r; ++R) {
+                for (let C = subsidyRange.s.c; C <= subsidyRange.e.c; ++C) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!subsidyWs[cellAddress]) subsidyWs[cellAddress] = { t: 's', v: '' };
+                    if (!subsidyWs[cellAddress].s) subsidyWs[cellAddress].s = {};
+                    
+                    // 添加边框
+                    subsidyWs[cellAddress].s.border = {
+                        top: { style: 'thin', color: { rgb: '000000' } },
+                        bottom: { style: 'thin', color: { rgb: '000000' } },
+                        left: { style: 'thin', color: { rgb: '000000' } },
+                        right: { style: 'thin', color: { rgb: '000000' } }
+                    };
+                    
+                    // 设置对齐
+                    subsidyWs[cellAddress].s.alignment = { 
+                        horizontal: 'center', 
+                        vertical: 'center',
+                        wrapText: true 
+                    };
+                    
+                    // 样式设置
+                    if (R === 0) { // 标题行
+                        subsidyWs[cellAddress].s.font = { bold: true, size: 14 };
+                        subsidyWs[cellAddress].s.fill = { 
+                            patternType: 'solid', 
+                            fgColor: { rgb: 'E6E6FA' } 
+                        };
+                    } else if (R === 2) { // 表头
+                        subsidyWs[cellAddress].s.font = { bold: true, size: 11 };
+                        subsidyWs[cellAddress].s.fill = { 
+                            patternType: 'solid', 
+                            fgColor: { rgb: 'F5F5F5' } 
+                        };
+                    } else if (R > 2) { // 数据行
+                        subsidyWs[cellAddress].s.font = { size: 10 };
+                        if (R % 2 === 1) {
+                            subsidyWs[cellAddress].s.fill = { 
+                                patternType: 'solid', 
+                                fgColor: { rgb: 'FAFAFA' } 
+                            };
+                        }
+                    }
+                }
+            }
             
             XLSX.utils.book_append_sheet(wb, subsidyWs, "特殊补助明细");
         }
@@ -399,13 +507,28 @@ app.get('/api/download-record/:id', async (req, res) => {
             return res.status(404).json({ error: '记录不存在' });
         }
 
-        // 生成文件名
-        const timestamp = Date.now();
-        const fileName = `${recordData.school_name}_建筑规模测算结果_${timestamp}.xlsx`;
-        const filePath = path.join(outputDir, fileName);
+        // 生成文件名 - 使用记录的创建时间作为最后更新时间
+        // 获取记录的创建时间并格式化为yyyymmddhhmmss
+        const recordDate = recordData.created_at ? new Date(recordData.created_at) : new Date();
+        const timestamp = recordDate.getFullYear().toString() + 
+                         (recordDate.getMonth() + 1).toString().padStart(2, '0') + 
+                         recordDate.getDate().toString().padStart(2, '0') + 
+                         recordDate.getHours().toString().padStart(2, '0') + 
+                         recordDate.getMinutes().toString().padStart(2, '0') + 
+                         recordDate.getSeconds().toString().padStart(2, '0');
         
-        console.log('生成Excel文件:', fileName);
-        console.log('文件路径:', filePath);
+        // 显示用的中文文件名 - 格式: 学校名+年份+年+测算结果+时间戳
+        const schoolName = recordData.school_name || '未知学校';
+        const year = recordData.year || new Date().getFullYear();
+        const displayFileName = `${schoolName}${year}年测算结果${timestamp}.xlsx`;
+        
+        // 存储用的安全文件名（使用记录ID）
+        const safeFileName = `Record${recordData.id}_${year}_${timestamp}.xlsx`;
+        
+        console.log('生成Excel文件:', safeFileName);
+        console.log('显示文件名:', displayFileName);
+        console.log('学校信息:', recordData.school_name);
+        console.log('记录创建时间:', recordData.created_at);
         
         // 创建工作簿
         const wb = XLSX.utils.book_new();
@@ -476,12 +599,68 @@ app.get('/api/download-record/:id', async (req, res) => {
         
         ws['!merges'] = merges;
         
-        // 设置单元格样式（标题居中）
-        if (!ws['A1']) ws['A1'] = {};
-        ws['A1'].s = {
-            alignment: { horizontal: 'center', vertical: 'center' },
-            font: { bold: true, size: 14 }
+        // 定义边框样式
+        const borderStyle = {
+            top: { style: 'thin', color: { rgb: '000000' } },
+            bottom: { style: 'thin', color: { rgb: '000000' } },
+            left: { style: 'thin', color: { rgb: '000000' } },
+            right: { style: 'thin', color: { rgb: '000000' } }
         };
+        
+        // 设置单元格样式
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!ws[cellAddress]) ws[cellAddress] = { t: 's', v: '' };
+                if (!ws[cellAddress].s) ws[cellAddress].s = {};
+                
+                // 添加边框到所有单元格
+                ws[cellAddress].s.border = borderStyle;
+                
+                // 设置对齐方式
+                ws[cellAddress].s.alignment = { 
+                    horizontal: 'center', 
+                    vertical: 'center',
+                    wrapText: true 
+                };
+                
+                // 特殊行的样式设置
+                if (R === 0) { // 主标题
+                    ws[cellAddress].s.font = { bold: true, size: 16, color: { rgb: '000000' } };
+                    ws[cellAddress].s.fill = { 
+                        patternType: 'solid', 
+                        fgColor: { rgb: 'E6E6FA' } 
+                    };
+                } else if (R === 5 || R === 11) { // 小标题行
+                    ws[cellAddress].s.font = { bold: true, size: 12, color: { rgb: '000000' } };
+                    ws[cellAddress].s.fill = { 
+                        patternType: 'solid', 
+                        fgColor: { rgb: 'F0F8FF' } 
+                    };
+                } else if (R === 12) { // 表头行
+                    ws[cellAddress].s.font = { bold: true, size: 11, color: { rgb: '000000' } };
+                    ws[cellAddress].s.fill = { 
+                        patternType: 'solid', 
+                        fgColor: { rgb: 'F5F5F5' } 
+                    };
+                } else if (R >= 13 && R <= 20) { // 数据行
+                    ws[cellAddress].s.font = { size: 10 };
+                    if (R % 2 === 0) {
+                        ws[cellAddress].s.fill = { 
+                            patternType: 'solid', 
+                            fgColor: { rgb: 'FAFAFA' } 
+                        };
+                    }
+                } else if (R >= 21) { // 汇总行
+                    ws[cellAddress].s.font = { bold: true, size: 11, color: { rgb: '000000' } };
+                    ws[cellAddress].s.fill = { 
+                        patternType: 'solid', 
+                        fgColor: { rgb: 'FFE4E1' } 
+                    };
+                }
+            }
+        }
         
         // 添加工作表到工作簿
         XLSX.utils.book_append_sheet(wb, ws, "建筑规模测算结果");
@@ -518,31 +697,42 @@ app.get('/api/download-record/:id', async (req, res) => {
                     { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }
                 ];
                 
+                // 简化的特殊补助样式
+                if (subsidyWs['A1']) {
+                    subsidyWs['A1'].s = {
+                        alignment: { horizontal: 'center', vertical: 'center' },
+                        font: { bold: true, sz: 14 }
+                    };
+                }
+                
+                // 表头样式
+                if (subsidyWs['A3']) {
+                    subsidyWs['A3'].s = {
+                        alignment: { horizontal: 'center', vertical: 'center' },
+                        font: { bold: true, sz: 11 }
+                    };
+                }
+                
+                if (subsidyWs['B3']) {
+                    subsidyWs['B3'].s = {
+                        alignment: { horizontal: 'center', vertical: 'center' },
+                        font: { bold: true, sz: 11 }
+                    };
+                }
+                
                 XLSX.utils.book_append_sheet(wb, subsidyWs, "特殊补助明细");
             }
         }
         
-        // 写入文件
-        XLSX.writeFile(wb, filePath);
+        // 写入文件到内存
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
         
-        // 设置响应头并发送文件
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-        res.download(filePath, fileName, (err) => {
-            if (err) {
-                console.error('文件下载失败:', err);
-            }
-            // 下载完成后删除临时文件（延迟删除）
-            setTimeout(() => {
-                try {
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                        console.log(`已删除下载完成的文件: ${fileName}`);
-                    }
-                } catch (deleteError) {
-                    console.error(`删除文件失败 ${fileName}:`, deleteError.message);
-                }
-            }, 10 * 60 * 1000); // 10分钟后删除
+        // 返回文件数据和元信息给前端处理
+        res.json({
+            success: true,
+            fileName: displayFileName,
+            fileData: buffer.toString('base64'),
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         });
         
     } catch (error) {
@@ -670,11 +860,7 @@ const SUBSIDIZED_AREA_STANDARDS = {
 // 生成批量导出Excel文件
 function generateBatchExportExcel(schoolsData, filters = {}) {
     const timestamp = Date.now();
-    const filterSuffix = [];
-    if (filters.year) filterSuffix.push(`${filters.year}年`);
-    if (filters.schoolType && filters.schoolType !== 'all') filterSuffix.push(filters.schoolType);
-    
-    const fileName = `高校建筑面积缺口批量导出_${filterSuffix.length > 0 ? filterSuffix.join('_') + '_' : ''}${timestamp}.xlsx`;
+    const fileName = `BatchDownload_${timestamp}.xlsx`;
     const filePath = path.join(outputDir, fileName);
     
     try {

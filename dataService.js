@@ -28,18 +28,19 @@ async function saveSchoolInfo(schoolData, specialSubsidies = [], calculationResu
         
         const [schoolResult] = await connection.execute(`
             INSERT INTO school_info (
-                school_name, school_type, year, full_time_undergraduate, full_time_specialist, 
+                school_name, school_type, year, base_year, full_time_undergraduate, full_time_specialist, 
                 full_time_master, full_time_doctor, international_undergraduate, international_specialist,
                 international_master, international_doctor, total_students, teaching_area, 
                 office_area, total_living_area, dormitory_area, logistics_area, remarks,
                 current_building_area, required_building_area, teaching_area_gap, office_area_gap,
                 dormitory_area_gap, other_living_area_gap, logistics_area_gap, total_area_gap,
                 special_subsidy_total, overall_compliance, calculation_results
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             schoolData['学校名称'],
             schoolData['学校类型'] || null,
             schoolData['年份'],
+            schoolData['基准年份'] || schoolData['年份'],
             schoolData['全日制本专科生人数'] || 0,
             schoolData['全日制专科生人数'] || 0,
             schoolData['全日制硕士生人数'] || 0,
@@ -171,7 +172,7 @@ async function getSchoolHistory(year = null) {
 }
 
 // 获取最新的学校记录
-async function getLatestSchoolRecords(year = null, schoolName = null) {
+async function getLatestSchoolRecords(year = null, schoolName = null, baseYear = null) {
     const pool = await getPool();
     
     try {
@@ -185,7 +186,7 @@ async function getLatestSchoolRecords(year = null, schoolName = null) {
             FROM school_info si
             LEFT JOIN special_subsidies ss ON si.id = ss.school_info_id
             INNER JOIN (
-                SELECT school_name, year, MAX(created_at) as max_created_at
+                SELECT school_name, year, base_year, MAX(created_at) as max_created_at
                 FROM school_info
         `;
         
@@ -195,6 +196,11 @@ async function getLatestSchoolRecords(year = null, schoolName = null) {
         if (year) {
             whereConditions.push('year = ?');
             params.push(year);
+        }
+        
+        if (baseYear) {
+            whereConditions.push('base_year = ?');
+            params.push(baseYear);
         }
         
         if (schoolName) {
@@ -207,9 +213,10 @@ async function getLatestSchoolRecords(year = null, schoolName = null) {
         }
         
         query += `
-                GROUP BY school_name, year
+                GROUP BY school_name, year, base_year
             ) latest ON si.school_name = latest.school_name 
                      AND si.year = latest.year
+                     AND (si.base_year = latest.base_year OR (si.base_year IS NULL AND latest.base_year IS NULL))
                      AND si.created_at = latest.max_created_at
         `;
         
@@ -312,6 +319,25 @@ async function getAvailableYears() {
         return rows.map(row => row.year);
     } catch (error) {
         console.error('获取可用年份失败:', error);
+        return [];
+    }
+}
+
+// 获取可用基准年份
+async function getAvailableBaseYears() {
+    const pool = await getPool();
+    
+    try {
+        const [rows] = await pool.execute(`
+            SELECT DISTINCT base_year 
+            FROM school_info 
+            WHERE base_year IS NOT NULL 
+            ORDER BY base_year DESC
+        `);
+        
+        return rows.map(row => row.base_year);
+    } catch (error) {
+        console.error('获取可用基准年份失败:', error);
         return [];
     }
 }
@@ -427,6 +453,71 @@ async function deleteSchoolRecord(id) {
     }
 }
 
+// 删除学校组合记录（按基准年份-测算年份-学校名称组合删除所有记录）
+async function deleteSchoolCombination(schoolName, baseYear, year) {
+    const pool = await getPool();
+    const connection = await pool.getConnection();
+    
+    try {
+        await connection.beginTransaction();
+        
+        // 构建WHERE条件
+        let whereConditions = ['school_name = ?', 'year = ?'];
+        let params = [schoolName, year];
+        
+        if (baseYear === null || baseYear === undefined) {
+            whereConditions.push('base_year IS NULL');
+        } else {
+            whereConditions.push('base_year = ?');
+            params.push(baseYear);
+        }
+        
+        const whereClause = whereConditions.join(' AND ');
+        
+        // 首先获取要删除的记录ID，用于删除特殊补助
+        const [recordsToDelete] = await connection.execute(
+            `SELECT id FROM school_info WHERE ${whereClause}`,
+            params
+        );
+        
+        let totalDeletedCount = 0;
+        
+        // 删除特殊补助记录
+        if (recordsToDelete.length > 0) {
+            const recordIds = recordsToDelete.map(record => record.id);
+            const placeholders = recordIds.map(() => '?').join(',');
+            
+            const [subsidiesResult] = await connection.execute(
+                `DELETE FROM special_subsidies WHERE school_info_id IN (${placeholders})`,
+                recordIds
+            );
+            
+            console.log(`删除特殊补助记录: ${subsidiesResult.affectedRows} 条`);
+        }
+        
+        // 删除学校信息记录
+        const [result] = await connection.execute(
+            `DELETE FROM school_info WHERE ${whereClause}`,
+            params
+        );
+        
+        totalDeletedCount = result.affectedRows;
+        
+        await connection.commit();
+        
+        console.log(`删除学校组合记录完成: 学校=${schoolName}, 基准年份=${baseYear}, 测算年份=${year}, 删除记录数=${totalDeletedCount}`);
+        
+        return { deletedCount: totalDeletedCount };
+        
+    } catch (error) {
+        await connection.rollback();
+        console.error('删除学校组合记录失败:', error);
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
 // 清空所有数据
 async function clearAllData() {
     const pool = await getPool();
@@ -499,9 +590,11 @@ module.exports = {
     getLatestSchoolRecords,
     getAllSchoolRecords,
     getAvailableYears,
+    getAvailableBaseYears,
     getSpecialSubsidies,
     getStatistics,
     deleteSchoolRecord,
+    deleteSchoolCombination,
     clearAllData,
     getSchoolRecordById
 };

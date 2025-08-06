@@ -99,6 +99,7 @@ async function initializeTables() {
                 school_name VARCHAR(100) NOT NULL,
                 school_type VARCHAR(50),
                 year INT,
+                base_year INT,
                 full_time_undergraduate INT DEFAULT 0,
                 full_time_specialist INT DEFAULT 0,
                 full_time_master INT DEFAULT 0,
@@ -128,6 +129,20 @@ async function initializeTables() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
+
+        // 为现有表添加base_year字段（如果不存在）
+        try {
+            await pool.execute(`
+                ALTER TABLE school_info ADD COLUMN base_year INT AFTER year;
+            `);
+            console.log('base_year字段已添加到school_info表');
+        } catch (err) {
+            if (err.message.includes('Duplicate column name')) {
+                console.log('base_year字段已存在，跳过添加');
+            } else {
+                console.warn('添加base_year字段失败:', err.message);
+            }
+        }
 
         // 创建特殊补助表
         await pool.execute(`

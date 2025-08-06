@@ -197,6 +197,34 @@
             margin-bottom: 20px;
         }
 
+        /* 第一行三个字段的特殊布局 */
+        .form-row:first-child {
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group-school-name {
+            min-width: 0; /* 允许收缩 */
+        }
+
+        .form-group-year,
+        .form-group-base-year {
+            min-width: 120px; /* 年份字段最小宽度 */
+        }
+
+        /* 移动端响应式调整 */
+        @media (max-width: 768px) {
+            .form-row:first-child {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .form-group-year,
+            .form-group-base-year {
+                min-width: auto;
+            }
+        }
+
         /* 按钮样式 */
         .btn {
             padding: 12px 24px;
@@ -273,31 +301,32 @@
         }
 
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: white;
+            color: #2c3e50;
             padding: 25px;
             border-radius: 15px;
             text-align: center;
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            border: 2px solid #3498db;
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.15);
         }
 
         .stat-card h4 {
             font-size: 14px;
             margin-bottom: 12px;
-            opacity: 0.9;
-            font-weight: 500;
+            color: #2c3e50;
+            font-weight: 600;
         }
 
         .stat-card .stat-value {
             font-size: 36px;
             font-weight: bold;
             margin-bottom: 8px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #2c3e50;
         }
 
         .stat-card .stat-unit {
             font-size: 12px;
-            opacity: 0.8;
+            color: #6c757d;
         }
 
         /* 表格样式 */
@@ -860,31 +889,32 @@
         }
 
         .stat-card {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
+            background: white;
+            color: #2c3e50;
             padding: 25px;
             border-radius: 15px;
             text-align: center;
-            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+            border: 2px solid #3498db;
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.15);
         }
 
         .stat-card h4 {
             font-size: 14px;
             margin-bottom: 12px;
-            opacity: 0.9;
-            font-weight: 500;
+            color: #2c3e50;
+            font-weight: 600;
         }
 
         .stat-card .stat-value {
             font-size: 36px;
             font-weight: bold;
             margin-bottom: 8px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #2c3e50;
         }
 
         .stat-card .stat-unit {
             font-size: 12px;
-            opacity: 0.8;
+            color: #6c757d;
         }
 
         /* 直接分析内容样式，不使用标题和大框 */
@@ -1361,6 +1391,13 @@
             height: auto;
         }
 
+        /* 留学生行特殊样式 - 4个字段与5个全日制字段总宽度一致 */
+        .student-category .international-row .form-group {
+            flex: 1.25; /* 4个字段 * 1.25 = 5，与全日制5个字段总比例一致 */
+            min-width: 175px; /* 稍微增加最小宽度 */
+            max-width: 225px; /* 稍微增加最大宽度 */
+        }
+
         .student-category .form-group small {
             font-size: 11px;
             line-height: 1.2;
@@ -1520,9 +1557,9 @@
                         <div class="form-container">
                         <form id="onlineDataForm" class="data-form">
                             <div class="form-row">
-                                <div class="form-group">
+                                <div class="form-group form-group-school-name">
                                     <label for="schoolName">学校名称 *</label>
-                                    <select id="schoolName" name="schoolName" required class="form-control" style="background: white;">
+                                    <select id="schoolName" name="schoolName" required class="form-control" style="background: white;" onchange="updateSchoolType()">
                                         <option value="">请选择学校</option>
                                         <option value="上海大学">上海大学</option>
                                         <option value="上海交通大学医学院">上海交通大学医学院</option>
@@ -1556,8 +1593,8 @@
                                     </select>
                                     <small class="school-type-display" id="schoolTypeDisplay"></small>
                                 </div>
-                                <div class="form-group">
-                                    <label for="year">年份 *</label>
+                                <div class="form-group form-group-year">
+                                    <label for="year">测算年份 *</label>
                                     <div class="year-selector-container">
                                         <input type="text" id="year" name="year" value="2025" readonly required class="form-control year-input" onclick="showYearGrid()">
                                         <div class="year-grid-overlay" id="yearGridOverlay" style="display: none;">
@@ -1577,6 +1614,27 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="form-group form-group-base-year">
+                                    <label for="base_year">基准年份 *</label>
+                                    <div class="year-selector-container">
+                                        <input type="text" id="base_year" name="base_year" value="2025" readonly required class="form-control year-input" onclick="showBaseYearGrid()">
+                                        <div class="year-grid-overlay" id="baseYearGridOverlay" style="display: none;">
+                                            <div class="year-grid-container">
+                                                <div class="year-grid-header">
+                                                    <button type="button" class="year-nav-btn" id="baseYearPrevBtn" onclick="moveBaseYearGrid(-1)">‹</button>
+                                                    <span class="year-range-text" id="baseYearRangeText"></span>
+                                                    <button type="button" class="year-nav-btn" id="baseYearNextBtn" onclick="moveBaseYearGrid(1)">›</button>
+                                                </div>
+                                                <div class="year-grid" id="baseYearGrid">
+                                                    <!-- 基准年份九宫格将在这里动态生成 -->
+                                                </div>
+                                                <div class="year-grid-footer">
+                                                    <button type="button" class="year-close-btn" onclick="hideBaseYearGrid()">关闭</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="card">
@@ -1588,12 +1646,12 @@
                                             <input type="text" id="fullTimeTotal" readonly class="form-control calculated-field" style="background: #f5f5f5; border: 1px solid #ddd;">
                                         </div>
                                         <div class="form-group">
-                                            <label for="fullTimeUndergraduate">全日制本科生(人) *</label>
-                                            <input type="number" id="fullTimeUndergraduate" name="fullTimeUndergraduate" min="0" value="0" required class="form-control" oninput="calculateTotalStudents()" style="background: white; border: 1px solid #ddd;">
-                                        </div>
-                                        <div class="form-group">
                                             <label for="fullTimeSpecialist">全日制专科生(人)</label>
                                             <input type="number" id="fullTimeSpecialist" name="fullTimeSpecialist" min="0" value="0" class="form-control" oninput="calculateTotalStudents()" style="background: white; border: 1px solid #ddd;">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="fullTimeUndergraduate">全日制本科生(人)</label>
+                                            <input type="number" id="fullTimeUndergraduate" name="fullTimeUndergraduate" min="0" value="0" class="form-control" oninput="calculateTotalStudents()" style="background: white; border: 1px solid #ddd;">
                                         </div>
                                         <div class="form-group">
                                             <label for="fullTimeMaster">全日制硕士生(人)</label>
@@ -1604,7 +1662,7 @@
                                             <input type="number" id="fullTimeDoctor" name="fullTimeDoctor" min="0" value="0" class="form-control" oninput="calculateTotalStudents()" style="background: white; border: 1px solid #ddd; font-weight: normal; text-align: left;">
                                         </div>
                                     </div>
-                                    <div class="form-row">
+                                    <div class="form-row international-row">
                                         <div class="form-group">
                                             <label>留学生总数(人)</label>
                                             <input type="text" id="internationalTotal" readonly class="form-control calculated-field" style="background: #f5f5f5; border: 1px solid #ddd;">
@@ -1612,10 +1670,6 @@
                                         <div class="form-group">
                                             <label for="internationalUndergraduate">留学生本科生(人)</label>
                                             <input type="number" id="internationalUndergraduate" name="internationalUndergraduate" min="0" value="0" class="form-control" oninput="calculateTotalStudents()" style="background: white; border: 1px solid #ddd;">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="internationalSpecialist">留学生专科生(人)</label>
-                                            <input type="number" id="internationalSpecialist" name="internationalSpecialist" min="0" value="0" class="form-control" oninput="calculateTotalStudents()" style="background: white; border: 1px solid #ddd;">
                                         </div>
                                         <div class="form-group">
                                             <label for="internationalMaster">留学生硕士生(人)</label>
@@ -1636,46 +1690,46 @@
                             </div>
                             
                             <div class="card">
-                                <h3>现有建筑面积信息</h3>
+                                <h3>现状建筑面积信息</h3>
                                 <div class="form-row">
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
-                                        <label for="teachingArea">现有教学及辅助用房面积(m²) *</label>
-                                        <input type="number" id="teachingArea" name="teachingArea" min="0" step="0.01" required class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
+                                        <label for="teachingArea">现状教学及辅助用房面积(m²)</label>
+                                        <input type="number" id="teachingArea" name="teachingArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">包括教室、实验室、图书馆等</small>
                                     </div>
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
-                                        <label for="officeArea">现有办公用房面积(m²) *</label>
-                                        <input type="number" id="officeArea" name="officeArea" min="0" step="0.01" required class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
+                                        <label for="officeArea">现状办公用房面积(m²)</label>
+                                        <input type="number" id="officeArea" name="officeArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">行政办公、教师办公等</small>
                                     </div>
                                     <div class="form-group" style="flex: 1;">
-                                        <label for="logisticsArea">现有后勤辅助用房面积(m²) *</label>
-                                        <input type="number" id="logisticsArea" name="logisticsArea" min="0" step="0.01" required class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
+                                        <label for="logisticsArea">现状后勤辅助用房面积(m²)</label>
+                                        <input type="number" id="logisticsArea" name="logisticsArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">设备用房、仓库等</small>
                                     </div>
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
-                                        <label for="totalLivingArea">现有生活用房总面积(m²) *</label>
-                                        <input type="number" id="totalLivingArea" name="totalLivingArea" min="0" step="0.01" required class="form-control" oninput="calculateOtherLivingArea(); calculateTotalBuildingArea();" style="background: white; border: 1px solid #ddd;">
+                                        <label for="totalLivingArea">现状生活用房总面积(m²)</label>
+                                        <input type="number" id="totalLivingArea" name="totalLivingArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateOtherLivingArea(); calculateTotalBuildingArea();" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">所有生活用房的总面积</small>
                                     </div>
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
-                                        <label for="dormitoryArea">现有学生宿舍面积(m²) *</label>
-                                        <input type="number" id="dormitoryArea" name="dormitoryArea" min="0" step="0.01" required class="form-control" oninput="calculateOtherLivingArea(); calculateTotalBuildingArea();" style="background: white; border: 1px solid #ddd;">
+                                        <label for="dormitoryArea">现状学生宿舍面积(m²)</label>
+                                        <input type="number" id="dormitoryArea" name="dormitoryArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateOtherLivingArea(); calculateTotalBuildingArea();" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">学生住宿用房面积</small>
                                     </div>
                                     <div class="form-group" style="flex: 1;">
-                                        <label>现有其他生活用房面积(m²)</label>
+                                        <label>现状其他生活用房面积(m²)</label>
                                         <input type="text" id="otherLivingArea" readonly class="form-control calculated-field" style="background: #f5f5f5; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">自动计算：生活用房总面积 - 学生宿舍面积</small>
                                     </div>
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>现有建筑总面积(m²)</label>
+                                        <label>现状建筑总面积(m²)</label>
                                         <input type="text" id="totalBuildingArea" readonly class="form-control calculated-field" style="background: #f5f5f5; border: 1px solid #ddd; font-weight: bold;">
-                                        <small style="color: #6c757d; font-size: 12px;">自动计算：现有教学及辅助用房面积+现有办公用房面积+现有生活用房总面积+现有后勤辅助用房面积</small>
+                                        <small style="color: #6c757d; font-size: 12px;">自动计算：现状教学及辅助用房面积+现状办公用房面积+现状生活用房总面积+现状后勤辅助用房面积</small>
                                     </div>
                                 </div>
                             </div>
@@ -1750,10 +1804,13 @@
                     <div class="card">
                         <h3>学校记录查询</h3>
                         <div class="search-bar">
-                            <select id="dataYearFilter" class="search-input">
-                                <option value="all">所有年份</option>
+                            <select id="dataBaseYearFilter" class="search-input" style="width: 14%; min-width: 120px;">
+                                <option value="all">所有基准年份</option>
                             </select>
-                            <select id="dataSchoolNameFilter" class="search-input">
+                            <select id="dataYearFilter" class="search-input" style="width: 14%; min-width: 120px;">
+                                <option value="all">所有测算年份</option>
+                            </select>
+                            <select id="dataSchoolNameFilter" class="search-input" style="width: 40%; min-width: 200px;">
                                 <option value="all">所有学校</option>
                                 <option value="上海大学">上海大学</option>
                                 <option value="上海交通大学医学院">上海交通大学医学院</option>
@@ -1786,8 +1843,8 @@
                                 <option value="上海健康医学院附属卫生学校(上海健康护理职业学院(筹))">上海健康医学院附属卫生学校(上海健康护理职业学院(筹))</option>
                             </select>
 
-                            <button class="btn btn-primary" onclick="searchDataRecords()">查找</button>
-                            <button class="btn btn-secondary" onclick="batchDownloadSearchResults()" id="batchDownloadBtn" style="background: #28a745; color: white; margin-left: 10px;" disabled>批量下载</button>
+                            <button class="btn btn-primary" onclick="searchDataRecords()" style="width: 12%; min-width: 80px; margin-left: 10px;">查找</button>
+                            <button class="btn btn-secondary" onclick="batchDownloadSearchResults()" id="batchDownloadBtn" style="background: #28a745; color: white; width: 16%; min-width: 100px; margin-left: 10px;" disabled>批量下载</button>
                         </div>
                         
                         <div id="dataHistoryResults">
@@ -1812,7 +1869,7 @@
                         <h3>数据概览</h3>
                         <div class="search-bar">
                             <select id="statsYearFilter" class="search-input">
-                                <option value="all">所有年份</option>
+                                <option value="all">所有测算年份</option>
                             </select>
                             <button class="btn btn-primary" onclick="loadStatistics()">刷新数据</button>
                         </div>
@@ -1833,6 +1890,94 @@
         function hideOnlineForm() {
             // 此函数不需要实际功能，因为表单已经直接嵌入页面
             console.log('Form is embedded, no need to hide');
+        }
+
+        // 更新学校类型显示
+        async function updateSchoolType() {
+            const schoolNameSelect = document.getElementById('schoolName');
+            const schoolTypeDisplay = document.getElementById('schoolTypeDisplay');
+            
+            if (!schoolNameSelect || !schoolTypeDisplay) {
+                return;
+            }
+            
+            const selectedSchool = schoolNameSelect.value;
+            if (!selectedSchool) {
+                schoolTypeDisplay.textContent = '';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/school-type/${encodeURIComponent(selectedSchool)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    schoolTypeDisplay.textContent = `院校类别: ${data.schoolType}`;
+                } else {
+                    schoolTypeDisplay.textContent = '院校类别: 未指定';
+                }
+            } catch (error) {
+                console.error('获取学校类型失败:', error);
+                schoolTypeDisplay.textContent = '院校类别: 获取失败';
+            }
+        }
+
+        // 计算学生总数
+        function calculateTotalStudents() {
+            console.log('开始计算学生总数...');
+            
+            // 全日制学生
+            const fullTimeSpecialistEl = document.getElementById('fullTimeSpecialist');
+            const fullTimeUndergraduateEl = document.getElementById('fullTimeUndergraduate');
+            const fullTimeMasterEl = document.getElementById('fullTimeMaster');
+            const fullTimeDoctorEl = document.getElementById('fullTimeDoctor');
+            
+            const fullTimeSpecialist = parseInt(fullTimeSpecialistEl ? fullTimeSpecialistEl.value : 0) || 0;
+            const fullTimeUndergraduate = parseInt(fullTimeUndergraduateEl ? fullTimeUndergraduateEl.value : 0) || 0;
+            const fullTimeMaster = parseInt(fullTimeMasterEl ? fullTimeMasterEl.value : 0) || 0;
+            const fullTimeDoctor = parseInt(fullTimeDoctorEl ? fullTimeDoctorEl.value : 0) || 0;
+            
+            const fullTimeTotal = fullTimeSpecialist + fullTimeUndergraduate + fullTimeMaster + fullTimeDoctor;
+            
+            // 留学生（不包括专科生）
+            const internationalUndergraduateEl = document.getElementById('internationalUndergraduate');
+            const internationalMasterEl = document.getElementById('internationalMaster');
+            const internationalDoctorEl = document.getElementById('internationalDoctor');
+            
+            const internationalUndergraduate = parseInt(internationalUndergraduateEl ? internationalUndergraduateEl.value : 0) || 0;
+            const internationalMaster = parseInt(internationalMasterEl ? internationalMasterEl.value : 0) || 0;
+            const internationalDoctor = parseInt(internationalDoctorEl ? internationalDoctorEl.value : 0) || 0;
+            
+            const internationalTotal = internationalUndergraduate + internationalMaster + internationalDoctor;
+            
+            // 更新显示
+            const fullTimeTotalEl = document.getElementById('fullTimeTotal');
+            if (fullTimeTotalEl) {
+                fullTimeTotalEl.value = fullTimeTotal;
+                console.log('设置全日制总数:', fullTimeTotal);
+            }
+            
+            const internationalTotalEl = document.getElementById('internationalTotal');
+            if (internationalTotalEl) {
+                internationalTotalEl.value = internationalTotal;
+                console.log('设置留学生总数:', internationalTotal);
+            }
+            
+            // 计算总学生数
+            const totalStudents = fullTimeTotal + internationalTotal;
+            const totalStudentsEl = document.getElementById('totalStudents');
+            if (totalStudentsEl) {
+                totalStudentsEl.value = totalStudents;
+                console.log('设置学生总人数:', totalStudents);
+            }
+            
+            console.log('计算完成:', { fullTimeTotal, internationalTotal, totalStudents });
+            
+            return {
+                fullTimeTotal,
+                internationalTotal,
+                totalStudents
+            };
         }
 
         // 页面切换函数
@@ -1879,7 +2024,7 @@
         // 加载统计分析内容
         async function loadStatisticsContent() {
             await loadAvailableYears();
-            // 默认加载当前年份的统计数据
+            // 默认加载当前测算年份的统计数据
             const currentYear = new Date().getFullYear();
             await loadStatistics(currentYear.toString());
         }
@@ -1948,7 +2093,7 @@
                         content.innerHTML = '<div class="alert alert-info">暂无数据记录</div>';
                     } else {
                         let tableHtml = '<div class="table-container"><table class="data-table"><thead><tr>';
-                        tableHtml += '<th>学校名称</th><th>学校类型</th><th>年份</th><th>学生总数</th><th>教学面积</th><th>最后更新</th>';
+                        tableHtml += '<th>学校名称</th><th>院校类别</th><th>基准年份</th><th>测算年份</th><th>学生总数</th><th>教学面积</th><th>最后更新</th>';
                         tableHtml += '</tr></thead><tbody>';
                         
                         result.data.forEach(school => {
@@ -1956,6 +2101,7 @@
                             tableHtml += `<tr>
                                 <td><strong>${school.school_name || '未知'}</strong></td>
                                 <td>${school.school_type || '未指定'}</td>
+                                <td>${school.base_year || '未知'}</td>
                                 <td>${school.year || '未知'}</td>
                                 <td>${(school.total_students || 0).toLocaleString()}人</td>
                                 <td>${(school.teaching_area || 0).toLocaleString()}㎡</td>
@@ -1984,13 +2130,13 @@
                     const yearSelect = document.getElementById('statsYearFilter');
                     if (yearSelect) {
                         const currentYear = new Date().getFullYear();
-                        yearSelect.innerHTML = '<option value="all">所有年份</option>';
+                        yearSelect.innerHTML = '<option value="all">所有测算年份</option>';
                         
                         result.data.forEach(year => {
                             const option = document.createElement('option');
                             option.value = year;
                             option.textContent = year + '年';
-                            // 默认选中当前年份
+                            // 默认选中当前测算年份
                             if (year === currentYear) {
                                 option.selected = true;
                             }
@@ -2037,6 +2183,7 @@
         // 加载数据管理页面内容
         async function loadDataManagementContent() {
             await loadDataAvailableYears();
+            await loadDataAvailableBaseYears();
             // 自动搜索加载所有数据
             setTimeout(() => {
                 searchDataRecords();
@@ -2046,11 +2193,13 @@
         // 搜索数据记录
         async function searchDataRecords() {
             const yearFilter = document.getElementById('dataYearFilter');
+            const baseYearFilter = document.getElementById('dataBaseYearFilter');
             const schoolFilter = document.getElementById('dataSchoolNameFilter');
             const year = yearFilter ? yearFilter.value : 'all';
+            const baseYear = baseYearFilter ? baseYearFilter.value : 'all';
             const school = schoolFilter ? schoolFilter.value : 'all';
             
-            console.log('开始搜索数据记录，筛选条件:', { year, school });
+            console.log('开始搜索数据记录，筛选条件:', { year, baseYear, school });
             
             const resultsContainer = document.getElementById('dataHistoryResults');
             const batchDownloadBtn = document.getElementById('batchDownloadBtn');
@@ -2067,6 +2216,10 @@
                 
                 if (year !== 'all') {
                     params.push(`year=${year}`);
+                }
+                
+                if (baseYear !== 'all') {
+                    params.push(`baseYear=${baseYear}`);
                 }
                 
                 if (school !== 'all') {
@@ -2119,7 +2272,7 @@
                 if (result.success) {
                     const yearSelect = document.getElementById('dataYearFilter');
                     if (yearSelect) {
-                        yearSelect.innerHTML = '<option value="all">所有年份</option>';
+                        yearSelect.innerHTML = '<option value="all">所有测算年份</option>';
                         
                         result.data.forEach(year => {
                             const option = document.createElement('option');
@@ -2131,6 +2284,30 @@
                 }
             } catch (error) {
                 console.error('加载年份失败:', error);
+            }
+        }
+
+        // 加载可用基准年份
+        async function loadDataAvailableBaseYears() {
+            try {
+                const response = await fetch('/api/base-years');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const baseYearSelect = document.getElementById('dataBaseYearFilter');
+                    if (baseYearSelect) {
+                        baseYearSelect.innerHTML = '<option value="all">所有基准年份</option>';
+                        
+                        result.data.forEach(year => {
+                            const option = document.createElement('option');
+                            option.value = year;
+                            option.textContent = year + '年';
+                            baseYearSelect.appendChild(option);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('加载基准年份失败:', error);
             }
         }
 
@@ -2168,10 +2345,12 @@
         // 批量下载搜索结果
         async function batchDownloadSearchResults() {
             const yearFilter = document.getElementById('dataYearFilter');
+            const baseYearFilter = document.getElementById('dataBaseYearFilter');
             const schoolFilter = document.getElementById('dataSchoolNameFilter');
             const batchDownloadBtn = document.getElementById('batchDownloadBtn');
             
             const year = yearFilter ? yearFilter.value : 'all';
+            const baseYear = baseYearFilter ? baseYearFilter.value : 'all';
             const school = schoolFilter ? schoolFilter.value : 'all';
             
             if (!allDataSchoolsData || allDataSchoolsData.length === 0) {
@@ -2192,6 +2371,9 @@
                 
                 if (year !== 'all') {
                     requestBody.year = year;
+                }
+                if (baseYear !== 'all') {
+                    requestBody.baseYear = baseYear;
                 }
                 if (school !== 'all') {
                     requestBody.school = school;
@@ -2300,7 +2482,7 @@
             }
             
             let html = '<div class="table-container"><table class="data-table"><thead><tr>';
-            html += '<th>学校名称</th><th>年份</th><th>最后更新时间</th><th>操作</th>';
+            html += '<th>学校名称</th><th>基准年份</th><th>测算年份</th><th>最后更新时间</th><th>操作</th>';
             html += '</tr></thead><tbody>';
             
             schoolsData.forEach(school => {
@@ -2309,13 +2491,14 @@
                 
                 html += `<tr>
                     <td><strong>${school.school_name || '未知'}</strong></td>
+                    <td>${school.base_year || '未知'}</td>
                     <td>${school.year || '未知'}</td>
                     <td>${date} ${time}</td>
                     <td>
                         <button style="background: white; color: #3498db; border: 2px solid #3498db; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 5px;" onclick="viewDataSchoolDetails(${school.id})">详情</button>
                         <button style="background: white; color: #3498db; border: 2px solid #3498db; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 5px;" onclick="downloadRecord(${school.id})">下载</button>
                         <button style="background: white; color: #f39c12; border: 2px solid #f39c12; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 5px;" onclick="editDataRecord(${school.id})">编辑</button>
-                        <button style="background: white; color: #e74c3c; border: 2px solid #e74c3c; padding: 8px 16px; border-radius: 4px; cursor: pointer;" onclick="deleteDataRecord(${school.id})">删除</button>
+                        <button style="background: white; color: #e74c3c; border: 2px solid #e74c3c; padding: 8px 16px; border-radius: 4px; cursor: pointer;" onclick="deleteSchoolCombination('${school.school_name}', ${school.base_year}, ${school.year})">删除</button>
                     </td>
                 </tr>`;
             });
@@ -2358,7 +2541,7 @@
                     
                     <div style="margin: 15px 0;">
                         <h4>基本信息</h4>
-                        <p><strong>学校类型：</strong>${school.school_type || '未指定'}</p>
+                        <p><strong>院校类别：</strong>${school.school_type || '未指定'}</p>
                         <p><strong>提交时间：</strong>${new Date(school.created_at).toLocaleString('zh-CN')}</p>
                     </div>
                     
@@ -2390,7 +2573,7 @@
                 detailsHtml += `
                     <div style="margin: 15px 0;">
                         <h4>计算结果</h4>
-                        <p><strong>现有建筑总面积：</strong>${(school.current_building_area || 0).toLocaleString()}㎡</p>
+                        <p><strong>现状建筑总面积：</strong>${(school.current_building_area || 0).toLocaleString()}㎡</p>
                         <p><strong>应配建筑总面积：</strong>${(school.required_building_area || 0).toLocaleString()}㎡</p>
                         <p><strong>教学及辅助用房缺口：</strong>${(school.teaching_area_gap || 0).toLocaleString()}㎡</p>
                         <p><strong>办公用房缺口：</strong>${(school.office_area_gap || 0).toLocaleString()}㎡</p>
@@ -2537,9 +2720,6 @@
                     const internationalUndergraduateEl = document.getElementById('internationalUndergraduate');
                     if (internationalUndergraduateEl) internationalUndergraduateEl.value = school.international_undergraduate || 0;
                     
-                    const internationalSpecialistEl = document.getElementById('internationalSpecialist');
-                    if (internationalSpecialistEl) internationalSpecialistEl.value = 0; // 历史数据没有留学生专科生字段
-                    
                     const internationalMasterEl = document.getElementById('internationalMaster');
                     if (internationalMasterEl) internationalMasterEl.value = school.international_master || 0;
                     
@@ -2566,7 +2746,7 @@
                     const remarksEl = document.getElementById('remarks');
                     if (remarksEl) remarksEl.value = school.remarks || '';
                     
-                    // 触发学校名称变化事件（更新学校类型显示）
+                    // 触发学校名称变化事件（更新院校类别显示）
                     if (schoolNameEl) {
                         updateSchoolType();
                     }
@@ -2774,7 +2954,87 @@
             }
         }
 
-        // 删除记录
+        // 删除学校组合记录
+        async function deleteSchoolCombination(schoolName, baseYear, year) {
+            const baseYearStr = baseYear === null ? '未设置' : `${baseYear}年`;
+            const confirmMessage = `确定要删除"${schoolName} - ${baseYearStr}基准${year}年测算"的所有记录吗？\n\n此操作将删除该组合的所有历史记录，不可恢复。`;
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            console.log('开始删除学校组合记录:', { schoolName, baseYear, year });
+            
+            // 显示删除进度
+            const progressDiv = document.createElement('div');
+            progressDiv.innerHTML = `
+                <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                            background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); 
+                            z-index: 2000; text-align: center;">
+                    <h4>正在删除记录...</h4>
+                    <p>请稍候，正在删除该组合的所有记录</p>
+                </div>
+            `;
+            document.body.appendChild(progressDiv);
+            
+            try {
+                const response = await fetch('/api/school-combination', {
+                    method: 'DELETE',
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    },
+                    body: JSON.stringify({
+                        schoolName: schoolName,
+                        baseYear: baseYear,
+                        year: year
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('删除API响应:', result);
+                
+                // 移除进度提示
+                progressDiv.remove();
+                
+                if (result.success) {
+                    console.log(`删除成功！共删除了 ${result.deletedCount} 条记录`);
+                    console.log('删除成功，开始刷新数据列表...');
+                    
+                    // 清空当前显示的数据
+                    allDataSchoolsData = [];
+                    
+                    // 立即显示加载状态
+                    const resultsContainer = document.getElementById('dataHistoryResults');
+                    if (resultsContainer) {
+                        resultsContainer.innerHTML = '<div class="loading">正在刷新数据列表...</div>';
+                    }
+                    
+                    // 延迟一点时间再刷新，确保数据库操作完成
+                    setTimeout(() => {
+                        console.log('执行数据刷新...');
+                        searchDataRecords().then(() => {
+                            console.log('数据刷新完成');
+                        }).catch(err => {
+                            console.error('刷新数据失败:', err);
+                            alert('刷新数据失败，请手动点击"查找"按钮重新加载。');
+                        });
+                    }, 1000);
+                } else {
+                    console.error('删除失败:', result.error);
+                    showDataError('删除失败: ' + result.error);
+                }
+            } catch (error) {
+                // 移除进度提示
+                progressDiv.remove();
+                console.error('删除失败:', error);
+                showDataError('删除失败: ' + error.message);
+            }
+        }
+
+        // 删除记录（保留原功能用于其他地方）
         async function deleteDataRecord(recordId) {
             if (!confirm('确定要删除这条记录吗？此操作不可恢复。')) {
                 return;
@@ -2811,7 +3071,7 @@
                 progressDiv.remove();
                 
                 if (result.success) {
-                    alert('记录删除成功！页面将自动刷新数据列表。');
+                    console.log('记录删除成功！');
                     console.log('删除成功，开始刷新数据列表...');
                     
                     // 清空当前显示的数据
@@ -2828,7 +3088,6 @@
                         console.log('执行数据刷新...');
                         searchDataRecords().then(() => {
                             console.log('数据刷新完成');
-                            alert('数据列表已刷新！');
                         }).catch(err => {
                             console.error('刷新数据失败:', err);
                             alert('刷新数据失败，请手动点击"查找"按钮重新加载。');
@@ -3051,6 +3310,125 @@
             const overlay = document.getElementById('yearGridOverlay');
             if (e.target === overlay) {
                 hideYearGrid();
+            }
+        });
+
+        // ========== 基准年份选择器功能 ==========
+        let currentBaseYearGridIndex = 0; // 当前显示的基准年份组索引
+
+        // 显示基准年份选择器
+        function showBaseYearGrid() {
+            const overlay = document.getElementById('baseYearGridOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                
+                // 计算当前年份应该在哪个组
+                const yearInput = document.getElementById('base_year');
+                const inputYear = parseInt(yearInput.value) || currentYear;
+                currentBaseYearGridIndex = Math.floor((inputYear - (currentYear - 4)) / 9);
+                
+                updateBaseYearGrid();
+                
+                // 添加键盘事件监听
+                document.addEventListener('keydown', handleBaseYearGridKeyboard);
+            }
+        }
+
+        // 隐藏基准年份选择器
+        function hideBaseYearGrid() {
+            const overlay = document.getElementById('baseYearGridOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+                
+                // 移除键盘事件监听
+                document.removeEventListener('keydown', handleBaseYearGridKeyboard);
+            }
+        }
+
+        // 移动基准年份网格
+        function moveBaseYearGrid(direction) {
+            currentBaseYearGridIndex += direction;
+            updateBaseYearGrid();
+        }
+
+        // 更新基准年份网格显示
+        function updateBaseYearGrid() {
+            const yearGrid = document.getElementById('baseYearGrid');
+            const yearRangeText = document.getElementById('baseYearRangeText');
+            const yearInput = document.getElementById('base_year');
+            const inputYear = parseInt(yearInput.value) || currentYear;
+            
+            if (!yearGrid || !yearRangeText) return;
+            
+            // 计算当前组的起始年份（以当前年份为中心，前后各4年，总共9年一组）
+            const baseYear = currentYear - 4 + (currentBaseYearGridIndex * 9);
+            const years = [];
+            
+            for (let i = 0; i < 9; i++) {
+                years.push(baseYear + i);
+            }
+            
+            // 更新范围文本
+            yearRangeText.textContent = `${years[0]} - ${years[8]}`;
+            
+            // 生成年份网格
+            yearGrid.innerHTML = '';
+            years.forEach(year => {
+                const yearItem = document.createElement('div');
+                yearItem.className = 'year-item';
+                yearItem.textContent = year;
+                yearItem.onclick = () => selectBaseYear(year);
+                
+                // 标记当前年份
+                if (year === currentYear) {
+                    yearItem.classList.add('current');
+                }
+                
+                // 标记已选择的年份
+                if (year === inputYear) {
+                    yearItem.classList.add('selected');
+                }
+                
+                yearGrid.appendChild(yearItem);
+            });
+        }
+
+        // 选择基准年份
+        function selectBaseYear(year) {
+            const yearInput = document.getElementById('base_year');
+            if (yearInput) {
+                yearInput.value = year;
+                
+                // 触发change事件，如果有其他逻辑依赖年份变化
+                const event = new Event('change', { bubbles: true });
+                yearInput.dispatchEvent(event);
+            }
+            
+            hideBaseYearGrid();
+        }
+
+        // 处理基准年份键盘事件
+        function handleBaseYearGridKeyboard(e) {
+            switch(e.key) {
+                case 'Escape':
+                    hideBaseYearGrid();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    moveBaseYearGrid(-1);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    moveBaseYearGrid(1);
+                    break;
+            }
+        }
+
+        // 点击遮罩层关闭基准年份选择器
+        document.addEventListener('click', function(e) {
+            const overlay = document.getElementById('baseYearGridOverlay');
+            if (e.target === overlay) {
+                hideBaseYearGrid();
             }
         });
     </script>

@@ -1,7 +1,51 @@
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     initializeOnlineForm();
+    // 初始化计算函数
+    setTimeout(() => {
+        calculateTotalStudents();
+        calculateOtherLivingArea();
+        calculateTotalBuildingArea();
+    }, 100);
 });
+
+// 计算学生总数
+function calculateTotalStudents() {
+    // 全日制学生
+    const fullTimeSpecialist = parseInt((document.getElementById('fullTimeSpecialist') && document.getElementById('fullTimeSpecialist').value) || 0);
+    const fullTimeUndergraduate = parseInt((document.getElementById('fullTimeUndergraduate') && document.getElementById('fullTimeUndergraduate').value) || 0);
+    const fullTimeMaster = parseInt((document.getElementById('fullTimeMaster') && document.getElementById('fullTimeMaster').value) || 0);
+    const fullTimeDoctor = parseInt((document.getElementById('fullTimeDoctor') && document.getElementById('fullTimeDoctor').value) || 0);
+    
+    const fullTimeTotal = fullTimeSpecialist + fullTimeUndergraduate + fullTimeMaster + fullTimeDoctor;
+    
+    // 留学生（不包括专科生）
+    const internationalUndergraduate = parseInt((document.getElementById('internationalUndergraduate') && document.getElementById('internationalUndergraduate').value) || 0);
+    const internationalMaster = parseInt((document.getElementById('internationalMaster') && document.getElementById('internationalMaster').value) || 0);
+    const internationalDoctor = parseInt((document.getElementById('internationalDoctor') && document.getElementById('internationalDoctor').value) || 0);
+    
+    const internationalTotal = internationalUndergraduate + internationalMaster + internationalDoctor;
+    
+    // 更新显示
+    const fullTimeTotalEl = document.getElementById('fullTimeTotal');
+    if (fullTimeTotalEl) fullTimeTotalEl.value = fullTimeTotal;
+    
+    const internationalTotalEl = document.getElementById('internationalTotal');
+    if (internationalTotalEl) internationalTotalEl.value = internationalTotal;
+    
+    // 计算总学生数
+    const totalStudents = fullTimeTotal + internationalTotal;
+    const totalStudentsEl = document.getElementById('totalStudents');
+    if (totalStudentsEl) totalStudentsEl.value = totalStudents;
+    
+    console.log('计算学生总数:', { fullTimeTotal, internationalTotal, totalStudents });
+    
+    return {
+        fullTimeTotal,
+        internationalTotal,
+        totalStudents
+    };
+}
 
 // 全局变量存储完整的分析结果，用于下载功能
 let globalAnalysisResult = null;
@@ -152,7 +196,7 @@ function displaySchoolInfo(schoolData) {
                     </div>
                     
                     <div class="stat-group">
-                        <div class="stat-group-title">现有建筑面积 (㎡)</div>
+                        <div class="stat-group-title">现状建筑面积 (㎡)</div>
                         <div class="stat-item">
                             <span class="stat-label">教学及辅助用房</span>
                             <span class="stat-value">${formatNumber(school['现有教学及辅助用房面积'])}</span>
@@ -235,22 +279,22 @@ function showAnalysisResults(analysisData) {
             <h3>${school['学校名称']} (${school['年份']})</h3>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <h4>现有建筑总面积</h4>
+                    <h4>现状总建筑面积</h4>
                     <div class="stat-value">${formatNumber(totalCurrentArea)}</div>
                     <div class="stat-unit">平方米</div>
                 </div>
                 <div class="stat-card">
-                    <h4>应配建筑总面积</h4>
+                    <h4>学生规模测算总建筑面积</h4>
                     <div class="stat-value">${formatNumber(totalRequiredArea)}</div>
                     <div class="stat-unit">平方米</div>
                 </div>
                 <div class="stat-card">
-                    <h4>建筑面积总缺口（不含补助）</h4>
+                    <h4>学生规模测算建筑面积总缺额(不含补助)</h4>
                     <div class="stat-value">${gapWithoutSubsidy > 0 ? '+' : ''}${formatNumber(gapWithoutSubsidy)}</div>
                     <div class="stat-unit">平方米</div>
                 </div>
                 <div class="stat-card">
-                    <h4>建筑面积总缺口（含补助）</h4>
+                    <h4>学生规模测算建筑面积总缺额(含补助)</h4>
                     <div class="stat-value">${gapWithSubsidy > 0 ? '+' : ''}${formatNumber(gapWithSubsidy)}</div>
                     <div class="stat-unit">平方米</div>
                 </div>
@@ -313,15 +357,15 @@ function showAnalysisResults(analysisData) {
                     </div>
                     <div class="area-details">
                         <div>
-                            <span>现有面积:</span>
+                            <span>现状建筑面积:</span>
                             <span>${formatNumber(area.current || 0)}㎡</span>
                         </div>
                         <div>
-                            <span>应配面积:</span>
+                            <span>学生规模测算建筑面积:</span>
                             <span>${formatNumber(area.required || 0)}㎡</span>
                         </div>
                         <div>
-                            <span>缺口面积:</span>
+                            <span>学生规模测算建筑面积缺额:</span>
                             <span class="${gapValue > 0 ? 'gap-positive' : 'gap-negative'}">
                                 ${gapValue > 0 ? '+' : ''}${formatNumber(gapValue)}㎡
                             </span>
@@ -761,6 +805,7 @@ async function handleOnlineFormSubmit(event) {
         '学校名称': selectedSchoolName,
         '学校类型': schoolType,
         '年份': parseInt(formData.get('year')),
+        '基准年份': parseInt(formData.get('base_year')),
         '全日制本科生人数': parseInt(formData.get('fullTimeUndergraduate')),
         '全日制专科生人数': parseInt(formData.get('fullTimeSpecialist')) || 0,
         '全日制硕士生人数': parseInt(formData.get('fullTimeMaster')) || 0,

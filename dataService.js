@@ -8,35 +8,75 @@ async function saveSchoolInfo(schoolData, specialSubsidies = [], calculationResu
     try {
         await connection.beginTransaction();
         
-        // 准备计算结果数据
-        let calcData = {};
-        if (calculationResults) {
-            calcData = {
-                current_building_area: calculationResults['现有建筑总面积'] || 0,
-                required_building_area: calculationResults['应配建筑总面积'] || 0,
-                teaching_area_gap: calculationResults['教学及辅助用房缺口(A)'] || 0,
-                office_area_gap: calculationResults['办公用房缺口(B)'] || 0,
-                dormitory_area_gap: calculationResults['学生宿舍缺口(C1)'] || 0,
-                other_living_area_gap: calculationResults['其他生活用房缺口(C2)'] || 0,
-                logistics_area_gap: calculationResults['后勤辅助用房缺口(D)'] || 0,
-                total_area_gap: calculationResults['建筑面积总缺口（含特殊补助）'] || 0,
-                special_subsidy_total: calculationResults['特殊补助总面积'] || 0,
-                overall_compliance: calculationResults['整体达标情况'] === '达标' ? 1 : 0,
-                calculation_results: JSON.stringify(calculationResults)
-            };
+        // 首先删除同一学校-测算年份组合的旧记录
+        const schoolName = schoolData['学校名称'];
+        const year = schoolData['年份'];
+        
+        console.log(`删除旧记录: 学校=${schoolName}, 测算年份=${year}`);
+        
+        // 获取要删除的记录ID（用于删除关联的特殊补助记录）
+        const [existingRecords] = await connection.execute(`
+            SELECT id FROM school_info 
+            WHERE school_name = ? AND year = ?
+        `, [schoolName, year]);
+        
+        // 删除关联的特殊补助记录
+        if (existingRecords.length > 0) {
+            const recordIds = existingRecords.map(record => record.id);
+            const placeholders = recordIds.map(() => '?').join(',');
+            await connection.execute(`
+                DELETE FROM special_subsidies 
+                WHERE school_info_id IN (${placeholders})
+            `, recordIds);
+            
+            console.log(`删除了 ${recordIds.length} 条旧记录的特殊补助数据`);
         }
         
-        const [schoolResult] = await connection.execute(`
-            INSERT INTO school_info (
-                school_name, school_type, year, base_year, full_time_undergraduate, full_time_specialist, 
-                full_time_master, full_time_doctor, international_undergraduate, international_specialist,
-                international_master, international_doctor, total_students, teaching_area, 
-                office_area, total_living_area, dormitory_area, logistics_area, remarks,
-                current_building_area, required_building_area, teaching_area_gap, office_area_gap,
-                dormitory_area_gap, other_living_area_gap, logistics_area_gap, total_area_gap,
-                special_subsidy_total, overall_compliance, calculation_results
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
+        // 删除主记录
+        const [deleteResult] = await connection.execute(`
+            DELETE FROM school_info 
+            WHERE school_name = ? AND year = ?
+        `, [schoolName, year]);
+        
+        console.log(`删除了 ${deleteResult.affectedRows} 条学校主记录`);
+        
+        // 准备计算结果数据
+        let calcData = {
+            current_building_area: 0,
+            required_building_area: 0,
+            teaching_area_gap: 0,
+            office_area_gap: 0,
+            dormitory_area_gap: 0,
+            other_living_area_gap: 0,
+            logistics_area_gap: 0,
+            total_area_gap: 0,
+            special_subsidy_total: 0,
+            overall_compliance: 0,
+            calculation_results: null
+        };
+        
+        if (calculationResults) {
+            calcData.current_building_area = calculationResults['现有建筑总面积'] || 0;
+            calcData.required_building_area = calculationResults['应配建筑总面积'] || 0;
+            calcData.teaching_area_gap = calculationResults['教学及辅助用房缺口(A)'] || 0;
+            calcData.office_area_gap = calculationResults['办公用房缺口(B)'] || 0;
+            calcData.dormitory_area_gap = calculationResults['学生宿舍缺口(C1)'] || 0;
+            calcData.other_living_area_gap = calculationResults['其他生活用房缺口(C2)'] || 0;
+            calcData.logistics_area_gap = calculationResults['后勤辅助用房缺口(D)'] || 0;
+            calcData.total_area_gap = calculationResults['建筑面积总缺口（含特殊补助）'] || 0;
+            calcData.special_subsidy_total = calculationResults['特殊补助总面积'] || 0;
+            calcData.overall_compliance = calculationResults['整体达标情况'] === '达标' ? 1 : 0;
+            calcData.calculation_results = JSON.stringify(calculationResults);
+        }
+        
+        console.log('准备插入的数据:', {
+            schoolName: schoolData['学校名称'],
+            year: schoolData['年份'],
+            calcData: calcData
+        });
+        
+        // 构建参数数组
+        const params = [
             schoolData['学校名称'],
             schoolData['学校类型'] || null,
             schoolData['年份'],
@@ -68,7 +108,28 @@ async function saveSchoolInfo(schoolData, specialSubsidies = [], calculationResu
             calcData.special_subsidy_total || 0,
             calcData.overall_compliance || 0,
             calcData.calculation_results || null
-        ]);
+        ];
+        
+        // 检查是否有undefined值
+        const undefinedIndex = params.findIndex(param => param === undefined);
+        if (undefinedIndex !== -1) {
+            console.log(`参数数组中第${undefinedIndex}个参数是undefined:`, params[undefinedIndex]);
+            console.log('完整参数数组:', params);
+            throw new Error(`参数数组中第${undefinedIndex}个参数是undefined`);
+        }
+        
+        // 插入新记录
+        const [schoolResult] = await connection.execute(`
+            INSERT INTO school_info (
+                school_name, school_type, year, base_year, full_time_undergraduate, full_time_specialist, 
+                full_time_master, full_time_doctor, international_undergraduate, international_specialist,
+                international_master, international_doctor, total_students, teaching_area, 
+                office_area, total_living_area, dormitory_area, logistics_area, remarks,
+                current_building_area, required_building_area, teaching_area_gap, office_area_gap,
+                dormitory_area_gap, other_living_area_gap, logistics_area_gap, total_area_gap,
+                special_subsidy_total, overall_compliance, calculation_results
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, params);
         
         const schoolInfoId = schoolResult.insertId;
         
@@ -80,8 +141,8 @@ async function saveSchoolInfo(schoolData, specialSubsidies = [], calculationResu
                     VALUES (?, ?, ?)
                 `, [
                     schoolInfoId,
-                    subsidy['特殊用房补助名称'],
-                    subsidy['补助面积（m²）']
+                    subsidy['特殊用房补助名称'] || subsidy.name || subsidy['name'],
+                    subsidy['补助面积（m²）'] || subsidy.area || subsidy['area']
                 ]);
             }
         }
@@ -186,7 +247,7 @@ async function getLatestSchoolRecords(year = null, schoolName = null, baseYear =
             FROM school_info si
             LEFT JOIN special_subsidies ss ON si.id = ss.school_info_id
             INNER JOIN (
-                SELECT school_name, year, base_year, MAX(created_at) as max_created_at
+                SELECT school_name, year, MAX(created_at) as max_created_at
                 FROM school_info
         `;
         
@@ -198,25 +259,21 @@ async function getLatestSchoolRecords(year = null, schoolName = null, baseYear =
             params.push(year);
         }
         
-        if (baseYear) {
-            whereConditions.push('base_year = ?');
-            params.push(baseYear);
-        }
-        
         if (schoolName) {
             whereConditions.push('school_name = ?');
             params.push(schoolName);
         }
+        
+        // 注意：baseYear参数被忽略，因为我们现在只根据学校名称和测算年份获取最新记录
         
         if (whereConditions.length > 0) {
             query += ' WHERE ' + whereConditions.join(' AND ');
         }
         
         query += `
-                GROUP BY school_name, year, base_year
+                GROUP BY school_name, year
             ) latest ON si.school_name = latest.school_name 
                      AND si.year = latest.year
-                     AND (si.base_year = latest.base_year OR (si.base_year IS NULL AND latest.base_year IS NULL))
                      AND si.created_at = latest.max_created_at
         `;
         
@@ -461,16 +518,9 @@ async function deleteSchoolCombination(schoolName, baseYear, year) {
     try {
         await connection.beginTransaction();
         
-        // 构建WHERE条件
-        let whereConditions = ['school_name = ?', 'year = ?'];
-        let params = [schoolName, year];
-        
-        if (baseYear === null || baseYear === undefined) {
-            whereConditions.push('base_year IS NULL');
-        } else {
-            whereConditions.push('base_year = ?');
-            params.push(baseYear);
-        }
+        // 只根据学校名称和测算年份删除记录，忽略基准年份参数
+        const whereConditions = ['school_name = ?', 'year = ?'];
+        const params = [schoolName, year];
         
         const whereClause = whereConditions.join(' AND ');
         

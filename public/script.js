@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateTotalStudents();
         calculateOtherLivingArea();
         calculateTotalBuildingArea();
+        updateSubsidySummary();
     }, 100);
 });
 
@@ -107,8 +108,14 @@ function showMessage(message, type = 'info') {
 
 // 格式化数字
 function formatNumber(num) {
-    if (num === null || num === undefined || num === '') return '0';
-    return parseFloat(num).toLocaleString();
+    if (num === null || num === undefined || num === '') return '0.00';
+    return parseFloat(num).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// 格式化为两位小数（不带千分符）
+function formatToTwoDecimals(num) {
+    if (num === null || num === undefined || num === '') return '0.00';
+    return parseFloat(num).toFixed(2);
 }
 
 // 生成特殊补助明细表格
@@ -281,22 +288,22 @@ function showAnalysisResults(analysisData) {
                 <div class="stat-card">
                     <h4>现状总建筑面积</h4>
                     <div class="stat-value">${formatNumber(totalCurrentArea)}</div>
-                    <div class="stat-unit">平方米</div>
+                    <div class="stat-unit">(m²)</div>
                 </div>
                 <div class="stat-card">
                     <h4>学生规模测算总建筑面积</h4>
                     <div class="stat-value">${formatNumber(totalRequiredArea)}</div>
-                    <div class="stat-unit">平方米</div>
+                    <div class="stat-unit">(m²)</div>
                 </div>
                 <div class="stat-card">
                     <h4>学生规模测算建筑面积总缺额(不含补助)</h4>
                     <div class="stat-value">${gapWithoutSubsidy > 0 ? '+' : ''}${formatNumber(gapWithoutSubsidy)}</div>
-                    <div class="stat-unit">平方米</div>
+                    <div class="stat-unit">(m²)</div>
                 </div>
                 <div class="stat-card">
                     <h4>学生规模测算建筑面积总缺额(含补助)</h4>
                     <div class="stat-value">${gapWithSubsidy > 0 ? '+' : ''}${formatNumber(gapWithSubsidy)}</div>
-                    <div class="stat-unit">平方米</div>
+                    <div class="stat-unit">(m²)</div>
                 </div>
             </div>
         </div>
@@ -323,8 +330,24 @@ function showAnalysisResults(analysisData) {
                 status: school['办公用房达标情况']
             },
             { 
+                key: 'D', 
+                name: '后勤辅助用房', 
+                current: school['现有后勤辅助用房面积'], 
+                required: school['总应配后勤辅助用房(D)'], 
+                gap: school['后勤辅助用房缺口(D)'], 
+                status: school['后勤辅助用房达标情况']
+            },
+            { 
+                key: 'C', 
+                name: '生活配套用房', 
+                current: school['现有生活用房总面积'], 
+                required: (school['总应配学生宿舍(C1)'] || 0) + (school['总应配其他生活用房(C2)'] || 0), 
+                gap: (school['学生宿舍缺口(C1)'] || 0) + (school['其他生活用房缺口(C2)'] || 0), 
+                status: ((school['学生宿舍缺口(C1)'] || 0) + (school['其他生活用房缺口(C2)'] || 0)) <= 0 ? '达标' : '不达标'
+            },
+            { 
                 key: 'C1', 
-                name: '学生宿舍', 
+                name: '其中:学生宿舍', 
                 current: school['现有学生宿舍面积'], 
                 required: school['总应配学生宿舍(C1)'], 
                 gap: school['学生宿舍缺口(C1)'], 
@@ -332,20 +355,12 @@ function showAnalysisResults(analysisData) {
             },
             { 
                 key: 'C2', 
-                name: '其他生活用房', 
+                name: '其中:其他生活用房', 
                 current: school['现有其他生活用房面积（计算）'] || school['现有其他生活用房面积'], 
                 required: school['总应配其他生活用房(C2)'], 
                 gap: school['其他生活用房缺口(C2)'], 
                 status: school['其他生活用房达标情况']
             },
-            { 
-                key: 'D', 
-                name: '后勤辅助用房', 
-                current: school['现有后勤辅助用房面积'], 
-                required: school['总应配后勤辅助用房(D)'], 
-                gap: school['后勤辅助用房缺口(D)'], 
-                status: school['后勤辅助用房达标情况']
-            }
         ];
         
         const areaAnalysisHTML = areaTypes.map(area => {
@@ -386,7 +401,7 @@ function showAnalysisResults(analysisData) {
     const downloadHTML = `
         <div class="download-section">
             <button class="download-link" onclick="downloadOnlineResult()">
-                下载完整分析报告 (Excel格式)
+                下载完整分析报告
             </button>
         </div>
     `;
@@ -445,13 +460,28 @@ function initializeOnlineForm() {
     
     // 为建筑面积输入框添加事件监听
     const buildingAreaInputs = [
-        'teachingArea', 'officeArea', 'logisticsArea'
+        'teachingArea', 'officeArea', 'logisticsArea', 'totalLivingArea', 'dormitoryArea'
     ];
     
     buildingAreaInputs.forEach(inputId => {
         const input = document.getElementById(inputId);
         if (input) {
-            input.addEventListener('input', calculateTotalBuildingArea);
+            // 设置默认值
+            if (!input.value || input.value === '0') {
+                input.value = '0.00';
+            }
+            
+            // 添加输入事件监听
+            input.addEventListener('input', function() {
+                calculateOtherLivingArea();
+                calculateTotalBuildingArea();
+            });
+            
+            // 添加失去焦点事件，自动格式化为两位小数
+            input.addEventListener('blur', function() {
+                const value = parseFloat(this.value) || 0;
+                this.value = formatToTwoDecimals(value);
+            });
         }
     });
     
@@ -519,7 +549,7 @@ function calculateOtherLivingArea() {
         const total = parseFloat(totalLivingArea.value) || 0;
         const dormitory = parseFloat(dormitoryArea.value) || 0;
         const other = Math.max(0, total - dormitory);
-        otherLivingArea.value = other > 0 ? other.toFixed(2) : '';
+        otherLivingArea.value = formatToTwoDecimals(other);
     }
 }
 
@@ -573,7 +603,7 @@ function calculateTotalBuildingArea() {
     
     const totalBuildingAreaEl = document.getElementById('totalBuildingArea');
     if (totalBuildingAreaEl) {
-        totalBuildingAreaEl.value = totalArea > 0 ? totalArea.toLocaleString() : '';
+        totalBuildingAreaEl.value = formatToTwoDecimals(totalArea);
     }
 }
 
@@ -595,7 +625,7 @@ function addSubsidy() {
                 </div>
                 <div class="form-group">
                     <label>补助面积 (m²)</label>
-                    <input type="number" name="subsidyArea[]" min="0" step="0.01" value="3000" placeholder="请输入补助面积" class="form-control">
+                    <input type="number" name="subsidyArea[]" min="0" step="0.01" value="0.00" placeholder="请输入补助面积" class="form-control" onblur="formatSubsidyArea(this)">
                 </div>
                 <div class="form-group">
                     <label>&nbsp;</label>
@@ -611,7 +641,7 @@ function addSubsidy() {
                     <input type="text" name="subsidyName[]" placeholder="如：重点实验室建设补助" class="form-control">
                 </div>
                 <div class="form-group no-label">
-                    <input type="number" name="subsidyArea[]" min="0" step="0.01" value="3000" placeholder="请输入补助面积" class="form-control">
+                    <input type="number" name="subsidyArea[]" min="0" step="0.01" value="0.00" placeholder="请输入补助面积" class="form-control" onblur="formatSubsidyArea(this)">
                 </div>
                 <div class="form-group">
                     <button type="button" class="btn btn-danger" onclick="removeSubsidy(this)" style="background: #dc3545; color: white; border: none; padding: 12px 15px; border-radius: 6px; cursor: pointer;">删除</button>
@@ -623,6 +653,14 @@ function addSubsidy() {
     specialSubsidies.appendChild(subsidyItem);
     
     // 更新特殊补助汇总
+    updateSubsidySummary();
+}
+
+// 格式化特殊补助面积输入框
+function formatSubsidyArea(input) {
+    const value = parseFloat(input.value) || 0;
+    input.value = formatToTwoDecimals(value);
+    // 触发汇总更新
     updateSubsidySummary();
 }
 
@@ -692,11 +730,6 @@ function updateSubsidySummary() {
         existingSummary.remove();
     }
     
-    // 如果没有补助项，不显示汇总
-    if (subsidyItems.length === 0) {
-        return;
-    }
-    
     // 计算汇总数据
     let totalCount = 0;
     let totalArea = 0;
@@ -726,7 +759,7 @@ function updateSubsidySummary() {
             </div>
             <div class="form-group">
                 <label>特殊补助总面积 (m²)</label>
-                <input type="text" value="${totalArea.toLocaleString()}" readonly class="form-control" style="background: #f5f5f5; border: 1px solid #ddd; font-weight: bold; text-align: center;">
+                <input type="text" value="${formatToTwoDecimals(totalArea)}" readonly class="form-control" style="background: #f5f5f5; border: 1px solid #ddd; font-weight: bold; text-align: center;">
             </div>
             <div class="form-group">
                 <label>&nbsp;</label>
@@ -764,7 +797,7 @@ function resetForm() {
         document.getElementById('totalStudents').value = '';
         document.getElementById('fullTimeTotal').value = '';
         document.getElementById('internationalTotal').value = '';
-        document.getElementById('totalBuildingArea').value = '';
+        document.getElementById('totalBuildingArea').value = '0.00';
         
         // 清空所有特殊补助项
         const specialSubsidies = document.getElementById('specialSubsidies');
@@ -876,14 +909,12 @@ function displayOnlineCalculationResult(result) {
     // 保存完整的结果数据供下载使用
     globalAnalysisResult = result;
     
-    // 不显示学校信息，只显示分析结果
+    // 显示详细的分析结果
     console.log('显示分析结果，使用schoolData:', result.schoolData);
     showAnalysisResults([result.schoolData]);
     
-    // 下载功能会在分析结果中添加
-    
     // 滚动到结果区域
-    document.getElementById('analysisResultsSection').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
 }
 
 // 显示在线计算结果的下载功能
@@ -925,11 +956,11 @@ function showOnlineResultDownload(result) {
                     ` : ''}
                 </div>
                 <p style="color: #6b7280; margin-bottom: 25px; font-size: 1rem;">
-                    已完成建筑面积缺口详细分析，请查看下方分析结果
+                    建筑面积缺口分析已完成
                 </p>
-                <button class="download-link" onclick="downloadOnlineResult()">
-                    下载完整分析报告 (Excel格式)
-                </button>
+                <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 15px; color: #0369a1;">
+                    详细统计分析功能已被禁用
+                </div>
             </div>
         `;
     }

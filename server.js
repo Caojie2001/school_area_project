@@ -532,7 +532,7 @@ app.delete('/api/school-record/:id', async (req, res) => {
     }
 });
 
-// 删除学校组合记录（按基准年份-测算年份-学校名称组合删除所有记录）
+// 删除学校组合记录（按测算年份-学校名称组合删除所有记录）
 app.delete('/api/school-combination', async (req, res) => {
     try {
         const { schoolName, baseYear, year } = req.body;
@@ -541,7 +541,7 @@ app.delete('/api/school-combination', async (req, res) => {
             return res.status(400).json({ error: '学校名称和测算年份不能为空' });
         }
         
-        console.log('删除学校组合记录:', { schoolName, baseYear, year });
+        console.log('删除学校组合记录:', { schoolName, year });
         
         const result = await dataService.deleteSchoolCombination(schoolName, baseYear, year);
         
@@ -1151,19 +1151,20 @@ function generateBatchExportExcel(schoolsData, filters = {}) {
             };
         });
         
-        // 详细数据工作表
-        const detailSheet = XLSX.utils.json_to_sheet(excelData);
-        XLSX.utils.book_append_sheet(wb, detailSheet, "学校详细数据");
-        
-        // 生成统计汇总工作表
-        const summaryData = generateBatchSummaryData(schoolsData, filters);
+        // 第一个Sheet：测算汇总
+        const summaryData = generateSummarySheet(schoolsData);
         const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(wb, summarySheet, "统计汇总");
+        XLSX.utils.book_append_sheet(wb, summarySheet, "测算汇总");
         
-        // 按院校类别分析
-        const typeAnalysisData = generateTypeAnalysisData(schoolsData);
-        const typeSheet = XLSX.utils.json_to_sheet(typeAnalysisData);
-        XLSX.utils.book_append_sheet(wb, typeSheet, "院校类别分析");
+        // 第二个Sheet：测算明细
+        const detailData = generateDetailSheet(schoolsData);
+        const detailSheet = XLSX.utils.json_to_sheet(detailData);
+        XLSX.utils.book_append_sheet(wb, detailSheet, "测算明细");
+        
+        // 第三个Sheet：学生数明细
+        const studentData = generateStudentDetailSheet(schoolsData);
+        const studentSheet = XLSX.utils.json_to_sheet(studentData);
+        XLSX.utils.book_append_sheet(wb, studentSheet, "学生数明细");
         
         // 写入文件
         XLSX.writeFile(wb, filePath);
@@ -1273,6 +1274,137 @@ function generateTypeAnalysisData(schoolsData) {
     });
     
     return Object.values(typeStats);
+}
+
+// 生成测算汇总Sheet数据
+function generateSummarySheet(schoolsData) {
+    return schoolsData.map(school => {
+        // 解析特殊补助数据
+        let specialSubsidies = [];
+        let specialSubsidyTotalArea = 0;
+        
+        try {
+            if (school.special_subsidies) {
+                specialSubsidies = JSON.parse(school.special_subsidies);
+                if (Array.isArray(specialSubsidies) && specialSubsidies.length > 0) {
+                    specialSubsidyTotalArea = specialSubsidies.reduce((sum, item) => 
+                        sum + (parseFloat(item['补助面积（m²）']) || 0), 0);
+                }
+            }
+        } catch (e) {
+            console.warn('解析特殊补助数据失败:', e);
+        }
+
+        // 计算全日制学生总数
+        const fullTimeTotal = (parseInt(school.full_time_undergraduate) || 0) + 
+                             (parseInt(school.full_time_specialist) || 0) + 
+                             (parseInt(school.full_time_master) || 0) + 
+                             (parseInt(school.full_time_doctor) || 0);
+        
+        // 计算留学生总数
+        const internationalTotal = (parseInt(school.international_undergraduate) || 0) + 
+                                  (parseInt(school.international_specialist) || 0) + 
+                                  (parseInt(school.international_master) || 0) + 
+                                  (parseInt(school.international_doctor) || 0);
+
+        return {
+            '单位学校机构名称': school.school_name || '',
+            '学院类别': school.school_type || '',
+            '基准年份': parseInt(school.base_year) || 0,
+            '测算年份': parseInt(school.year) || 0,
+            '全日制学生总数': fullTimeTotal,
+            '留学生总数': internationalTotal,
+            '学生规模测算建筑总面积': parseFloat(school.required_building_area) || 0,
+            '现状建筑总面积': parseFloat(school.current_building_area) || 0,
+            '学生规模测算建筑面积总缺额不含补助': parseFloat(school.total_area_gap) || 0,
+            '补助建筑总面积': specialSubsidyTotalArea,
+            '学生规模测算建筑面积总缺额含补助': (parseFloat(school.total_area_gap) || 0) + specialSubsidyTotalArea
+        };
+    });
+}
+
+// 生成测算明细Sheet数据
+function generateDetailSheet(schoolsData) {
+    const detailData = [];
+    
+    schoolsData.forEach(school => {
+        // 五类用房类型
+        const roomTypes = [
+            { 
+                type: '教学及辅助用房', 
+                current: parseFloat(school.teaching_area) || 0, 
+                required: (parseFloat(school.teaching_area) || 0) + (parseFloat(school.teaching_area_gap) || 0)
+            },
+            { 
+                type: '办公用房', 
+                current: parseFloat(school.office_area) || 0, 
+                required: (parseFloat(school.office_area) || 0) + (parseFloat(school.office_area_gap) || 0)
+            },
+            { 
+                type: '学生宿舍', 
+                current: parseFloat(school.dormitory_area) || 0, 
+                required: (parseFloat(school.dormitory_area) || 0) + (parseFloat(school.dormitory_area_gap) || 0)
+            },
+            { 
+                type: '其他生活用房', 
+                current: (parseFloat(school.total_living_area) || 0) - (parseFloat(school.dormitory_area) || 0), 
+                required: (parseFloat(school.total_living_area) || 0) - (parseFloat(school.dormitory_area) || 0) + (parseFloat(school.other_living_area_gap) || 0)
+            },
+            { 
+                type: '后勤辅助用房', 
+                current: parseFloat(school.logistics_area) || 0, 
+                required: (parseFloat(school.logistics_area) || 0) + (parseFloat(school.logistics_area_gap) || 0)
+            }
+        ];
+
+        roomTypes.forEach(room => {
+            const gap = room.required - room.current;
+            detailData.push({
+                '单位学校机构名称': school.school_name || '',
+                '学院类别': school.school_type || '',
+                '基准年份': parseInt(school.base_year) || 0,
+                '测算年份': parseInt(school.year) || 0,
+                '用房类型': room.type,
+                '现状建筑面积': room.current,
+                '学生规模测算建筑面积': room.required,
+                '学生规模测算建筑面积缺额': gap
+            });
+        });
+    });
+    
+    return detailData;
+}
+
+// 生成学生数明细Sheet数据
+function generateStudentDetailSheet(schoolsData) {
+    const studentData = [];
+    
+    schoolsData.forEach(school => {
+        // 学生类型
+        const studentTypes = [
+            { type: '全日制专科生', count: parseInt(school.full_time_specialist) || 0 },
+            { type: '全日制本科生', count: parseInt(school.full_time_undergraduate) || 0 },
+            { type: '全日制硕士生', count: parseInt(school.full_time_master) || 0 },
+            { type: '全日制博士生', count: parseInt(school.full_time_doctor) || 0 },
+            { type: '留学生本科生', count: parseInt(school.international_undergraduate) || 0 },
+            { type: '留学生专科生', count: parseInt(school.international_specialist) || 0 },
+            { type: '留学生硕士生', count: parseInt(school.international_master) || 0 },
+            { type: '留学生博士生', count: parseInt(school.international_doctor) || 0 }
+        ];
+
+        studentTypes.forEach(student => {
+            studentData.push({
+                '单位学校机构名称': school.school_name || '',
+                '学院类别': school.school_type || '',
+                '基准年份': parseInt(school.base_year) || 0,
+                '测算年份': parseInt(school.year) || 0,
+                '学生类型': student.type,
+                '学生数': student.count
+            });
+        });
+    });
+    
+    return studentData;
 }
 
 // 计算建筑面积缺口的函数

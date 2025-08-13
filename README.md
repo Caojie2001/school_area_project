@@ -1,296 +1,320 @@
 # 高校建筑面积缺口测算系统
 
-一个用于高校建筑面积缺口分析的现代化Web应用程序，支持在线数据录入、自动计算分析和报告生成。
+[![Node.js](https://img.shields.io/badge/Node.js-16+-green.svg)](https://nodejs.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-blue.svg)](https://www.mysql.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-2.0.0-orange.svg)](package.json)
 
-## 功能特点
+一个现代化的Web应用程序，用于高校建筑面积缺口分析与计算。支持在线数据录入、自动标准化计算、智能缺口分析和专业报告生成。
 
-### 核心功能
-- **在线数据录入** - 现代化表单界面，支持多种学校类型
-- **学生信息管理** - 详细的全日制/留学生分类统计  
-- **建筑面积分析** - 五大类建筑面积标准化计算
-- **特殊补助管理** - 动态添加特殊用房补助项目
-- **自动缺口分析** - 基于国家标准的智能计算
-- **报告生成** - 生成详细的Excel分析报告
-- **数据持久化** - 基于MySQL的数据存储
+## ✨ 核心功能
 
-### 系统特性
-- **现代化UI** - 响应式设计，支持移动端
-- **数据验证** - 完整的表单验证和错误处理
-- **多端兼容** - 支持桌面端和移动端访问
-- **实时计算** - 数据变化时自动更新计算结果
-- **数据管理** - 历史数据查询、编辑和删除功能
-- **统计分析** - 多维度数据统计和可视化
+### 🏫 学校信息管理
+- **多类型学校支持** - 综合类、理工类、农业类等多种院校类型
+- **学生数据统计** - 全日制学生、留学生分类管理
+- **建筑面积录入** - 现有建筑面积详细记录
+- **统计年份管理** - 支持学生统计年份和建筑统计年份独立设置
 
-## 技术架构
+### 📊 智能测算分析
+- **标准化计算** - 基于教育部标准的自动化面积计算
+- **五类建筑分析** - 教学、办公、宿舍、生活、后勤用房全覆盖
+- **缺口分析** - 精确计算各类建筑面积缺口
+- **达标评估** - 自动判断各类用房达标情况
+- **特殊补助** - 支持特殊用房补助项目动态添加
+
+### 🔐 用户权限管理
+- **多角色系统** - 管理员、基建中心、学校用户三级权限
+- **安全认证** - 基于Session的用户认证机制
+- **数据隔离** - 不同角色用户数据访问权限控制
+- **用户管理** - 完整的用户增删改查功能
+
+### 📈 统计分析功能
+- **多维度筛选** - 按年份、用户类型灵活筛选数据
+- **汇总统计** - 自动计算总面积、缺口等关键指标
+- **趋势分析** - 支持历史数据对比分析
+- **数据导出** - 生成Excel格式的专业分析报告
+
+### 📋 数据管理
+- **历史记录** - 完整的数据修改历史追踪
+- **批量操作** - 支持数据批量导入导出
+- **数据验证** - 完善的数据完整性检查
+- **备份恢复** - 支持数据备份和恢复功能
+
+## 🛠️ 技术架构
 
 ### 后端技术栈
-- **Node.js 16+** - 服务器运行环境
-- **Express.js** - Web应用框架
-- **MySQL 8.0+** - 数据库（支持本地和云端）
-- **mysql2** - MySQL连接驱动
-- **SheetJS (xlsx)** - Excel文件处理
-- **CORS** - 跨域资源共享
+```
+├── Node.js 16+          # 服务器运行环境
+├── Express.js 4.18+     # Web应用框架
+├── MySQL 8.0+           # 关系型数据库
+├── mysql2 3.14+         # MySQL连接驱动
+├── bcrypt 6.0+          # 密码加密
+├── express-session      # 会话管理
+├── xlsx 0.18+           # Excel文件处理
+└── cors 2.8+            # 跨域资源共享
+```
 
 ### 前端技术栈
-- **HTML5** - 语义化页面结构
-- **CSS3** - 现代化样式和布局
-- **JavaScript (ES6+)** - 原生JS交互逻辑
-- **Fetch API** - 异步数据通信
-- **响应式设计** - 适配多种设备
+```
+├── HTML5               # 语义化页面结构
+├── CSS3                # 现代化样式设计
+├── JavaScript ES6+     # 原生JS交互逻辑
+├── Fetch API           # 异步数据通信
+└── 响应式设计           # 多设备适配
+```
 
 ### 数据库设计
-- **school_info** - 学校基本信息和计算结果
-- **special_subsidies** - 特殊补助信息
-- **索引优化** - 查询性能优化
-- **事务支持** - 数据一致性保障
-
-## 项目结构
-
 ```
-高校建筑面积缺口测算系统/
-├── server.js                      # Express服务器主文件
-├── database.js                    # MySQL数据库连接和配置
-├── dataService.js                 # 数据访问层服务
-├── dataService_sqlserver_backup.js # SQL Server备份版本
-├── package.json                   # 项目依赖和脚本配置
-├── package-lock.json              # 依赖版本锁定文件
-├── install.sh                     # 自动安装配置脚本
-├── .env                           # 环境变量配置文件（需手动创建）
-├── .env.example                   # 环境变量配置模板
-├── .gitignore                     # Git版本控制忽略规则
-├── README.md                      # 项目说明文档
-│
-├── public/                        # 前端静态资源目录
-│   ├── index.html                 # 主应用页面
-│   └── script.js                  # 前端核心交互脚本
-│
-├── output/                        # Excel报告输出目录（自动创建）
-└── node_modules/                  # NPM依赖包目录（自动生成）
+├── school_info         # 学校信息与测算结果主表
+├── special_subsidies   # 特殊补助信息表
+├── users              # 用户信息与权限表
+└── 索引优化            # 查询性能优化
 ```
 
-## 快速开始
+## 📁 项目结构
+
+```
+school_area_project/
+├── 🚀 核心服务文件
+│   ├── server.js                    # Express服务器主文件
+│   ├── database.js                  # MySQL数据库连接配置
+│   ├── dataService.js               # 数据访问层服务
+│   └── authService.js               # 用户认证服务
+│
+├── ⚙️ 配置文件
+│   ├── package.json                 # 项目依赖和脚本配置
+│   ├── package-lock.json            # 依赖版本锁定文件
+│   ├── .env.example                 # 环境变量配置模板
+│   ├── .env                         # 环境变量配置文件（需创建）
+│   └── .gitignore                   # Git版本控制忽略规则
+│
+├── 🌐 前端界面
+│   └── public/
+│       ├── index.html               # 主应用界面
+│       ├── login.html               # 用户登录页面
+│       ├── user-management.html     # 用户管理页面
+│       ├── script.js                # 前端交互脚本
+│       └── login_background.jpg     # 登录背景图片
+│
+├── 📊 数据文件
+│   └── data/
+│       ├── 院校类别.xlsx            # 院校分类标准数据
+│       ├── 示例-测算结果.xlsx       # 测算结果示例
+│       └── 示例_测算汇总.xlsx       # 汇总数据示例
+│
+├── 📈 输出文件
+│   └── output/                      # Excel报告输出目录
+│
+├── 🔧 工具脚本
+│   ├── install.sh                   # 自动安装配置脚本
+│   └── update_database.sql          # 数据库结构更新脚本
+│
+└── 📝 文档
+    └── README.md                    # 项目说明文档
+```
+
+## 🚀 快速开始
 
 ### 环境要求
-- Node.js 16.0+
-- npm 或 yarn
-- MySQL 8.0+
+- **Node.js**: 16.0 或更高版本
+- **npm**: 8.0 或更高版本  
+- **MySQL**: 8.0 或更高版本
+- **操作系统**: Windows 10+, macOS 10.15+, Ubuntu 18.04+
 
 ### 安装步骤
 
-#### 方式一：使用安装脚本（推荐）
+#### 方式一：自动安装（推荐）
 ```bash
-# 克隆或下载项目后运行
+# 1. 克隆或下载项目
+git clone <repository-url>
+cd school_area_project
+
+# 2. 运行自动安装脚本
 chmod +x install.sh
 ./install.sh
 ```
 
 #### 方式二：手动安装
 ```bash
-# 1. 安装依赖
+# 1. 安装项目依赖
 npm install
 
 # 2. 复制环境配置文件
 cp .env.example .env
 
-# 3. 编辑环境配置
+# 3. 编辑数据库配置
 nano .env
 ```
 
-### 配置数据库
+### 数据库配置
 
-1. 确保MySQL服务正在运行
-2. 创建数据库（可选，应用会自动创建）：
+1. **创建数据库**
 ```sql
 CREATE DATABASE school_area_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-3. 配置 `.env` 文件：
+2. **配置环境变量** (`.env`)
 ```env
-# 服务器端口
-PORT=3000
-
-# MySQL数据库配置
+# 数据库配置
 DB_HOST=localhost
 DB_PORT=3306
-DB_USER=root
+DB_USER=your_username
 DB_PASSWORD=your_password
 DB_NAME=school_area_management
 
-# 文件存储路径
-OUTPUT_DIR=output
+# 会话配置
+SESSION_SECRET=your_secret_key_here
 
-# 保留的历史文件数量
-KEEP_FILES_COUNT=5
+# 服务器配置
+PORT=3000
+NODE_ENV=production
+```
+
+3. **运行数据库更新脚本**（如果需要）
+```bash
+mysql -u your_username -p school_area_management < update_database.sql
 ```
 
 ### 启动应用
 
 ```bash
-# 启动服务器
-node server.js
-
-# 或使用npm脚本
+# 生产环境启动
 npm start
+
+# 开发环境启动（需要安装nodemon）
+npm run dev
 ```
 
-应用启动后，访问 http://localhost:3000
+访问应用: http://localhost:3000
 
-## 数据库表结构
+## 👥 默认用户账号
 
-### school_info 表
-存储学校基本信息和计算结果
-```sql
-CREATE TABLE school_info (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    school_name VARCHAR(100) NOT NULL,
-    school_type VARCHAR(50),
-    year INT,
-    full_time_undergraduate INT DEFAULT 0,
-    full_time_specialist INT DEFAULT 0,
-    full_time_master INT DEFAULT 0,
-    full_time_doctor INT DEFAULT 0,
-    international_undergraduate INT DEFAULT 0,
-    international_specialist INT DEFAULT 0,
-    international_master INT DEFAULT 0,
-    international_doctor INT DEFAULT 0,
-    total_students INT DEFAULT 0,
-    teaching_area DECIMAL(12,2) DEFAULT 0.00,
-    office_area DECIMAL(12,2) DEFAULT 0.00,
-    total_living_area DECIMAL(12,2) DEFAULT 0.00,
-    dormitory_area DECIMAL(12,2) DEFAULT 0.00,
-    logistics_area DECIMAL(12,2) DEFAULT 0.00,
-    current_building_area DECIMAL(12,2) DEFAULT 0.00,
-    required_building_area DECIMAL(12,2) DEFAULT 0.00,
-    teaching_area_gap DECIMAL(12,2) DEFAULT 0.00,
-    office_area_gap DECIMAL(12,2) DEFAULT 0.00,
-    dormitory_area_gap DECIMAL(12,2) DEFAULT 0.00,
-    other_living_area_gap DECIMAL(12,2) DEFAULT 0.00,
-    logistics_area_gap DECIMAL(12,2) DEFAULT 0.00,
-    total_area_gap DECIMAL(12,2) DEFAULT 0.00,
-    special_subsidy_total DECIMAL(12,2) DEFAULT 0.00,
-    overall_compliance BOOLEAN DEFAULT false,
-    calculation_results LONGTEXT,
-    remarks TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+系统会自动创建以下默认用户：
+
+| 角色 | 用户名 | 密码 | 权限说明 |
+|------|--------|------|----------|
+| 管理员 | admin | admin123 | 系统管理、用户管理、数据查看 |
+| 基建中心 | jjzx | jjzx123 | 数据审核、统计分析 |
+| 学校用户 | shlgdx | shlgdx123 | 数据录入、报告查看 |
+
+> ⚠️ **安全提示**: 首次登录后请立即修改默认密码！
+
+## 📖 使用指南
+
+### 数据录入流程
+1. **登录系统** - 使用学校用户账号登录
+2. **选择学校类型** - 根据实际情况选择院校类型
+3. **录入学生数据** - 分类录入全日制和留学生人数
+4. **录入建筑面积** - 填写现有建筑面积数据
+5. **添加特殊补助** - 根据需要添加特殊用房补助
+6. **自动计算** - 系统自动计算缺口并生成分析结果
+7. **生成报告** - 导出Excel格式的详细分析报告
+
+### 数据管理功能
+- **数据查询** - 支持多条件组合查询
+- **数据编辑** - 在线编辑已保存的数据
+- **数据删除** - 安全删除不需要的记录
+- **批量操作** - 批量导入导出数据
+
+### 统计分析功能
+- **年份筛选** - 按测算年份查看数据
+- **用户筛选** - 按用户类型分析数据
+- **汇总统计** - 查看总体统计指标
+- **趋势分析** - 多年数据对比分析
+
+## 🔧 系统配置
+
+### 计算标准配置
+系统采用以下国家标准进行计算：
+- **教学及辅助用房**: 根据学科类型和学生规模
+- **办公用房**: 按学生总数比例计算
+- **学生宿舍**: 按在校学生数量计算
+- **其他生活用房**: 根据学生总数配置
+- **后勤辅助用房**: 按学校规模配置
+
+### 权限配置说明
+- **管理员**: 完全权限，包括用户管理和系统配置
+- **基建中心**: 数据审核和统计分析权限
+- **学校用户**: 数据录入和查看权限
+
+## 🐛 故障排除
+
+### 常见问题
+
+**1. 数据库连接失败**
+```bash
+# 检查MySQL服务状态
+sudo systemctl status mysql
+
+# 检查环境变量配置
+cat .env
 ```
 
-### special_subsidies 表
-存储特殊补助信息
-```sql
-CREATE TABLE special_subsidies (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    school_info_id INT NOT NULL,
-    subsidy_name VARCHAR(200) NOT NULL,
-    subsidy_amount DECIMAL(12,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (school_info_id) REFERENCES school_info(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+**2. 端口被占用**
+```bash
+# 查找占用端口的进程
+lsof -i :3000
+
+# 终止进程
+kill -9 <PID>
 ```
 
-## API接口
+**3. 依赖安装失败**
+```bash
+# 清除npm缓存
+npm cache clean --force
 
-### 数据录入
-- `POST /api/submit` - 提交学校数据
-- `GET /api/data` - 获取学校数据列表
-- `GET /api/data/:id` - 获取指定学校数据
-- `PUT /api/data/:id` - 更新学校数据
-- `DELETE /api/data/:id` - 删除学校数据
+# 重新安装依赖
+rm -rf node_modules package-lock.json
+npm install
+```
 
-### 特殊补助
-- `GET /api/subsidies/:schoolId` - 获取学校特殊补助
-- `POST /api/subsidies` - 添加特殊补助
-- `DELETE /api/subsidies/:id` - 删除特殊补助
+## 📊 性能优化
 
-### 报告生成
-- `POST /api/generate-report` - 生成Excel报告
-- `GET /api/export-data` - 导出所有数据
+### 数据库优化
+- 使用索引优化查询性能
+- 定期清理过期数据
+- 配置适当的连接池大小
 
-### 统计分析
-- `GET /api/statistics` - 获取统计数据
+### 应用优化
+- 启用Gzip压缩
+- 使用CDN加速静态资源
+- 配置缓存策略
 
-## 计算标准
+## 🔄 版本更新
 
-### 基础指标（平方米/生）
+### 2.0.0 (当前版本)
+- ✅ 新增用户权限管理系统
+- ✅ 优化统计分析功能
+- ✅ 改进数据验证逻辑
+- ✅ 增强安全性配置
+- ✅ 重构代码架构
 
-| 学校类型 | A（教学） | B（办公） | C1（宿舍） | C2（其他生活） | D（后勤） |
-|---------|-----------|-----------|------------|---------------|-----------|
-| 医学院校 | 16        | 1.6       | 6.5        | 1.3           | 1.3       |
-| 师范院校 | 14        | 1.4       | 6.5        | 1.3           | 1.3       |
-| 农林院校 | 16        | 1.6       | 6.5        | 1.3           | 1.3       |
-| 工科院校 | 18        | 1.8       | 6.5        | 1.3           | 1.3       |
-| 财经院校 | 9         | 0.9       | 6.5        | 1.3           | 1.3       |
-| 政法院校 | 9         | 0.9       | 6.5        | 1.3           | 1.3       |
-| 体育院校 | 22        | 2.2       | 6.5        | 1.3           | 1.3       |
-| 艺术院校 | 18        | 1.8       | 6.5        | 1.3           | 1.3       |
-| 民族院校 | 14        | 1.4       | 6.5        | 1.3           | 1.3       |
-| 语言院校 | 9         | 0.9       | 6.5        | 1.3           | 1.3       |
-| 综合院校 | 14        | 1.4       | 6.5        | 1.3           | 1.3       |
+### 1.x.x (历史版本)
+- 基础的面积计算功能
+- 简单的数据录入界面
+- Excel报告生成
 
-### 特殊补助标准（平方米/生）
+## 🤝 贡献指南
 
-针对硕士生、博士生和留学生的额外补助：
-- **教学用房**：硕士生 5.0，博士生 8.0，留学生 3.0
-- **办公用房**：硕士生 0.5，博士生 0.8，留学生 0.3
-- **宿舍用房**：硕士生 7.0，博士生 12.0，留学生 8.0
-- **其他生活用房**：硕士生 1.5，博士生 2.5，留学生 1.5
-- **后勤用房**：硕士生 1.5，博士生 2.5，留学生 1.5
+1. Fork 项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启一个Pull Request
 
-## 开发说明
+## 📄 许可证
 
-### 目录说明
-- `server.js` - Express服务器主文件，包含所有API路由
-- `database.js` - 数据库连接配置和表初始化
-- `dataService.js` - 数据访问层，封装所有数据库操作
-- `public/index.html` - 前端主页面，包含表单和界面
-- `public/script.js` - 前端交互逻辑和API调用
-- `output/` - 生成的Excel报告存储目录
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
-### 主要功能模块
-1. **数据录入模块** - 学校基本信息和建筑面积录入
-2. **计算模块** - 基于国家标准的面积缺口计算
-3. **特殊补助模块** - 动态管理特殊用房补助
-4. **数据管理模块** - 历史数据查询、编辑、删除
-5. **报告生成模块** - Excel格式的分析报告生成
-6. **统计分析模块** - 多维度数据统计和展示
+## 📞 技术支持
 
-## 更新日志
+- **项目仓库**: [GitHub Repository](https://github.com/your-username/school-area-calculator)
+- **问题反馈**: [Issues](https://github.com/your-username/school-area-calculator/issues)
+- **开发文档**: [Wiki](https://github.com/your-username/school-area-calculator/wiki)
 
-### v2.5.1 (2024-08-04)
-#### 用户体验优化
-- **改进**：数据管理编辑功能体验优化
-- **简化**：移除编辑确认弹窗，点击编辑直接跳转并填充数据
-- **优化**：移除数据填充成功/失败提示窗口，实现完全静默的编辑操作
-- **修复**：特殊补助信息自动填充功能
-  - 修复特殊补助数据解析问题
-  - 支持多种数据格式的兼容性处理  
-  - 优先匹配中文字段名（"特殊用房补助名称"、"补助面积（m²）"）
-  - 增加详细的调试日志输出
-  - 确保历史数据的特殊补助项能正确填充到表单
-  - 同步修复详情显示功能的字段名匹配问题
-- **提升**：提高操作流畅性，减少不必要的用户交互步骤
+---
 
-### v2.5.0 (2024-12-28) 
-#### 重大更新：Excel标准化格式
-- **新增**：采用教育部标准"高校建筑规模测算结果"表格格式
-- **优化**：Excel输出采用单一标准化工作表，提升专业性
-- **改进**：表格布局优化，包含学生数统计、规划/现状/缺口面积对比
-- **增强**：支持单元格合并、列宽调整、标题居中等专业格式
-- **完善**：保留特殊补助明细作为独立工作表
-- **标准化**：符合高校建筑规模测算官方报告要求
-
-### v2.4.0 (2025-08-04)
-- **修复**：下载完整分析报告功能
-  - 修复了下载按钮无法正确调用的问题
-  - 优化了数据传递机制，使用全局变量存储分析结果
-  - 改进了Excel文件生成逻辑，分别创建学校信息、计算结果和特殊补助明细工作表
-  - 增加了详细的错误处理和日志输出
-  - 确保下载功能的稳定性和可靠性
-
-## 许可证
-
-MIT License
-
-## 技术支持
-
-如需技术支持或有问题反馈，请查看项目文档或联系开发团队。
+**开发团队**: School Area Calculator Team  
+**最后更新**: 2025年8月13日  
+**版本**: 2.0.0

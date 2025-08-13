@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高校建筑面积缺口测算系统</title>
+    <title>高校建筑面积缺口测算系统 - v2.1</title>
     <style>
         * {
             margin: 0;
@@ -93,6 +93,64 @@
             display: inline-block;
         }
 
+        /* 下拉菜单样式 */
+        .menu-dropdown {
+            position: relative;
+        }
+
+        .menu-dropdown-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .menu-dropdown-arrow {
+            transition: transform 0.3s ease;
+            font-size: 12px;
+        }
+
+        .menu-dropdown.open .menu-dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .menu-dropdown-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #34495e;
+        }
+
+        .menu-dropdown.open .menu-dropdown-content {
+            max-height: 200px;
+        }
+
+        .submenu-item {
+            display: block;
+            padding: 12px 25px 12px 45px;
+            color: #95a5a6;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 400;
+            border-left: 4px solid transparent;
+        }
+
+        .submenu-item:hover {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-left-color: #3498db;
+            transform: translateX(5px);
+        }
+
+        .submenu-item.active {
+            background: #2c3e50;
+            color: #3498db;
+            border-left-color: #3498db;
+            font-weight: 600;
+        }
+
         /* 主内容区域 */
         .main-content {
             flex: 1;
@@ -106,19 +164,79 @@
             padding: 25px 30px;
             border-bottom: 1px solid #e9ecef;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .content-header h2 {
+        .content-header-left h2 {
             font-size: 28px;
             color: #2c3e50;
             margin-bottom: 8px;
             font-weight: 700;
         }
 
-        .content-header p {
+        .content-header-left p {
             color: #6c757d;
             font-size: 16px;
             margin: 0;
+        }
+
+        .content-header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #2c3e50;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .user-role {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s ease;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
         }
 
         .content-body {
@@ -331,36 +449,297 @@
 
         /* 表格样式 */
         .table-container {
-            overflow-x: auto;
+            overflow: visible; /* 移除整体滚动条 */
             margin-top: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: relative;
         }
 
         .data-table {
             width: 100%;
-            border-collapse: collapse;
+            min-width: 1400px; /* 设置最小宽度以适应更多列 */
+            border-collapse: separate; /* 改为separate以支持sticky定位 */
+            border-spacing: 0;
             background: white;
+            position: relative;
+        }
+
+        /* 数据列滚动区域 */
+        .data-table-wrapper {
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 数据列滚动区域 */
+        .data-table-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .data-table-scroll-area {
+            margin-left: 240px; /* 左侧冻结列宽度 */
+            margin-right: 260px; /* 右侧操作列宽度 */
+            overflow-x: auto; /* 只在数据列区域添加水平滚动 */
+            overflow-y: hidden;
+        }
+
+        /* 新的分栏表格结构 */
+        .frozen-left-columns {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 240px;
+            z-index: 20;
+            background: #f8f9fa;
+            border-right: 2px solid #dee2e6;
+        }
+
+        .scrollable-middle-columns {
+            margin-left: 240px;
+            margin-right: 200px;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .frozen-right-columns {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 200px;
+            z-index: 20;
+            background: #f8f9fa;
+            border-left: 2px solid #dee2e6;
+        }
+
+        .data-table-frozen-left,
+        .data-table-scrollable,
+        .data-table-frozen-right {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+        }
+
+        .data-table-frozen-left th,
+        .data-table-frozen-left td,
+        .data-table-scrollable th,
+        .data-table-scrollable td,
+        .data-table-frozen-right th,
+        .data-table-frozen-right td {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+            border-right: 1px solid #e9ecef;
+            font-size: 12px;
+            white-space: nowrap;
+            background: white;
+        }
+
+        /* 冻结列单元格使用灰色背景 */
+        .data-table-frozen-left th,
+        .data-table-frozen-left td,
+        .data-table-frozen-right th,
+        .data-table-frozen-right td {
+            background: #f8f9fa;
+        }
+
+        .data-table-frozen-left th,
+        .data-table-scrollable th,
+        .data-table-frozen-right th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 11px;
+            letter-spacing: 0.3px;
+            position: sticky;
+            top: 0;
+            z-index: 25;
+        }
+
+        /* 中间滚动区域的表头保持原色 */
+        .data-table-scrollable th {
+            background: #f8f9fa;
+        }
+
+        .data-table-frozen-left tr:hover,
+        .data-table-scrollable tr:hover,
+        .data-table-frozen-right tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* 冻结列hover效果 */
+        .data-table-frozen-left tr:hover td,
+        .data-table-frozen-right tr:hover td {
+            background: #e9ecef;
+        }
+
+        /* 中间滚动区域hover效果 */
+        .data-table-scrollable tr:hover td {
+            background: #f8f9fa;
+        }
+
+        /* 左侧冻结列特殊样式 */
+        .data-table-frozen-left th:first-child,
+        .data-table-frozen-left td:first-child {
+            width: 80px;
+            min-width: 80px;
+        }
+
+        .data-table-frozen-left th:last-child,
+        .data-table-frozen-left td:last-child {
+            width: 160px;
+            min-width: 160px;
+            text-align: left;
+            padding-left: 12px;
+        }
+
+        /* 中间滚动列统一宽度 */
+        .data-table-scrollable th,
+        .data-table-scrollable td {
+            width: 140px;
+            min-width: 140px;
+        }
+
+        .data-table-scrollable td:nth-child(1),
+        .data-table-scrollable td:nth-child(2),
+        .data-table-scrollable td:nth-child(3),
+        .data-table-scrollable td:nth-child(4),
+        .data-table-scrollable td:nth-child(5) {
+            text-align: right;
+            padding-right: 12px;
+        }
+
+        .data-table-scrollable td:nth-child(6),
+        .data-table-scrollable td:nth-child(7) {
+            width: 120px;
+            min-width: 120px;
+        }
+
+        /* 右侧操作列样式 */
+        .data-table-frozen-right th,
+        .data-table-frozen-right td {
+            width: 200px;
+            min-width: 200px;
         }
 
         .data-table th,
         .data-table td {
-            padding: 15px 12px;
-            text-align: left;
+            padding: 10px 8px; /* 减少左右padding以节省空间 */
+            text-align: center; /* 居中对齐提高可读性 */
             border-bottom: 1px solid #e9ecef;
+            border-right: 1px solid #e9ecef;
+            font-size: 12px; /* 略微减小字体 */
+            white-space: nowrap; /* 防止换行 */
+            background: white; /* 确保背景色 */
         }
 
         .data-table th {
             background: #f8f9fa;
             font-weight: 600;
             color: #2c3e50;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 11px;
+            letter-spacing: 0.3px;
+            position: sticky; /* 使表头固定 */
+            top: 0;
+            z-index: 20;
         }
 
         .data-table tr:hover {
             background: #f8f9fa;
+        }
+
+        /* hover状态下的冻结列特殊处理 */
+        .data-table tr:hover td:nth-child(1),
+        .data-table tr:hover td:nth-child(2),
+        .data-table tr:hover td:last-child {
+            background: #e9ecef; /* 冻结列hover时使用稍深的背景色 */
+        }
+
+        /* 冻结左侧列：测算年份和学校名称 */
+        .data-table th:nth-child(1),
+        .data-table td:nth-child(1) {
+            position: sticky;
+            left: 0;
+            z-index: 15;
+            background: #f8f9fa;
+            border-right: 2px solid #dee2e6;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .data-table th:nth-child(2),
+        .data-table td:nth-child(2) {
+            position: sticky;
+            left: 80px; /* 第一列的宽度 */
+            z-index: 15;
+            background: #f8f9fa;
+            border-right: 2px solid #dee2e6;
+            font-weight: bold;
+            text-align: left; /* 学校名称左对齐 */
+            padding-left: 12px;
+        }
+
+        /* 冻结右侧操作列 */
+        .data-table th:last-child,
+        .data-table td:last-child {
+            position: sticky;
+            right: 0;
+            z-index: 15;
+            background: #f8f9fa;
+            border-left: 2px solid #dee2e6;
+            min-width: 260px;
+        }
+
+        /* 表头特殊样式 */
+        .data-table th:nth-child(1),
+        .data-table th:nth-child(2),
+        .data-table th:last-child {
+            z-index: 25; /* 表头优先级更高 */
+        }
+
+        /* 数据列特殊样式 */
+        .data-table td:nth-child(3),
+        .data-table td:nth-child(4),
+        .data-table td:nth-child(5),
+        .data-table td:nth-child(6),
+        .data-table td:nth-child(7) {
+            text-align: right;
+            padding-right: 12px;
+        }
+
+        /* 设置列宽 */
+        .data-table th:nth-child(1),
+        .data-table td:nth-child(1) {
+            width: 80px;
+            min-width: 80px;
+        }
+
+        .data-table th:nth-child(2),
+        .data-table td:nth-child(2) {
+            width: 160px;
+            min-width: 160px;
+        }
+
+        .data-table th:nth-child(3),
+        .data-table td:nth-child(3),
+        .data-table th:nth-child(4),
+        .data-table td:nth-child(4),
+        .data-table th:nth-child(5),
+        .data-table td:nth-child(5),
+        .data-table th:nth-child(6),
+        .data-table td:nth-child(6),
+        .data-table th:nth-child(7),
+        .data-table td:nth-child(7) {
+            width: 140px;
+            min-width: 140px;
+        }
+
+        .data-table th:nth-child(8),
+        .data-table td:nth-child(8) {
+            width: 120px;
+            min-width: 120px;
         }
 
         /* 搜索栏 */
@@ -1507,12 +1886,10 @@
 
         /* 缺口显示样式 */
         .gap-positive {
-            color: #dc2626;
             font-weight: 600;
         }
         
         .gap-negative {
-            color: #16a34a;
             font-weight: 600;
         }
 
@@ -1537,11 +1914,14 @@
                 <a class="menu-item" onclick="showPage('data-management')" id="menu-data-management">
                     数据管理
                 </a>
-                <!-- 统计分析菜单项已注释
-                <a class="menu-item" onclick="showPage('statistics')" id="menu-statistics">
+                <!-- 统计分析菜单项（仅基建中心和管理员可见） -->
+                <a class="menu-item" onclick="showPage('statistics')" id="menu-statistics" style="display: none;">
                     统计分析
                 </a>
-                -->
+                <!-- 用户管理菜单项（仅管理员可见） -->
+                <a class="menu-item" onclick="showPage('user-management')" id="menu-user-management" style="display: none;">
+                    用户管理
+                </a>
             </div>
         </nav>
 
@@ -1550,8 +1930,20 @@
             <!-- 数据填报页面 -->
             <div id="page-data-entry" class="page-content active">
                 <div class="content-header">
-                    <h2>数据填报</h2>
-                    <p>填写学校基本信息和建筑面积数据，自动计算建筑面积缺口</p>
+                    <div class="content-header-left">
+                        <h2>数据填报</h2>
+                        <p>填写学校基本信息和建筑面积数据，自动计算建筑面积缺口</p>
+                    </div>
+                    <div class="content-header-right">
+                        <div class="user-info" id="userInfo">
+                            <div class="user-avatar" id="userAvatar">A</div>
+                            <div class="user-details">
+                                <div class="user-name" id="userName">加载中...</div>
+                                <div class="user-role" id="userRole">用户</div>
+                            </div>
+                        </div>
+                        <button class="logout-btn" onclick="logout()">退出登录</button>
+                    </div>
                 </div>
                 <div class="content-body">
                     <!-- 在线数据填写表单 -->
@@ -1616,31 +2008,33 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="form-group form-group-base-year">
-                                    <label for="base_year">基准年份 *</label>
-                                    <div class="year-selector-container">
-                                        <input type="text" id="base_year" name="base_year" value="2025" readonly required class="form-control year-input" onclick="showBaseYearGrid()">
-                                        <div class="year-grid-overlay" id="baseYearGridOverlay" style="display: none;">
-                                            <div class="year-grid-container">
-                                                <div class="year-grid-header">
-                                                    <button type="button" class="year-nav-btn" id="baseYearPrevBtn" onclick="moveBaseYearGrid(-1)">‹</button>
-                                                    <span class="year-range-text" id="baseYearRangeText"></span>
-                                                    <button type="button" class="year-nav-btn" id="baseYearNextBtn" onclick="moveBaseYearGrid(1)">›</button>
-                                                </div>
-                                                <div class="year-grid" id="baseYearGrid">
-                                                    <!-- 基准年份九宫格将在这里动态生成 -->
-                                                </div>
-                                                <div class="year-grid-footer">
-                                                    <button type="button" class="year-close-btn" onclick="hideBaseYearGrid()">关闭</button>
+                            </div>
+                            
+                            <div class="card">
+                                <h3>学生人数信息</h3>
+                                <div class="form-row" style="margin-bottom: 20px;">
+                                    <div class="form-group form-group-student-year">
+                                        <label for="student_stat_year">学生统计年份 *</label>
+                                        <div class="year-selector-container">
+                                            <input type="text" id="student_stat_year" name="student_stat_year" value="2025" readonly required class="form-control year-input" onclick="showStudentYearGrid()">
+                                            <div class="year-grid-overlay" id="studentYearGridOverlay" style="display: none;">
+                                                <div class="year-grid-container">
+                                                    <div class="year-grid-header">
+                                                        <button type="button" class="year-nav-btn" id="studentYearPrevBtn" onclick="moveStudentYearGrid(-1)">‹</button>
+                                                        <span class="year-range-text" id="studentYearRangeText"></span>
+                                                        <button type="button" class="year-nav-btn" id="studentYearNextBtn" onclick="moveStudentYearGrid(1)">›</button>
+                                                    </div>
+                                                    <div class="year-grid" id="studentYearGrid">
+                                                        <!-- 学生统计年份九宫格将在这里动态生成 -->
+                                                    </div>
+                                                    <div class="year-grid-footer">
+                                                        <button type="button" class="year-close-btn" onclick="hideStudentYearGrid()">关闭</button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <div class="card">
-                                <h3>学生人数信息</h3>
                                 <div class="student-category">
                                     <div class="form-row">
                                         <div class="form-group">
@@ -1693,51 +2087,74 @@
                             
                             <div class="card">
                                 <h3>现状建筑面积信息</h3>
+                                <div class="form-row" style="margin-bottom: 20px;">
+                                    <div class="form-group form-group-building-year">
+                                        <label for="building_stat_year">建筑面积统计年份 *</label>
+                                        <div class="year-selector-container">
+                                            <input type="text" id="building_stat_year" name="building_stat_year" value="2025" readonly required class="form-control year-input" onclick="showBuildingYearGrid()">
+                                            <div class="year-grid-overlay" id="buildingYearGridOverlay" style="display: none;">
+                                                <div class="year-grid-container">
+                                                    <div class="year-grid-header">
+                                                        <button type="button" class="year-nav-btn" id="buildingYearPrevBtn" onclick="moveBuildingYearGrid(-1)">‹</button>
+                                                        <span class="year-range-text" id="buildingYearRangeText"></span>
+                                                        <button type="button" class="year-nav-btn" id="buildingYearNextBtn" onclick="moveBuildingYearGrid(1)">›</button>
+                                                    </div>
+                                                    <div class="year-grid" id="buildingYearGrid">
+                                                        <!-- 建筑面积统计年份九宫格将在这里动态生成 -->
+                                                    </div>
+                                                    <div class="year-grid-footer">
+                                                        <button type="button" class="year-close-btn" onclick="hideBuildingYearGrid()">关闭</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="form-row">
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
-                                        <label for="teachingArea">现状教学及辅助用房面积(m²)</label>
+                                        <label for="teachingArea">教学及辅助用房面积(m²)</label>
                                         <input type="number" id="teachingArea" name="teachingArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">包括教室、实验室、图书馆等</small>
                                     </div>
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
-                                        <label for="officeArea">现状办公用房面积(m²)</label>
+                                        <label for="officeArea">办公用房面积(m²)</label>
                                         <input type="number" id="officeArea" name="officeArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">行政办公、教师办公等</small>
                                     </div>
                                     <div class="form-group" style="flex: 1;">
-                                        <label for="logisticsArea">现状后勤辅助用房面积(m²)</label>
+                                        <label for="logisticsArea">后勤辅助用房面积(m²)</label>
                                         <input type="number" id="logisticsArea" name="logisticsArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateTotalBuildingArea()" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">设备用房、仓库等</small>
                                     </div>
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
-                                        <label for="totalLivingArea">现状生活用房总面积(m²)</label>
+                                        <label for="totalLivingArea">生活用房总面积(m²)</label>
                                         <input type="number" id="totalLivingArea" name="totalLivingArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateOtherLivingArea(); calculateTotalBuildingArea();" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">所有生活用房的总面积</small>
                                     </div>
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
-                                        <label for="dormitoryArea">现状学生宿舍面积(m²)</label>
+                                        <label for="dormitoryArea">其中:学生宿舍面积(m²)</label>
                                         <input type="number" id="dormitoryArea" name="dormitoryArea" min="0" step="0.01" value="0" class="form-control" oninput="calculateOtherLivingArea(); calculateTotalBuildingArea();" style="background: white; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">学生住宿用房面积</small>
                                     </div>
                                     <div class="form-group" style="flex: 1;">
-                                        <label>现状其他生活用房面积(m²)</label>
+                                        <label>其中:其他生活用房面积(m²)</label>
                                         <input type="text" id="otherLivingArea" readonly class="form-control calculated-field" style="background: #f5f5f5; border: 1px solid #ddd;">
                                         <small style="color: #6c757d; font-size: 12px;">自动计算：生活用房总面积 - 学生宿舍面积</small>
                                     </div>
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>现状建筑总面积(m²)</label>
+                                        <label>建筑总面积(m²)</label>
                                         <input type="text" id="totalBuildingArea" readonly class="form-control calculated-field" style="background: #f5f5f5; border: 1px solid #ddd; font-weight: bold;">
-                                        <small style="color: #6c757d; font-size: 12px;">自动计算：现状教学及辅助用房面积+现状办公用房面积+现状生活用房总面积+现状后勤辅助用房面积</small>
+                                        <small style="color: #6c757d; font-size: 12px;">自动计算：教学及辅助用房面积+办公用房面积+生活用房总面积+后勤辅助用房面积</small>
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="card">
-                                <h3>特殊补助信息</h3>
+                                <h3>特殊用房补助信息</h3>
                                 <div id="specialSubsidies">
                                     <!-- 特殊补助项将在这里动态添加 -->
                                 </div>
@@ -1798,18 +2215,29 @@
             <!-- 数据管理页面 -->
             <div id="page-data-management" class="page-content">
                 <div class="content-header">
-                    <h2>数据管理</h2>
-                    <p>查看、编辑和管理已提交的学校数据记录</p>
+                    <div class="content-header-left">
+                        <h2>数据管理</h2>
+                        <p>查看、编辑和管理已提交的测算数据记录</p>
+                    </div>
+                    <div class="content-header-right">
+                        <div class="user-info" id="userInfo2">
+                            <div class="user-avatar" id="userAvatar2">A</div>
+                            <div class="user-details">
+                                <div class="user-name" id="userName2">加载中...</div>
+                                <div class="user-role" id="userRole2">用户</div>
+                            </div>
+                        </div>
+                        <button class="logout-btn" onclick="logout()">退出登录</button>
+                    </div>
                 </div>
                 <div class="content-body">
                     <!-- 学校历史查询 -->
                     <div class="card">
-                        <h3>学校记录查询</h3>
                         <div class="search-bar">
-                            <select id="dataYearFilter" class="search-input" style="width: 14%; min-width: 120px;">
+                            <select id="dataYearFilter" class="search-input" style="width: 12%; min-width: 100px;">
                                 <option value="all">所有测算年份</option>
                             </select>
-                            <select id="dataSchoolNameFilter" class="search-input" style="width: 40%; min-width: 200px;">
+                            <select id="dataSchoolNameFilter" class="search-input" style="width: 28%; min-width: 150px;">
                                 <option value="all">所有学校</option>
                                 <option value="上海大学">上海大学</option>
                                 <option value="上海交通大学医学院">上海交通大学医学院</option>
@@ -1841,9 +2269,12 @@
                                 <option value="上海农林职业技术学院">上海农林职业技术学院</option>
                                 <option value="上海健康医学院附属卫生学校(上海健康护理职业学院(筹))">上海健康医学院附属卫生学校(上海健康护理职业学院(筹))</option>
                             </select>
+                            <select id="dataUserFilter" class="search-input" style="width: 15%; min-width: 100px;">
+                                <option value="all">所有测算用户</option>
+                            </select>
 
-                            <button class="btn btn-primary" onclick="searchDataRecords()" style="width: 12%; min-width: 80px; margin-left: 10px;">查找</button>
-                            <button class="btn btn-secondary" onclick="batchDownloadSearchResults()" id="batchDownloadBtn" style="background: #28a745; color: white; width: 16%; min-width: 100px; margin-left: 10px;" disabled>批量下载</button>
+                            <button class="btn btn-primary" onclick="searchDataRecords()" style="width: 10%; min-width: 70px; margin-left: 8px;">查找</button>
+                            <button class="btn btn-secondary" onclick="batchDownloadSearchResults()" id="batchDownloadBtn" style="background: #28a745; color: white; width: 13%; min-width: 90px; margin-left: 8px;" disabled>批量下载</button>
                         </div>
                         
                         <div id="dataHistoryResults">
@@ -1853,14 +2284,374 @@
                 </div>
             </div>
 
+            <!-- 统计分析页面 -->
+            <div id="page-statistics" class="page-content">
+                <div class="content-header">
+                    <div class="content-header-left">
+                        <h2>统计分析</h2>
+                        <p>查看各学校数据填报情况的总体概览</p>
+                    </div>
+                    <div class="content-header-right">
+                        <div class="user-info" id="userInfo3">
+                            <div class="user-avatar" id="userAvatar3">A</div>
+                            <div class="user-details">
+                                <div class="user-name" id="userName3">加载中...</div>
+                                <div class="user-role" id="userRole3">用户</div>
+                            </div>
+                        </div>
+                        <button class="logout-btn" onclick="logout()">退出登录</button>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <!-- 数据统计卡片 -->
+                    <div class="stats-cards-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                        <div class="stat-card">
+                            <h4>现状建筑总面积</h4>
+                            <div class="stat-value" id="overviewCurrentArea">0.00</div>
+                            <div class="stat-unit">(m²)</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>学生规模测算建筑总面积</h4>
+                            <div class="stat-value" id="overviewRequiredArea">0.00</div>
+                            <div class="stat-unit">(m²)</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>学生规模测算建筑面积总缺额(不含补助)</h4>
+                            <div class="stat-value" id="overviewGapWithoutSubsidy">0.00</div>
+                            <div class="stat-unit">(m²)</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>学生规模测算建筑面积总缺额(含补助)</h4>
+                            <div class="stat-value" id="overviewGapWithSubsidy">0.00</div>
+                            <div class="stat-unit">(m²)</div>
+                        </div>
+                    </div>
+
+                    <!-- 筛选区域 -->
+                    <div class="card">
+                        <div class="search-bar">
+                            <select id="overviewYearFilter" class="search-input" style="width: 20%; min-width: 120px;">
+                                <!-- 年份选项将通过JavaScript动态加载 -->
+                            </select>
+                            <select id="overviewUserTypeFilter" class="search-input" style="width: 25%; min-width: 150px;">
+                                <option value="school">所有学校用户</option>
+                                <option value="construction_center" selected>所有基建中心用户</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="searchOverviewRecords()" style="width: 10%; min-width: 70px; margin-left: 8px;">查找</button>
+                        </div>
+                        
+                        <!-- 记录总数显示 -->
+                        <div id="overviewRecordCount" class="record-count" style="display: none; margin-top: 15px; padding: 8px 12px; background: #e8f4fd; border-radius: 6px; border-left: 4px solid #3498db; font-size: 14px; color: #333;">
+                            共找到 <span id="overviewTotalCount">0</span> 条记录
+                        </div>
+                        
+                        <!-- 数据表格 -->
+                        <div id="overviewDataResults" style="margin-top: 20px;">
+                            <div class="alert alert-info">请选择筛选条件并点击查找按钮</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 用户管理页面 -->
+            <div id="page-user-management" class="page-content">
+                <div class="content-header">
+                    <div class="content-header-left">
+                        <h2>用户管理</h2>
+                        <p>管理系统用户账户和权限</p>
+                    </div>
+                    <div class="content-header-right">
+                        <div class="user-info" id="userInfo4">
+                            <div class="user-avatar" id="userAvatar4">A</div>
+                            <div class="user-details">
+                                <div class="user-name" id="userName4">加载中...</div>
+                                <div class="user-role" id="userRole4">用户</div>
+                            </div>
+                        </div>
+                        <button class="logout-btn" onclick="logout()">退出登录</button>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <!-- 操作按钮 -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-primary" onclick="showCreateUserModal()">
+                                <span>+</span>
+                                新增用户
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 用户管理卡片 -->
+                    <div class="card">
+                        <div id="userManagementAlert" style="display: none; margin-bottom: 20px;"></div>
+                        
+                        <div class="loading" id="userManagementLoading" style="text-align: center; padding: 40px; color: #6c757d;">
+                            <p>正在加载用户数据...</p>
+                        </div>
+                        
+                        <div id="userTableContainer" style="display: none;">
+                            <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px;">
+                                    <thead>
+                                        <tr style="background: #f8f9fa;">
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">UID</th>
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">真实姓名</th>
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">邮箱</th>
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">角色</th>
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">学校名称</th>
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">状态</th>
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">创建时间</th>
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">最后登录</th>
+                                            <th style="padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #2c3e50; font-size: 12px;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="userTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="userEmptyState" style="display: none; text-align: center; padding: 60px 30px; color: #6c757d;">
+                            <h3 style="margin-bottom: 10px; color: #2c3e50; font-size: 16px;">暂无用户数据</h3>
+                            <p style="font-size: 12px;">系统中还没有任何用户，点击上方按钮创建第一个用户。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 统计分析页面已被完全移除 -->
         </main>
+
+        <!-- 用户管理模态框 -->
+        <div id="createUserModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="background: white; border-radius: 12px; max-width: 500px; margin: 10% auto; padding: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+                <div style="padding: 20px 30px; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; color: #2c3e50; font-size: 18px;">新增用户</h3>
+                    <span style="font-size: 20px; font-weight: bold; color: #999; cursor: pointer;" onclick="hideCreateUserModal()">&times;</span>
+                </div>
+                <div style="padding: 30px;">
+                    <form id="createUserForm">
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #2c3e50; font-weight: 500; font-size: 12px;">UID *</label>
+                            <input type="text" id="createUsername" name="username" style="width: 100%; padding: 12px 15px; border: 1px solid #e9ecef; border-radius: 6px; font-size: 12px;" required>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #2c3e50; font-weight: 500; font-size: 12px;">密码 *</label>
+                            <input type="password" id="createPassword" name="password" style="width: 100%; padding: 12px 15px; border: 1px solid #e9ecef; border-radius: 6px; font-size: 12px;" required>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #2c3e50; font-weight: 500; font-size: 12px;">真实姓名</label>
+                            <input type="text" id="createRealName" name="real_name" style="width: 100%; padding: 12px 15px; border: 1px solid #e9ecef; border-radius: 6px; font-size: 12px;">
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #2c3e50; font-weight: 500; font-size: 12px;">邮箱</label>
+                            <input type="email" id="createEmail" name="email" style="width: 100%; padding: 12px 15px; border: 1px solid #e9ecef; border-radius: 6px; font-size: 12px;">
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #2c3e50; font-weight: 500; font-size: 12px;">角色 *</label>
+                            <select id="createRole" name="role" style="width: 100%; padding: 12px 15px; border: 1px solid #e9ecef; border-radius: 6px; font-size: 12px;" required onchange="toggleSchoolNameField()">
+                                <option value="">请选择角色</option>
+                                <option value="admin">管理员</option>
+                                <option value="construction_center">基建中心</option>
+                                <option value="school">学校用户</option>
+                            </select>
+                        </div>
+                        <div id="schoolNameGroup" style="margin-bottom: 20px; display: none;">
+                            <label style="display: block; margin-bottom: 8px; color: #2c3e50; font-weight: 500; font-size: 12px;">学校名称 *</label>
+                            <select id="createSchoolName" name="school_name" style="width: 100%; padding: 12px 15px; border: 1px solid #e9ecef; border-radius: 6px; font-size: 12px;">
+                                <option value="">请选择学校</option>
+                                <option value="上海大学">上海大学</option>
+                                <option value="上海交通大学医学院">上海交通大学医学院</option>
+                                <option value="上海理工大学">上海理工大学</option>
+                                <option value="上海师范大学">上海师范大学</option>
+                                <option value="上海科技大学">上海科技大学</option>
+                                <option value="华东政法大学">华东政法大学</option>
+                                <option value="上海海事大学">上海海事大学</option>
+                                <option value="上海海洋大学">上海海洋大学</option>
+                                <option value="上海中医药大学">上海中医药大学</option>
+                                <option value="上海体育大学">上海体育大学</option>
+                                <option value="上海音乐学院">上海音乐学院</option>
+                                <option value="上海戏剧学院">上海戏剧学院</option>
+                                <option value="上海电力大学">上海电力大学</option>
+                                <option value="上海对外经贸大学">上海对外经贸大学</option>
+                                <option value="上海应用技术大学">上海应用技术大学</option>
+                                <option value="上海立信会计金融学院">上海立信会计金融学院</option>
+                                <option value="上海工程技术大学">上海工程技术大学</option>
+                                <option value="上海第二工业大学">上海第二工业大学</option>
+                                <option value="上海商学院">上海商学院</option>
+                                <option value="上海电机学院">上海电机学院</option>
+                                <option value="上海政法学院">上海政法学院</option>
+                                <option value="上海健康医学院">上海健康医学院</option>
+                                <option value="上海出版印刷高等专科学校">上海出版印刷高等专科学校</option>
+                                <option value="上海旅游高等专科学校">上海旅游高等专科学校</option>
+                                <option value="上海城建职业学院">上海城建职业学院</option>
+                                <option value="上海电子信息职业技术学院">上海电子信息职业技术学院</option>
+                                <option value="上海工艺美术职业学院">上海工艺美术职业学院</option>
+                                <option value="上海农林职业技术学院">上海农林职业技术学院</option>
+                                <option value="上海健康医学院附属卫生学校(上海健康护理职业学院(筹))">上海健康医学院附属卫生学校(上海健康护理职业学院(筹))</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div style="padding: 20px 30px; border-top: 1px solid #e9ecef; text-align: right;">
+                    <button type="button" style="padding: 10px 20px; border-radius: 6px; border: 1px solid #6c757d; background: #6c757d; color: white; cursor: pointer; margin-right: 10px; font-size: 12px;" onclick="hideCreateUserModal()">取消</button>
+                    <button type="button" style="padding: 10px 20px; border-radius: 6px; border: none; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; cursor: pointer; font-size: 12px;" onclick="createUser()">创建用户</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 引入外部脚本 -->
     <script src="script.js"></script>
     
     <script>
+        // 页面加载时检查用户登录状态
+        document.addEventListener('DOMContentLoaded', async function() {
+            await checkUserStatus();
+        });
+
+        // 检查用户登录状态
+        async function checkUserStatus() {
+            try {
+                const response = await fetch('/api/auth/status');
+                const result = await response.json();
+                
+                if (result.success && result.isLoggedIn) {
+                    updateUserInfo(result.user);
+                } else {
+                    // 如果未登录，重定向到登录页
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                console.error('检查用户状态失败:', error);
+                // 网络错误时也重定向到登录页
+                window.location.href = '/login.html';
+            }
+        }
+
+        // 更新用户信息显示
+        function updateUserInfo(user) {
+            // 保存当前用户信息到全局变量
+            currentUser = user;
+            
+            const userElements = [
+                { avatar: 'userAvatar', name: 'userName', role: 'userRole' },
+                { avatar: 'userAvatar2', name: 'userName2', role: 'userRole2' }
+            ];
+
+            userElements.forEach(elements => {
+                const avatarEl = document.getElementById(elements.avatar);
+                const nameEl = document.getElementById(elements.name);
+                const roleEl = document.getElementById(elements.role);
+
+                if (avatarEl) {
+                    avatarEl.textContent = (user.real_name || user.username || 'U').charAt(0).toUpperCase();
+                }
+                if (nameEl) {
+                    nameEl.textContent = user.real_name || user.username || '未知用户';
+                }
+                if (roleEl) {
+                    let roleText = '用户';
+                    if (user.role === 'admin') {
+                        roleText = '管理员';
+                    } else if (user.role === 'construction_center') {
+                        roleText = '基建中心';
+                    } else if (user.role === 'school') {
+                        roleText = '学校用户';
+                    }
+                    roleEl.textContent = roleText;
+                }
+            });
+
+            // 根据用户角色显示/隐藏用户管理菜单
+            const userManagementMenu = document.getElementById('menu-user-management');
+            if (userManagementMenu && user.role === 'admin') {
+                userManagementMenu.style.display = 'block';
+            }
+
+            // 根据用户角色显示/隐藏统计分析菜单
+            const statisticsMenu = document.getElementById('menu-statistics');
+            if (statisticsMenu && (user.role === 'admin' || user.role === 'construction_center')) {
+                statisticsMenu.style.display = 'block';
+            }
+
+            // 根据用户角色调整界面
+            adjustInterfaceByRole(user);
+            
+            // 初始化年份数据（适用于有权限访问统计分析的用户）
+            if (user.role === 'admin' || user.role === 'construction_center') {
+                setTimeout(() => {
+                    console.log('初始化年份数据...');
+                    loadOverviewAvailableYears();
+                }, 500);
+            }
+        }
+
+        // 登出功能
+        async function logout() {
+            if (!confirm('确定要退出登录吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 清除本地状态
+                    window.location.href = '/login.html';
+                } else {
+                    alert('退出登录失败: ' + result.message);
+                }
+            } catch (error) {
+                console.error('退出登录失败:', error);
+                alert('网络错误，请稍后重试');
+            }
+        }
+
+        // 根据用户角色调整界面
+        function adjustInterfaceByRole(user) {
+            // 如果是学校用户，自动选择并锁定学校名称
+            if (user.role === 'school' && user.school_name) {
+                const schoolNameSelect = document.getElementById('schoolName');
+                if (schoolNameSelect) {
+                    schoolNameSelect.value = user.school_name;
+                    // 不使用disabled，而是通过样式和事件阻止更改，保持表单提交时的值
+                    schoolNameSelect.style.backgroundColor = '#f5f5f5';
+                    schoolNameSelect.style.cursor = 'not-allowed';
+                    schoolNameSelect.style.pointerEvents = 'none';
+                    // 添加只读属性标记
+                    schoolNameSelect.setAttribute('data-locked', 'true');
+                    // 更新学校类型显示
+                    updateSchoolType();
+                }
+            }
+            
+            // 根据角色隐藏某些菜单项
+            if (user.role === 'school') {
+                // 学校用户隐藏统计分析菜单
+                const statsMenu = document.getElementById('menu-statistics');
+                if (statsMenu) {
+                    statsMenu.style.display = 'none';
+                }
+            }
+            
+            // 基建中心用户不能访问用户管理
+            if (user.role === 'construction_center') {
+                const userManagementMenu = document.getElementById('menu-user-management');
+                if (userManagementMenu) {
+                    userManagementMenu.style.display = 'none';
+                }
+            }
+        }
+
         // 添加缺少的hideOnlineForm函数
         function hideOnlineForm() {
             // 此函数不需要实际功能，因为表单已经直接嵌入页面
@@ -1962,7 +2753,7 @@
             allPages.forEach(page => page.classList.remove('active'));
             
             // 移除所有菜单项的活动状态
-            const allMenuItems = document.querySelectorAll('.menu-item');
+            const allMenuItems = document.querySelectorAll('.menu-item, .submenu-item');
             allMenuItems.forEach(item => item.classList.remove('active'));
             
             // 显示选中的页面
@@ -1973,12 +2764,27 @@
             if (targetMenu) targetMenu.classList.add('active');
             
             // 根据页面类型加载相应内容
-            // 统计分析页面已注释
-            // if (pageId === 'statistics') {
-            //     setTimeout(() => loadStatisticsContent(), 300);
-            // } else 
             if (pageId === 'data-management') {
                 setTimeout(() => loadDataManagementContent(), 300);
+            } else if (pageId === 'statistics') {
+                // 加载统计分析内容
+                setTimeout(() => {
+                    loadOverviewAvailableYears();
+                    searchOverviewRecords();
+                    // 更新用户信息
+                    if (currentUser) {
+                        updateStatisticsUserInfo(currentUser);
+                    }
+                }, 300);
+            } else if (pageId === 'user-management') {
+                // 加载用户管理内容
+                setTimeout(() => {
+                    loadUserManagementContent();
+                    // 更新用户信息
+                    if (currentUser) {
+                        updateUserManagementUserInfo(currentUser);
+                    }
+                }, 300);
             }
             
             // 移动端自动关闭菜单
@@ -1996,6 +2802,294 @@
         function closeSidebar() {
             const sidebar = document.getElementById('sidebar');
             sidebar.classList.remove('open');
+        }
+
+        // 更新统计分析页面的用户信息
+        function updateStatisticsUserInfo(user) {
+            const avatarEl = document.getElementById('userAvatar3');
+            const nameEl = document.getElementById('userName3');
+            const roleEl = document.getElementById('userRole3');
+            
+            if (avatarEl && nameEl && roleEl) {
+                avatarEl.textContent = user.real_name ? user.real_name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase();
+                nameEl.textContent = user.real_name || user.username;
+                
+                let roleText = '用户';
+                if (user.role === 'admin') roleText = '管理员';
+                else if (user.role === 'construction_center') roleText = '基建中心';
+                else if (user.role === 'school') roleText = '学校用户';
+                
+                roleEl.textContent = roleText;
+            }
+        }
+
+        // ========== 填报概览页面功能 ==========
+        
+        // 搜索填报概览记录
+        async function searchOverviewRecords() {
+            const yearFilter = document.getElementById('overviewYearFilter');
+            const userTypeFilter = document.getElementById('overviewUserTypeFilter');
+            const year = yearFilter ? yearFilter.value : '2025';
+            const userType = userTypeFilter ? userTypeFilter.value : 'construction_center';
+            
+            console.log('开始搜索填报概览记录，筛选条件:', { year, userType });
+            
+            const resultsContainer = document.getElementById('overviewDataResults');
+            const recordCount = document.getElementById('overviewRecordCount');
+            
+            resultsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
+            
+            // 隐藏记录计数
+            if (recordCount) recordCount.style.display = 'none';
+            
+            try {
+                // 构建查询参数
+                let queryParams = [];
+                if (year !== 'all') queryParams.push(`year=${encodeURIComponent(year)}`);
+                if (userType !== 'all') queryParams.push(`userType=${encodeURIComponent(userType)}`);
+                
+                const queryString = queryParams.length > 0 ? '?' + queryParams.join('&') : '';
+                const response = await fetch(`/api/overview/records${queryString}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayOverviewResults(result.data);
+                    updateOverviewSummary(result.data);
+                    
+                    // 显示记录计数
+                    if (recordCount) {
+                        const totalCount = document.getElementById('overviewTotalCount');
+                        if (totalCount) totalCount.textContent = result.data.length;
+                        recordCount.style.display = 'block';
+                    }
+                } else {
+                    console.error('搜索失败:', result.error);
+                    resultsContainer.innerHTML = `<div class="alert alert-danger">搜索失败: ${result.error}</div>`;
+                }
+            } catch (error) {
+                console.error('搜索填报概览记录失败:', error);
+                resultsContainer.innerHTML = '<div class="alert alert-danger">网络错误，请稍后重试</div>';
+            }
+        }
+        
+        // 显示填报概览搜索结果
+        function displayOverviewResults(data) {
+            const resultsContainer = document.getElementById('overviewDataResults');
+            
+            if (data.length === 0) {
+                resultsContainer.innerHTML = '<div class="alert alert-info">未找到符合条件的记录</div>';
+                return;
+            }
+            
+            // 复用数据管理的表格结构，但去掉操作列和右侧空间
+            let html = '<div class="table-container">';
+            html += '<div class="data-table-wrapper">';
+            
+            // 左侧冻结列
+            html += '<div class="frozen-left-columns">';
+            html += '<table class="data-table-frozen-left"><thead><tr>';
+            html += '<th>测算年份</th>';
+            html += '<th>学校名称</th>';
+            html += '</tr></thead><tbody>';
+            
+            data.forEach(record => {
+                html += `<tr>
+                    <td><strong>${record.year || '未知'}</strong></td>
+                    <td><strong>${record.school_name || '未知'}</strong></td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table></div>';
+            
+            // 中间滚动数据列（去掉右侧margin，占满剩余空间）
+            html += '<div class="scrollable-middle-columns" style="margin-left: 240px; margin-right: 0; overflow-x: auto; overflow-y: hidden;">';
+            html += '<table class="data-table-scrollable"><thead><tr>';
+            html += '<th>现状建筑总面积(m²)</th>';
+            html += '<th>学生规模测算建筑总面积(m²)</th>';
+            html += '<th>学生规模测算建筑面积总缺额(不含补助)(m²)</th>';
+            html += '<th>补助建筑总面积(m²)</th>';
+            html += '<th>学生规模测算建筑面积总缺额(含补助)(m²)</th>';
+            html += '</tr></thead><tbody>';
+            
+            data.forEach(record => {
+                // 直接使用API返回的正确值
+                const gapWithoutSubsidy = record.gap_without_subsidy || 0;
+                const gapWithSubsidy = record.gap_with_subsidy || 0;
+                
+                html += `<tr>
+                    <td>${formatNumber(record.current_total_area || 0)}</td>
+                    <td>${formatNumber(record.required_total_area || 0)}</td>
+                    <td>${gapWithoutSubsidy > 0 ? '+' : ''}${formatNumber(gapWithoutSubsidy)}</td>
+                    <td>${formatNumber(record.total_subsidy_area || 0)}</td>
+                    <td>${gapWithSubsidy > 0 ? '+' : ''}${formatNumber(gapWithSubsidy)}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table></div>';
+            
+            // 不需要右侧操作列，直接结束
+            html += '</div>'; // data-table-wrapper
+            html += '</div>'; // table-container
+            
+            html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
+                <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                    <strong>共找到 ${data.length} 条记录</strong>
+                </p>
+            </div>`;
+            
+            resultsContainer.innerHTML = html;
+            
+            // 更新汇总数据
+            updateOverviewSummary(data);
+            
+            // 同步表格行高度和滚动
+            setTimeout(() => {
+                syncOverviewTableRows();
+                syncOverviewTableScroll();
+            }, 0);
+        }
+        
+        // 同步填报概览表格行高度
+        function syncOverviewTableRows() {
+            const leftRows = document.querySelectorAll('.data-table-frozen-left tbody tr');
+            const middleRows = document.querySelectorAll('.data-table-scrollable tbody tr');
+            
+            if (leftRows.length === middleRows.length) {
+                for (let i = 0; i < leftRows.length; i++) {
+                    const maxHeight = Math.max(
+                        leftRows[i].offsetHeight,
+                        middleRows[i].offsetHeight
+                    );
+                    
+                    leftRows[i].style.height = maxHeight + 'px';
+                    middleRows[i].style.height = maxHeight + 'px';
+                }
+            }
+        }
+
+        // 同步填报概览表格垂直滚动
+        function syncOverviewTableScroll() {
+            const leftTable = document.querySelector('.frozen-left-columns');
+            const middleTable = document.querySelector('.scrollable-middle-columns');
+            
+            if (!leftTable || !middleTable) return;
+            
+            let isScrolling = false;
+            
+            function syncScroll(source, targets) {
+                if (isScrolling) return;
+                isScrolling = true;
+                
+                targets.forEach(target => {
+                    target.scrollTop = source.scrollTop;
+                });
+                
+                setTimeout(() => {
+                    isScrolling = false;
+                }, 10);
+            }
+            
+            leftTable.addEventListener('scroll', () => {
+                syncScroll(leftTable, [middleTable]);
+            });
+            
+            middleTable.addEventListener('scroll', () => {
+                syncScroll(middleTable, [leftTable]);
+            });
+        }
+        
+        // 更新填报概览汇总数据
+        function updateOverviewSummary(data) {
+            const currentAreaEl = document.getElementById('overviewCurrentArea');
+            const requiredAreaEl = document.getElementById('overviewRequiredArea');
+            const gapWithoutSubsidyEl = document.getElementById('overviewGapWithoutSubsidy');
+            const gapWithSubsidyEl = document.getElementById('overviewGapWithSubsidy');
+            
+            let totalCurrent = 0;
+            let totalRequired = 0;
+            let totalGapWithoutSubsidy = 0;
+            let totalGapWithSubsidy = 0;
+            
+            data.forEach(record => {
+                totalCurrent += parseFloat(record.current_total_area) || 0;
+                totalRequired += parseFloat(record.required_total_area) || 0;
+                totalGapWithoutSubsidy += parseFloat(record.gap_without_subsidy) || 0;
+                totalGapWithSubsidy += parseFloat(record.gap_with_subsidy) || 0;
+            });
+            
+            if (currentAreaEl) currentAreaEl.textContent = formatNumber(totalCurrent);
+            if (requiredAreaEl) requiredAreaEl.textContent = formatNumber(totalRequired);
+            if (gapWithoutSubsidyEl) gapWithoutSubsidyEl.textContent = (totalGapWithoutSubsidy > 0 ? '+' : '') + formatNumber(totalGapWithoutSubsidy);
+            if (gapWithSubsidyEl) gapWithSubsidyEl.textContent = (totalGapWithSubsidy > 0 ? '+' : '') + formatNumber(totalGapWithSubsidy);
+        }
+        
+        // 加载填报概览可用年份
+        async function loadOverviewAvailableYears() {
+            console.log('开始加载年份数据...');
+            try {
+                const response = await fetch('/api/years');
+                const result = await response.json();
+                console.log('API响应:', result);
+                
+                if (result.success && result.years) {
+                    const yearFilter = document.getElementById('overviewYearFilter');
+                    console.log('年份筛选器元素:', yearFilter);
+                    if (yearFilter) {
+                        console.log('清空前的选项:', yearFilter.innerHTML);
+                        
+                        // 清空现有选项
+                        yearFilter.innerHTML = '';
+                        
+                        // 添加年份选项，按降序排列
+                        const sortedYears = result.years.sort((a, b) => b - a);
+                        console.log('排序后的年份:', sortedYears);
+                        
+                        sortedYears.forEach(year => {
+                            const option = document.createElement('option');
+                            option.value = year;
+                            option.textContent = `${year}年`;
+                            yearFilter.appendChild(option);
+                            console.log(`添加年份选项: ${year}年`);
+                        });
+                        
+                        console.log('添加后的选项:', yearFilter.innerHTML);
+                        
+                        // 默认选择最新年份
+                        if (sortedYears.length > 0) {
+                            yearFilter.value = sortedYears[0];
+                            console.log(`设置默认选择年份: ${sortedYears[0]}`);
+                            console.log('当前选择的值:', yearFilter.value);
+                        }
+                    } else {
+                        console.error('找不到年份筛选器元素');
+                    }
+                } else {
+                    console.error('API响应格式错误:', result);
+                }
+            } catch (error) {
+                console.error('加载年份失败:', error);
+            }
+        }
+
+        // 格式化数字显示
+        function formatNumber(num) {
+            if (num === null || num === undefined || isNaN(num)) return '0.00';
+            return parseFloat(num).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // 格式化日期时间显示
+        function formatDateTime(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '-';
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            return `${year}-${month}-${day} ${hours}:${minutes}`;
         }
 
         // 加载统计分析内容 - 已注释
@@ -2077,7 +3171,7 @@
                         content.innerHTML = '<div class="alert alert-info">暂无数据记录</div>';
                     } else {
                         let tableHtml = '<div class="table-container"><table class="data-table"><thead><tr>';
-                        tableHtml += '<th>学校名称</th><th>院校类别</th><th>基准年份</th><th>测算年份</th><th>学生总数</th><th>教学面积</th><th>最后更新</th>';
+                        tableHtml += '<th>学校名称</th><th>院校类别</th><th>测算年份</th><th>学生统计年份</th><th>建筑面积统计年份</th><th>学生总数</th><th>教学面积</th><th>最后更新</th>';
                         tableHtml += '</tr></thead><tbody>';
                         
                         result.data.forEach(school => {
@@ -2085,8 +3179,9 @@
                             tableHtml += `<tr>
                                 <td><strong>${school.school_name || '未知'}</strong></td>
                                 <td>${school.school_type || '未指定'}</td>
-                                <td>${school.base_year || '未知'}</td>
                                 <td>${school.year || '未知'}</td>
+                                <td>${school.student_stat_year || school.year || '未知'}</td>
+                                <td>${school.building_stat_year || school.year || '未知'}</td>
                                 <td>${(school.total_students || 0).toLocaleString()}人</td>
                                 <td>${(school.teaching_area || 0).toLocaleString()}㎡</td>
                                 <td>${updateDate}</td>
@@ -2168,10 +3263,63 @@
 
         // ========== 数据管理页面功能 ==========
         let allDataSchoolsData = []; // 存储所有学校数据
+        let currentUser = null; // 存储当前用户信息
 
         // 加载数据管理页面内容
         async function loadDataManagementContent() {
+            // 初始化时隐藏汇总栏
+            const summarySection = document.getElementById('dataSummarySection');
+            if (summarySection) {
+                summarySection.style.display = 'none';
+            }
+            
             await loadDataAvailableYears();
+            await loadDataAvailableUsers();
+            
+            // 如果是学校用户，自动锁定学校筛选器和用户筛选器
+            if (currentUser && currentUser.role === 'school') {
+                // 锁定学校筛选器
+                const schoolFilter = document.getElementById('dataSchoolNameFilter');
+                if (schoolFilter && currentUser.school_name) {
+                    // 检查是否存在对应的学校选项
+                    let schoolOptionExists = false;
+                    for (let i = 0; i < schoolFilter.options.length; i++) {
+                        if (schoolFilter.options[i].value === currentUser.school_name) {
+                            schoolOptionExists = true;
+                            break;
+                        }
+                    }
+                    
+                    // 如果不存在，添加学校选项
+                    if (!schoolOptionExists) {
+                        const option = document.createElement('option');
+                        option.value = currentUser.school_name;
+                        option.textContent = currentUser.school_name;
+                        schoolFilter.appendChild(option);
+                    }
+                    
+                    // 设置选中当前学校
+                    schoolFilter.value = currentUser.school_name;
+                    // 禁用筛选器，防止学校用户修改
+                    schoolFilter.disabled = true;
+                    // 添加样式提示这是被锁定的
+                    schoolFilter.style.backgroundColor = '#f5f5f5';
+                    schoolFilter.style.cursor = 'not-allowed';
+                }
+                
+                // 锁定用户筛选器
+                const userFilter = document.getElementById('dataUserFilter');
+                if (userFilter) {
+                    // 设置选中当前用户（使用真实姓名）
+                    userFilter.value = currentUser.real_name || currentUser.username;
+                    // 禁用筛选器，防止学校用户修改
+                    userFilter.disabled = true;
+                    // 添加样式提示这是被锁定的
+                    userFilter.style.backgroundColor = '#f5f5f5';
+                    userFilter.style.cursor = 'not-allowed';
+                }
+            }
+            
             // 自动搜索加载所有数据
             setTimeout(() => {
                 searchDataRecords();
@@ -2182,14 +3330,22 @@
         async function searchDataRecords() {
             const yearFilter = document.getElementById('dataYearFilter');
             const schoolFilter = document.getElementById('dataSchoolNameFilter');
+            const userFilter = document.getElementById('dataUserFilter');
             const year = yearFilter ? yearFilter.value : 'all';
             const school = schoolFilter ? schoolFilter.value : 'all';
+            const user = userFilter ? userFilter.value : 'all';
             
-            console.log('开始搜索数据记录，筛选条件:', { year, school });
+            console.log('开始搜索数据记录，筛选条件:', { year, school, user });
             
             const resultsContainer = document.getElementById('dataHistoryResults');
             const batchDownloadBtn = document.getElementById('batchDownloadBtn');
             resultsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
+            
+            // 搜索时隐藏汇总栏
+            const summarySection = document.getElementById('dataSummarySection');
+            if (summarySection) {
+                summarySection.style.display = 'none';
+            }
             
             // 禁用批量下载按钮
             if (batchDownloadBtn) {
@@ -2206,6 +3362,10 @@
                 
                 if (school !== 'all') {
                     params.push(`school=${encodeURIComponent(school)}`);
+                }
+                
+                if (user !== 'all') {
+                    params.push(`user=${encodeURIComponent(user)}`);
                 }
                 
                 if (params.length > 0) {
@@ -2269,6 +3429,32 @@
             }
         }
 
+        // 加载可用的测算用户
+        async function loadDataAvailableUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const userSelect = document.getElementById('dataUserFilter');
+                    if (userSelect) {
+                        userSelect.innerHTML = '<option value="all">所有测算用户</option>';
+                        
+                        result.data.forEach(user => {
+                            const option = document.createElement('option');
+                            // 使用真实姓名作为value进行筛选
+                            option.value = user.real_name || user.username || user;
+                            // 只显示真实姓名，不显示用户名
+                            option.textContent = user.real_name || user.username || user;
+                            userSelect.appendChild(option);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('加载测算用户失败:', error);
+            }
+        }
+
         // 加载学校数据（保留但不自动调用）
         async function loadDataSchoolsData() {
             // 该函数已被 searchDataRecords 替代
@@ -2285,6 +3471,7 @@
         function clearDataFilter() {
             document.getElementById('dataYearFilter').value = 'all';
             document.getElementById('dataSchoolNameFilter').value = 'all';
+            document.getElementById('dataUserFilter').value = 'all';
             
             // 清空结果显示
             const resultsContainer = document.getElementById('dataHistoryResults');
@@ -2304,10 +3491,12 @@
         async function batchDownloadSearchResults() {
             const yearFilter = document.getElementById('dataYearFilter');
             const schoolFilter = document.getElementById('dataSchoolNameFilter');
+            const userFilter = document.getElementById('dataUserFilter');
             const batchDownloadBtn = document.getElementById('batchDownloadBtn');
             
             const year = yearFilter ? yearFilter.value : 'all';
             const school = schoolFilter ? schoolFilter.value : 'all';
+            const user = userFilter ? userFilter.value : 'all';
             
             if (!allDataSchoolsData || allDataSchoolsData.length === 0) {
                 showMessage('没有可下载的数据，请先进行搜索', 'error');
@@ -2330,6 +3519,9 @@
                 }
                 if (school !== 'all') {
                     requestBody.school = school;
+                }
+                if (user !== 'all') {
+                    requestBody.user = user;
                 }
                 
                 console.log('批量下载请求参数:', requestBody);
@@ -2423,6 +3615,72 @@
         function showDataError(message) {
             const container = document.getElementById('dataHistoryResults');
             container.innerHTML = `<div class="alert alert-danger">${message}</div>`;
+            
+            // 隐藏汇总栏
+            const summarySection = document.getElementById('dataSummarySection');
+            if (summarySection) {
+                summarySection.style.display = 'none';
+            }
+        }
+
+        // 更新数据汇总
+        function updateDataSummary(schoolsData) {
+            if (!schoolsData || schoolsData.length === 0) {
+                // 隐藏汇总栏
+                const summarySection = document.getElementById('dataSummarySection');
+                if (summarySection) {
+                    summarySection.style.display = 'none';
+                }
+                return;
+            }
+            
+            // 计算汇总数据
+            let totalSchools = schoolsData.length;
+            let totalCurrentArea = 0;
+            let totalRequiredArea = 0;
+            let totalGapWithoutSubsidy = 0;
+            let totalGapWithSubsidy = 0;
+            
+            schoolsData.forEach(school => {
+                // 解析数字，确保是有效的数值
+                const currentArea = parseFloat(school.current_building_area) || 0;
+                const requiredArea = parseFloat(school.required_building_area) || 0;
+                const gapWithSubsidy = parseFloat(school.total_area_gap_with_subsidy) || 0;
+                const subsidyTotal = parseFloat(school.special_subsidy_total) || 0;
+                const gapWithoutSubsidy = school.total_area_gap_without_subsidy ? parseFloat(school.total_area_gap_without_subsidy) : (gapWithSubsidy - subsidyTotal);
+                
+                totalCurrentArea += currentArea;
+                totalRequiredArea += requiredArea;
+                totalGapWithoutSubsidy += gapWithoutSubsidy;
+                totalGapWithSubsidy += gapWithSubsidy;
+            });
+            
+            // 格式化数字为两位小数
+            const formatNumber = (num) => {
+                return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+            
+            // 更新显示
+            const summarySection = document.getElementById('dataSummarySection');
+            if (summarySection) {
+                summarySection.style.display = 'block';
+                
+                const schoolCountEl = document.getElementById('summarySchoolCount');
+                const currentAreaEl = document.getElementById('summaryCurrentArea');
+                const requiredAreaEl = document.getElementById('summaryRequiredArea');
+                const gapWithoutSubsidyEl = document.getElementById('summaryGapWithoutSubsidy');
+                const gapWithSubsidyEl = document.getElementById('summaryGapWithSubsidy');
+                
+                if (schoolCountEl) schoolCountEl.textContent = totalSchools;
+                if (currentAreaEl) currentAreaEl.textContent = formatNumber(totalCurrentArea);
+                if (requiredAreaEl) requiredAreaEl.textContent = formatNumber(totalRequiredArea);
+                if (gapWithoutSubsidyEl) {
+                    gapWithoutSubsidyEl.textContent = formatNumber(totalGapWithoutSubsidy);
+                }
+                if (gapWithSubsidyEl) {
+                    gapWithSubsidyEl.textContent = formatNumber(totalGapWithSubsidy);
+                }
+            }
         }
 
         // 显示学校数据结果
@@ -2431,32 +3689,89 @@
             
             if (!schoolsData || schoolsData.length === 0) {
                 container.innerHTML = '<div class="alert alert-info">没有找到相关数据</div>';
+                // 隐藏汇总栏
+                const summarySection = document.getElementById('dataSummarySection');
+                if (summarySection) {
+                    summarySection.style.display = 'none';
+                }
                 return;
             }
             
-            let html = '<div class="table-container"><table class="data-table"><thead><tr>';
-            html += '<th>学校名称</th><th>基准年份</th><th>测算年份</th><th>最后更新时间</th><th>操作</th>';
+            // 计算并显示汇总信息
+            updateDataSummary(schoolsData);
+            
+            let html = '<div class="table-container">';
+            html += '<div class="data-table-wrapper">';
+            
+            // 左侧冻结列
+            html += '<div class="frozen-left-columns">';
+            html += '<table class="data-table-frozen-left"><thead><tr>';
+            html += '<th>测算年份</th>';
+            html += '<th>学校名称</th>';
+            html += '</tr></thead><tbody>';
+            
+            schoolsData.forEach(school => {
+                html += `<tr>
+                    <td><strong>${school.year || '未知'}</strong></td>
+                    <td><strong>${school.school_name || '未知'}</strong></td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table></div>';
+            
+            // 中间滚动数据列
+            html += '<div class="scrollable-middle-columns">';
+            html += '<table class="data-table-scrollable"><thead><tr>';
+            html += '<th>现状建筑总面积(m²)</th>';
+            html += '<th>学生规模测算建筑总面积(m²)</th>';
+            html += '<th>学生规模测算建筑面积总缺额(不含补助)(m²)</th>';
+            html += '<th>补助建筑总面积(m²)</th>';
+            html += '<th>学生规模测算建筑面积总缺额(含补助)(m²)</th>';
+            html += '<th>测算时间</th>';
+            html += '<th>测算用户</th>';
             html += '</tr></thead><tbody>';
             
             schoolsData.forEach(school => {
                 const date = new Date(school.created_at).toLocaleDateString('zh-CN');
                 const time = new Date(school.created_at).toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
                 
+                // 计算不含补助的缺口
+                const gapWithoutSubsidy = school.total_area_gap_without_subsidy ? parseFloat(school.total_area_gap_without_subsidy) : ((school.total_area_gap_with_subsidy || 0) - (school.special_subsidy_total || 0));
+                
                 html += `<tr>
-                    <td><strong>${school.school_name || '未知'}</strong></td>
-                    <td>${school.base_year || '未知'}</td>
-                    <td>${school.year || '未知'}</td>
+                    <td>${school.current_building_area || '0.00'}</td>
+                    <td>${school.required_building_area || '0.00'}</td>
+                    <td>${gapWithoutSubsidy.toFixed ? gapWithoutSubsidy.toFixed(2) : '0.00'}</td>
+                    <td>${school.special_subsidy_total || '0.00'}</td>
+                    <td>${school.total_area_gap_with_subsidy || '0.00'}</td>
                     <td>${date} ${time}</td>
+                    <td>${school.submitter_real_name || school.submitter_username || '未知用户'}</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table></div>';
+            
+            // 右侧冻结操作列
+            html += '<div class="frozen-right-columns">';
+            html += '<table class="data-table-frozen-right"><thead><tr>';
+            html += '<th>操作</th>';
+            html += '</tr></thead><tbody>';
+            
+            schoolsData.forEach(school => {
+                html += `<tr>
                     <td>
-                        <button style="background: white; color: #3498db; border: 2px solid #3498db; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 5px;" onclick="viewDataSchoolDetails(${school.id})">详情</button>
-                        <button style="background: white; color: #3498db; border: 2px solid #3498db; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 5px;" onclick="downloadRecord(${school.id})">下载</button>
-                        <button style="background: white; color: #f39c12; border: 2px solid #f39c12; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: 5px;" onclick="editDataRecord(${school.id})">编辑</button>
-                        <button style="background: white; color: #e74c3c; border: 2px solid #e74c3c; padding: 8px 16px; border-radius: 4px; cursor: pointer;" onclick="deleteSchoolCombination('${school.school_name}', ${school.base_year}, ${school.year})">删除</button>
+                        <button style="background: none; color: #3498db; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="viewDataSchoolDetails(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">详情</button>
+                        <button style="background: none; color: #3498db; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="downloadRecord(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">下载</button>
+                        <button style="background: none; color: #f39c12; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="editDataRecord(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">编辑</button>
+                        <button style="background: none; color: #e74c3c; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px; text-decoration: underline;" onclick="deleteSchoolCombination('${school.school_name}', ${school.year}, '${school.submitter_username || '未知用户'}')" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">删除</button>
                     </td>
                 </tr>`;
             });
             
             html += '</tbody></table></div>';
+            html += '</div>'; // data-table-wrapper
+            html += '</div>'; // table-container
+            
             html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
                 <p style="margin: 0; color: #6c757d; font-size: 14px;">
                     <strong>共找到 ${schoolsData.length} 条记录</strong> | 
@@ -2464,6 +3779,69 @@
                 </p>
             </div>`;
             container.innerHTML = html;
+            
+            // 同步表格行高度和滚动
+            setTimeout(() => {
+                syncTableRows();
+                syncTableScroll();
+            }, 0);
+        }
+
+        // 同步表格行高度
+        function syncTableRows() {
+            const leftRows = document.querySelectorAll('.data-table-frozen-left tbody tr');
+            const middleRows = document.querySelectorAll('.data-table-scrollable tbody tr');
+            const rightRows = document.querySelectorAll('.data-table-frozen-right tbody tr');
+            
+            if (leftRows.length === middleRows.length && middleRows.length === rightRows.length) {
+                for (let i = 0; i < leftRows.length; i++) {
+                    const maxHeight = Math.max(
+                        leftRows[i].offsetHeight,
+                        middleRows[i].offsetHeight,
+                        rightRows[i].offsetHeight
+                    );
+                    
+                    leftRows[i].style.height = maxHeight + 'px';
+                    middleRows[i].style.height = maxHeight + 'px';
+                    rightRows[i].style.height = maxHeight + 'px';
+                }
+            }
+        }
+
+        // 同步表格垂直滚动
+        function syncTableScroll() {
+            const leftTable = document.querySelector('.frozen-left-columns');
+            const middleTable = document.querySelector('.scrollable-middle-columns');
+            const rightTable = document.querySelector('.frozen-right-columns');
+            
+            if (!leftTable || !middleTable || !rightTable) return;
+            
+            let isScrolling = false;
+            
+            function syncScroll(source, targets) {
+                if (isScrolling) return;
+                isScrolling = true;
+                
+                targets.forEach(target => {
+                    target.scrollTop = source.scrollTop;
+                });
+                
+                setTimeout(() => {
+                    isScrolling = false;
+                }, 10);
+            }
+            
+            leftTable.addEventListener('scroll', () => {
+                syncScroll(leftTable, [middleTable, rightTable]);
+            });
+            
+            middleTable.addEventListener('scroll', () => {
+                syncScroll(middleTable, [leftTable, rightTable]);
+            });
+            
+            rightTable.addEventListener('scroll', () => {
+                syncScroll(rightTable, [leftTable, middleTable]);
+            });
         }
 
         // 显示最近分析记录
@@ -2479,143 +3857,230 @@
                 return;
             }
             
-            // 调试：打印学校数据
-            console.log('学校详情数据:', school);
-            console.log('计算结果字段检查:');
-            console.log('  current_building_area:', school.current_building_area, typeof school.current_building_area);
-            console.log('  required_building_area:', school.required_building_area, typeof school.required_building_area);
-            console.log('  total_area_gap:', school.total_area_gap, typeof school.total_area_gap);
-            
-            let detailsHtml = `
-                <div style="max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: white;">
-                    <h3 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
-                        ${school.school_name} - ${school.year}年详细信息
-                    </h3>
-                    
-                    <div style="margin: 15px 0;">
-                        <h4>基本信息</h4>
-                        <p><strong>院校类别：</strong>${school.school_type || '未指定'}</p>
-                        <p><strong>提交时间：</strong>${new Date(school.created_at).toLocaleString('zh-CN')}</p>
-                    </div>
-                    
-                    <div style="margin: 15px 0;">
-                        <h4>学生人数</h4>
-                        <p><strong>全日制本专科生：</strong>${(school.full_time_undergraduate || 0).toLocaleString()}人</p>
-                        <p><strong>全日制硕士生：</strong>${(school.full_time_master || 0).toLocaleString()}人</p>
-                        <p><strong>全日制博士生：</strong>${(school.full_time_doctor || 0).toLocaleString()}人</p>
-                        <p><strong>留学生本科生：</strong>${(school.international_undergraduate || 0).toLocaleString()}人</p>
-                        <p><strong>留学生硕士生：</strong>${(school.international_master || 0).toLocaleString()}人</p>
-                        <p><strong>留学生博士生：</strong>${(school.international_doctor || 0).toLocaleString()}人</p>
-                        <p><strong>学生总数：</strong>${(school.total_students || 0).toLocaleString()}人</p>
-                    </div>
-                    
-                    <div style="margin: 15px 0;">
-                        <h4>房屋面积</h4>
-                        <p><strong>教学及辅助用房：</strong>${(school.teaching_area || 0).toLocaleString()}㎡</p>
-                        <p><strong>办公用房：</strong>${(school.office_area || 0).toLocaleString()}㎡</p>
-                        <p><strong>生活用房总面积：</strong>${(school.total_living_area || 0).toLocaleString()}㎡</p>
-                        <p><strong>学生宿舍：</strong>${(school.dormitory_area || 0).toLocaleString()}㎡</p>
-                        <p><strong>后勤辅助用房：</strong>${(school.logistics_area || 0).toLocaleString()}㎡</p>
-                    </div>
-            `;
-            
-            // 显示计算结果（如果有） - 修改条件判断
-            console.log('条件判断结果:', !!(school.current_building_area !== null && school.current_building_area !== undefined));
-            if (school.current_building_area !== null && school.current_building_area !== undefined) {
-                console.log('显示计算结果部分');
-                detailsHtml += `
-                    <div style="margin: 15px 0;">
-                        <h4>计算结果</h4>
-                        <p><strong>现状建筑总面积：</strong>${(school.current_building_area || 0).toLocaleString()}㎡</p>
-                        <p><strong>应配建筑总面积：</strong>${(school.required_building_area || 0).toLocaleString()}㎡</p>
-                        <p><strong>教学及辅助用房缺口：</strong>${(school.teaching_area_gap || 0).toLocaleString()}㎡</p>
-                        <p><strong>办公用房缺口：</strong>${(school.office_area_gap || 0).toLocaleString()}㎡</p>
-                        <p><strong>学生宿舍缺口：</strong>${(school.dormitory_area_gap || 0).toLocaleString()}㎡</p>
-                        <p><strong>其他生活用房缺口：</strong>${(school.other_living_area_gap || 0).toLocaleString()}㎡</p>
-                        <p><strong>后勤辅助用房缺口：</strong>${(school.logistics_area_gap || 0).toLocaleString()}㎡</p>
-                        <p><strong>总缺口面积：</strong>${(school.total_area_gap || 0).toLocaleString()}㎡</p>
-                        <p><strong>特殊补助总面积：</strong>${(school.special_subsidy_total || 0).toLocaleString()}㎡</p>
-                        <p><strong>整体达标情况：</strong><span style="color: ${school.overall_compliance ? '#27ae60' : '#e74c3c'}; font-weight: bold;">${school.overall_compliance ? '达标' : '不达标'}</span></p>
-                    </div>
-                `;
-            } else {
-                console.log('计算结果条件不满足，不显示计算结果部分');
-            }
-            
-            // 显示特殊补助信息
-            let subsidiesData = [];
-            if (school.special_subsidies) {
+            // 解析计算结果JSON
+            let calculationResults = {};
+            if (school.calculation_results) {
                 try {
-                    if (typeof school.special_subsidies === 'string') {
-                        subsidiesData = JSON.parse(school.special_subsidies);
-                    } else if (Array.isArray(school.special_subsidies)) {
-                        subsidiesData = school.special_subsidies;
-                    }
-                } catch (error) {
-                    console.error('解析特殊补助数据失败:', error);
+                    calculationResults = JSON.parse(school.calculation_results);
+                } catch (e) {
+                    console.error('解析计算结果失败:', e);
                 }
             }
             
-            if (subsidiesData && subsidiesData.length > 0) {
+            // 解析特殊补助数据
+            let specialSubsidies = [];
+            if (school.special_subsidies) {
+                try {
+                    specialSubsidies = JSON.parse(school.special_subsidies);
+                } catch (e) {
+                    console.error('解析特殊补助数据失败:', e);
+                }
+            }
+            
+            // 计算不含补助的缺口
+            const gapWithoutSubsidy = school.total_area_gap_without_subsidy ? parseFloat(school.total_area_gap_without_subsidy) : ((school.total_area_gap_with_subsidy || 0) - (school.special_subsidy_total || 0));
+            
+            // 创建与Excel第一个sheet完全一致的表格
+            let detailsHtml = `
+                <div style="max-width: 900px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="color: #2c3e50; margin: 0;">学校详情</h2>
+                        <button onclick="closeDetailsModal()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">关闭</button>
+                    </div>
+                    
+                    <!-- Excel表格样式 -->
+                    <div style="border: 1px solid #000; background: white;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <tr>
+                                <td colspan="4" style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #f0f0f0;">高校测算</td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" style="border: 1px solid #000; padding: 6px; background: #f8f8f8;">基本办学条件缺口（"－"表示超额，"+"表示缺额）</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="border: 1px solid #000; padding: 6px;"></td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">测算时间：${new Date(school.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-')}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">测算年份</td>
+                                <td colspan="3" style="border: 1px solid #000; padding: 6px;">${school.year}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生统计年份</td>
+                                <td style="border: 1px solid #000; padding: 6px;">${school.student_stat_year || school.year}</td>
+                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">建筑面积统计年份</td>
+                                <td style="border: 1px solid #000; padding: 6px;">${school.building_stat_year || school.year}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">单位/学校(机构)名称(章)</td>
+                                <td style="border: 1px solid #000; padding: 6px;">${school.school_name}</td>
+                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">院校类型</td>
+                                <td style="border: 1px solid #000; padding: 6px;">${school.school_type ? school.school_type.substring(5) : ''}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" style="border: 1px solid #000; padding: 6px;"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" style="border: 1px solid #000; padding: 6px; font-weight: bold; background: #f8f8f8;">规划学生数</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">专科全日制学生数(人)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.full_time_specialist || 0}</td>
+                                <td style="border: 1px solid #000; padding: 6px;">本科全日制学生数(人)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.full_time_undergraduate || 0}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">硕士全日制学生数(人)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.full_time_master || 0}</td>
+                                <td style="border: 1px solid #000; padding: 6px;">博士全日制学生数(人)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.full_time_doctor || 0}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">本科留学生数(人)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.international_undergraduate || 0}</td>
+                                <td style="border: 1px solid #000; padding: 6px;">硕士留学生数(人)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.international_master || 0}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">博士留学生(人)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.international_doctor || 0}</td>
+                                <td style="border: 1px solid #000; padding: 6px;"></td>
+                                <td style="border: 1px solid #000; padding: 6px;"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" style="border: 1px solid #000; padding: 6px;"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="4" style="border: 1px solid #000; padding: 6px; font-weight: bold; background: #f8f8f8;">测算结果</td>
+                            </tr>
+                            <tr style="font-weight: bold; background: #f0f0f0;">
+                                <td style="border: 1px solid #000; padding: 6px;">用房类型</td>
+                                <td style="border: 1px solid #000; padding: 6px;">现状建筑面积(m²)</td>
+                                <td style="border: 1px solid #000; padding: 6px;">学生规模测算建筑面积(m²)</td>
+                                <td style="border: 1px solid #000; padding: 6px;">学生规模测算建筑面积缺额(m²)</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">教学及辅助用房</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.teaching_area || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配教学及辅助用房(A)'] || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.teaching_area_gap || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">办公用房</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.office_area || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配办公用房(B)'] || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.office_area_gap || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">生活配套用房</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.total_living_area || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${(parseFloat(calculationResults['总应配学生宿舍(C1)'] || 0) + parseFloat(calculationResults['总应配其他生活用房(C2)'] || 0)).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${(parseFloat(school.dormitory_area_gap || 0) + parseFloat(school.other_living_area_gap || 0)).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">其中:学生宿舍</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.dormitory_area || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配学生宿舍(C1)'] || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.dormitory_area_gap || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">其中:其他生活用房</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat((school.total_living_area || 0) - (school.dormitory_area || 0)).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配其他生活用房(C2)'] || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.other_living_area_gap || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px;">后勤补助用房</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.logistics_area || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配后勤辅助用房(D)'] || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.logistics_area_gap || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr style="font-weight: bold; background: #f0f0f0;">
+                                <td style="border: 1px solid #000; padding: 6px;">小计</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.current_building_area || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.required_building_area || 0).toFixed(2)}</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(gapWithoutSubsidy || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生规模测算建筑面积总缺额（不含补助）(m²)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(gapWithoutSubsidy || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">补助建筑总面积(m²)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(school.special_subsidy_total || 0).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生规模测算建筑面积总缺额（含补助）(m²)</td>
+                                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(school.total_area_gap_with_subsidy || 0).toFixed(2)}</td>
+                            </tr>
+                        </table>
+                    </div>
+            `;
+            
+            // 如果有特殊补助，显示补助明细
+            if (specialSubsidies && specialSubsidies.length > 0) {
                 detailsHtml += `
-                    <div style="margin: 15px 0;">
-                        <h4>特殊补助项目</h4>
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                            <thead>
-                                <tr style="background: #f8f9fa;">
-                                    <th style="border: 1px solid #ddd; padding: 8px;">补助名称</th>
-                                    <th style="border: 1px solid #ddd; padding: 8px;">补助面积</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                    <div style="margin-top: 20px; border: 1px solid #000;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <tr>
+                                <td colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #f0f0f0;">特殊补助明细</td>
+                            </tr>
+                            <tr style="font-weight: bold; background: #f8f8f8;">
+                                <td style="border: 1px solid #000; padding: 6px;">补助名称</td>
+                                <td style="border: 1px solid #000; padding: 6px;">补助面积(㎡)</td>
+                            </tr>
                 `;
                 
-                subsidiesData.forEach(subsidy => {
+                specialSubsidies.forEach(subsidy => {
                     detailsHtml += `
                         <tr>
-                            <td style="border: 1px solid #ddd; padding: 8px;">${subsidy['特殊用房补助名称'] || subsidy.subsidy_name || ''}</td>
-                            <td style="border: 1px solid #ddd; padding: 8px;">${((subsidy['补助面积（m²）'] || subsidy.subsidy_area) || 0).toLocaleString()}㎡</td>
+                            <td style="border: 1px solid #000; padding: 6px;">${subsidy['特殊用房补助名称'] || subsidy.name || '未命名项目'}</td>
+                            <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(subsidy['补助面积（m²）'] || subsidy.area || 0).toFixed(2)}</td>
                         </tr>
                     `;
                 });
                 
                 detailsHtml += `
-                            </tbody>
                         </table>
                     </div>
                 `;
             }
             
-            if (school.remarks) {
-                detailsHtml += `
-                    <div style="margin: 15px 0;">
-                        <h4>备注</h4>
-                        <p style="background: #f8f9fa; padding: 10px; border-radius: 5px;">${school.remarks}</p>
-                    </div>
-                `;
-            }
-            
             detailsHtml += `
-                    <div style="text-align: center; margin-top: 20px;">
-                        <button onclick="this.parentElement.parentElement.remove()" 
-                                style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                            关闭
-                        </button>
-                    </div>
                 </div>
             `;
             
-            // 创建遮罩层并显示详情
-            const overlay = document.createElement('div');
-            overlay.style.cssText = `
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto;
+            // 创建模态框显示详情
+            const modal = document.createElement('div');
+            modal.id = 'detailsModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 1000;
+                overflow-y: auto;
+                padding: 20px 0;
             `;
-            overlay.innerHTML = detailsHtml;
-            overlay.onclick = function(e) {
-                if (e.target === overlay) overlay.remove();
-            };
-            document.body.appendChild(overlay);
+            modal.innerHTML = detailsHtml;
+            document.body.appendChild(modal);
+            
+            // 点击背景关闭模态框
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeDetailsModal();
+                }
+            });
+        }
+        
+        // 关闭详情模态框
+        function closeDetailsModal() {
+            const modal = document.getElementById('detailsModal');
+            if (modal) {
+                modal.remove();
+            }
         }
 
         // 编辑记录 - 将数据回填到数据填报界面
@@ -2655,6 +4120,13 @@
                     
                     const yearEl = document.getElementById('year');
                     if (yearEl) yearEl.value = school.year || 2025;
+                    
+                    // 新增字段：学生统计年份和建筑面积统计年份
+                    const studentStatYearEl = document.getElementById('student_stat_year');
+                    if (studentStatYearEl) studentStatYearEl.value = school.student_stat_year || school.year || 2025;
+                    
+                    const buildingStatYearEl = document.getElementById('building_stat_year');
+                    if (buildingStatYearEl) buildingStatYearEl.value = school.building_stat_year || school.year || 2025;
                     
                     // 学生人数信息
                     // 对于历史数据的本专科生，优先放到本科生字段，专科生字段为0
@@ -2862,11 +4334,13 @@
                                             console.log(`设置前面积输入框值: "${areaInput.value}"`);
                                             console.log(`面积输入框类型: ${areaInput.type}`);
                                             
-                                            areaInput.value = String(area || 0);
+                                            // 格式化面积值为两位小数
+                                            const formattedArea = parseFloat(area || 0).toFixed(2);
+                                            areaInput.value = formattedArea;
                                             console.log(`设置后面积输入框值: "${areaInput.value}"`);
                                             
                                             // 强制刷新显示 - 多种方式
-                                            areaInput.setAttribute('value', String(area || 0));
+                                            areaInput.setAttribute('value', formattedArea);
                                             
                                             // 触发多种事件
                                             areaInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -2908,15 +4382,14 @@
         }
 
         // 删除学校组合记录
-        async function deleteSchoolCombination(schoolName, baseYear, year) {
-            const baseYearStr = baseYear === null ? '未设置' : `${baseYear}年`;
-            const confirmMessage = `确定要删除"${schoolName} - ${baseYearStr}基准${year}年测算"的所有记录吗？\n\n此操作将删除该组合的所有历史记录，不可恢复。`;
+        async function deleteSchoolCombination(schoolName, year, submitterUsername) {
+            const confirmMessage = `确定要删除"${schoolName} - ${year}年测算 - 测算用户:${submitterUsername}"的所有记录吗？\n\n此操作将删除该组合的所有历史记录，不可恢复。`;
             
             if (!confirm(confirmMessage)) {
                 return;
             }
             
-            console.log('开始删除学校组合记录:', { schoolName, baseYear, year });
+            console.log('开始删除学校组合记录:', { schoolName, year, submitterUsername });
             
             // 显示删除进度
             const progressDiv = document.createElement('div');
@@ -2941,8 +4414,8 @@
                     },
                     body: JSON.stringify({
                         schoolName: schoolName,
-                        baseYear: baseYear,
-                        year: year
+                        year: year,
+                        submitterUsername: submitterUsername
                     })
                 });
                 
@@ -3266,55 +4739,55 @@
             }
         });
 
-        // ========== 基准年份选择器功能 ==========
-        let currentBaseYearGridIndex = 0; // 当前显示的基准年份组索引
+        // ========== 学生统计年份选择器功能 ==========
+        let currentStudentYearGridIndex = 0; // 当前显示的学生统计年份组索引
 
-        // 显示基准年份选择器
-        function showBaseYearGrid() {
-            const overlay = document.getElementById('baseYearGridOverlay');
+        // 显示学生统计年份选择器
+        function showStudentYearGrid() {
+            const overlay = document.getElementById('studentYearGridOverlay');
             if (overlay) {
                 overlay.style.display = 'flex';
                 
                 // 计算当前年份应该在哪个组
-                const yearInput = document.getElementById('base_year');
+                const yearInput = document.getElementById('student_stat_year');
                 const inputYear = parseInt(yearInput.value) || currentYear;
-                currentBaseYearGridIndex = Math.floor((inputYear - (currentYear - 4)) / 9);
+                currentStudentYearGridIndex = Math.floor((inputYear - (currentYear - 4)) / 9);
                 
-                updateBaseYearGrid();
+                updateStudentYearGrid();
                 
                 // 添加键盘事件监听
-                document.addEventListener('keydown', handleBaseYearGridKeyboard);
+                document.addEventListener('keydown', handleStudentYearGridKeyboard);
             }
         }
 
-        // 隐藏基准年份选择器
-        function hideBaseYearGrid() {
-            const overlay = document.getElementById('baseYearGridOverlay');
+        // 隐藏学生统计年份选择器
+        function hideStudentYearGrid() {
+            const overlay = document.getElementById('studentYearGridOverlay');
             if (overlay) {
                 overlay.style.display = 'none';
                 
                 // 移除键盘事件监听
-                document.removeEventListener('keydown', handleBaseYearGridKeyboard);
+                document.removeEventListener('keydown', handleStudentYearGridKeyboard);
             }
         }
 
-        // 移动基准年份网格
-        function moveBaseYearGrid(direction) {
-            currentBaseYearGridIndex += direction;
-            updateBaseYearGrid();
+        // 移动学生统计年份网格
+        function moveStudentYearGrid(direction) {
+            currentStudentYearGridIndex += direction;
+            updateStudentYearGrid();
         }
 
-        // 更新基准年份网格显示
-        function updateBaseYearGrid() {
-            const yearGrid = document.getElementById('baseYearGrid');
-            const yearRangeText = document.getElementById('baseYearRangeText');
-            const yearInput = document.getElementById('base_year');
+        // 更新学生统计年份网格显示
+        function updateStudentYearGrid() {
+            const yearGrid = document.getElementById('studentYearGrid');
+            const yearRangeText = document.getElementById('studentYearRangeText');
+            const yearInput = document.getElementById('student_stat_year');
             const inputYear = parseInt(yearInput.value) || currentYear;
             
             if (!yearGrid || !yearRangeText) return;
             
             // 计算当前组的起始年份（以当前年份为中心，前后各4年，总共9年一组）
-            const baseYear = currentYear - 4 + (currentBaseYearGridIndex * 9);
+            const baseYear = currentYear - 4 + (currentStudentYearGridIndex * 9);
             const years = [];
             
             for (let i = 0; i < 9; i++) {
@@ -3330,7 +4803,7 @@
                 const yearItem = document.createElement('div');
                 yearItem.className = 'year-item';
                 yearItem.textContent = year;
-                yearItem.onclick = () => selectBaseYear(year);
+                yearItem.onclick = () => selectStudentYear(year);
                 
                 // 标记当前年份
                 if (year === currentYear) {
@@ -3346,9 +4819,9 @@
             });
         }
 
-        // 选择基准年份
-        function selectBaseYear(year) {
-            const yearInput = document.getElementById('base_year');
+        // 选择学生统计年份
+        function selectStudentYear(year) {
+            const yearInput = document.getElementById('student_stat_year');
             if (yearInput) {
                 yearInput.value = year;
                 
@@ -3357,33 +4830,473 @@
                 yearInput.dispatchEvent(event);
             }
             
-            hideBaseYearGrid();
+            hideStudentYearGrid();
         }
 
-        // 处理基准年份键盘事件
-        function handleBaseYearGridKeyboard(e) {
+        // 处理学生统计年份键盘事件
+        function handleStudentYearGridKeyboard(e) {
             switch(e.key) {
                 case 'Escape':
-                    hideBaseYearGrid();
+                    hideStudentYearGrid();
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
-                    moveBaseYearGrid(-1);
+                    moveStudentYearGrid(-1);
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    moveBaseYearGrid(1);
+                    moveStudentYearGrid(1);
                     break;
             }
         }
 
-        // 点击遮罩层关闭基准年份选择器
+        // 点击遮罩层关闭学生统计年份选择器
         document.addEventListener('click', function(e) {
-            const overlay = document.getElementById('baseYearGridOverlay');
+            const overlay = document.getElementById('studentYearGridOverlay');
             if (e.target === overlay) {
-                hideBaseYearGrid();
+                hideStudentYearGrid();
             }
         });
+
+        // ========== 建筑面积统计年份选择器功能 ==========
+        let currentBuildingYearGridIndex = 0; // 当前显示的建筑面积统计年份组索引
+
+        // 显示建筑面积统计年份选择器
+        function showBuildingYearGrid() {
+            const overlay = document.getElementById('buildingYearGridOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                
+                // 计算当前年份应该在哪个组
+                const yearInput = document.getElementById('building_stat_year');
+                const inputYear = parseInt(yearInput.value) || currentYear;
+                currentBuildingYearGridIndex = Math.floor((inputYear - (currentYear - 4)) / 9);
+                
+                updateBuildingYearGrid();
+                
+                // 添加键盘事件监听
+                document.addEventListener('keydown', handleBuildingYearGridKeyboard);
+            }
+        }
+
+        // 隐藏建筑面积统计年份选择器
+        function hideBuildingYearGrid() {
+            const overlay = document.getElementById('buildingYearGridOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+                
+                // 移除键盘事件监听
+                document.removeEventListener('keydown', handleBuildingYearGridKeyboard);
+            }
+        }
+
+        // 移动建筑面积统计年份网格
+        function moveBuildingYearGrid(direction) {
+            currentBuildingYearGridIndex += direction;
+            updateBuildingYearGrid();
+        }
+
+        // 更新建筑面积统计年份网格显示
+        function updateBuildingYearGrid() {
+            const yearGrid = document.getElementById('buildingYearGrid');
+            const yearRangeText = document.getElementById('buildingYearRangeText');
+            const yearInput = document.getElementById('building_stat_year');
+            const inputYear = parseInt(yearInput.value) || currentYear;
+            
+            if (!yearGrid || !yearRangeText) return;
+            
+            // 计算当前组的起始年份（以当前年份为中心，前后各4年，总共9年一组）
+            const baseYear = currentYear - 4 + (currentBuildingYearGridIndex * 9);
+            const years = [];
+            
+            for (let i = 0; i < 9; i++) {
+                years.push(baseYear + i);
+            }
+            
+            // 更新范围文本
+            yearRangeText.textContent = `${years[0]} - ${years[8]}`;
+            
+            // 生成年份网格
+            yearGrid.innerHTML = '';
+            years.forEach(year => {
+                const yearItem = document.createElement('div');
+                yearItem.className = 'year-item';
+                yearItem.textContent = year;
+                yearItem.onclick = () => selectBuildingYear(year);
+                
+                // 标记当前年份
+                if (year === currentYear) {
+                    yearItem.classList.add('current');
+                }
+                
+                // 标记已选择的年份
+                if (year === inputYear) {
+                    yearItem.classList.add('selected');
+                }
+                
+                yearGrid.appendChild(yearItem);
+            });
+        }
+
+        // 选择建筑面积统计年份
+        function selectBuildingYear(year) {
+            const yearInput = document.getElementById('building_stat_year');
+            if (yearInput) {
+                yearInput.value = year;
+                
+                // 触发change事件，如果有其他逻辑依赖年份变化
+                const event = new Event('change', { bubbles: true });
+                yearInput.dispatchEvent(event);
+            }
+            
+            hideBuildingYearGrid();
+        }
+
+        // 处理建筑面积统计年份键盘事件
+        function handleBuildingYearGridKeyboard(e) {
+            switch(e.key) {
+                case 'Escape':
+                    hideBuildingYearGrid();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    moveBuildingYearGrid(-1);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    moveBuildingYearGrid(1);
+                    break;
+            }
+        }
+
+        // 点击遮罩层关闭建筑面积统计年份选择器
+        document.addEventListener('click', function(e) {
+            const overlay = document.getElementById('buildingYearGridOverlay');
+            if (e.target === overlay) {
+                hideBuildingYearGrid();
+            }
+        });
+
+        // ========== 用户管理页面功能 ==========
+        let users = [];
+
+        // 更新用户管理页面的用户信息
+        function updateUserManagementUserInfo(user) {
+            const avatarEl = document.getElementById('userAvatar4');
+            const nameEl = document.getElementById('userName4');
+            const roleEl = document.getElementById('userRole4');
+            
+            if (avatarEl && nameEl && roleEl) {
+                avatarEl.textContent = user.real_name ? user.real_name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase();
+                nameEl.textContent = user.real_name || user.username;
+                
+                let roleText = '用户';
+                if (user.role === 'admin') roleText = '管理员';
+                else if (user.role === 'construction_center') roleText = '基建中心';
+                else if (user.role === 'school') roleText = '学校用户';
+                
+                roleEl.textContent = roleText;
+            }
+        }
+
+        // 加载用户管理页面内容
+        async function loadUserManagementContent() {
+            await loadUserList();
+        }
+
+        // 获取角色显示名称
+        function getRoleDisplayName(role) {
+            switch(role) {
+                case 'admin':
+                    return '管理员';
+                case 'construction_center':
+                    return '基建中心';
+                case 'school':
+                    return '学校用户';
+                default:
+                    return '用户';
+            }
+        }
+
+        // 获取状态显示样式
+        function getStatusBadge(status) {
+            if (status === 'active') {
+                return '<span style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: #d4edda; color: #155724;">激活</span>';
+            } else {
+                return '<span style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: #f8d7da; color: #721c24;">禁用</span>';
+            }
+        }
+
+        // 获取角色显示样式
+        function getRoleBadge(role) {
+            let color, bgColor;
+            switch(role) {
+                case 'admin':
+                    color = '#0c5460';
+                    bgColor = '#d1ecf1';
+                    break;
+                case 'construction_center':
+                    color = '#856404';
+                    bgColor = '#fff3cd';
+                    break;
+                case 'school':
+                    color = '#155724';
+                    bgColor = '#d4edda';
+                    break;
+                default:
+                    color = '#383d41';
+                    bgColor = '#e2e3e5';
+            }
+            return `<span style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: ${bgColor}; color: ${color};">${getRoleDisplayName(role)}</span>`;
+        }
+
+        // 加载用户列表
+        async function loadUserList() {
+            const loading = document.getElementById('userManagementLoading');
+            const tableContainer = document.getElementById('userTableContainer');
+            const emptyState = document.getElementById('userEmptyState');
+            
+            loading.style.display = 'block';
+            tableContainer.style.display = 'none';
+            emptyState.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/auth/users');
+                const result = await response.json();
+                
+                if (result.success) {
+                    users = result.users;
+                    displayUsers(users);
+                } else {
+                    showUserManagementAlert(result.message || '获取用户列表失败', 'error');
+                }
+            } catch (error) {
+                console.error('获取用户列表失败:', error);
+                showUserManagementAlert('网络错误，请稍后重试', 'error');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 显示用户列表
+        function displayUsers(userList) {
+            const tableContainer = document.getElementById('userTableContainer');
+            const emptyState = document.getElementById('userEmptyState');
+            const tableBody = document.getElementById('userTableBody');
+            
+            if (userList.length === 0) {
+                tableContainer.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            tableContainer.style.display = 'block';
+            
+            tableBody.innerHTML = '';
+            
+            userList.forEach(user => {
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid #e9ecef';
+                row.innerHTML = `
+                    <td style="padding: 12px 15px;">${user.username}</td>
+                    <td style="padding: 12px 15px;">${user.real_name || '-'}</td>
+                    <td style="padding: 12px 15px;">${user.email || '-'}</td>
+                    <td style="padding: 12px 15px;">${getRoleBadge(user.role)}</td>
+                    <td style="padding: 12px 15px;">${user.school_name || '-'}</td>
+                    <td style="padding: 12px 15px;">${getStatusBadge(user.status)}</td>
+                    <td style="padding: 12px 15px;">${formatDate(user.created_at)}</td>
+                    <td style="padding: 12px 15px;">${user.last_login ? formatDate(user.last_login) : '-'}</td>
+                    <td style="padding: 12px 15px;">
+                        <div style="display: flex; gap: 8px;">
+                            ${user.username !== 'admin' && user.role !== 'admin' ? 
+                                (user.status === 'active' ? 
+                                    `<button style="padding: 6px 12px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="toggleUserStatus(${user.id}, 'inactive')">禁用</button>` :
+                                    `<button style="padding: 6px 12px; font-size: 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="toggleUserStatus(${user.id}, 'active')">启用</button>`
+                                ) : 
+                                '<span style="padding: 6px 12px; font-size: 12px; color: #6c757d;">系统账户</span>'
+                            }
+                            ${user.username !== 'admin' && user.role !== 'admin' ? 
+                                `<button style="padding: 6px 12px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="deleteUserConfirm(${user.id}, '${user.username}')">删除</button>` :
+                                '<span style="padding: 6px 12px; font-size: 12px; color: #6c757d;">不可删除</span>'
+                            }
+                        </div>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('zh-CN') + ' ' + date.toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
+        }
+
+        // 显示用户管理提示消息
+        function showUserManagementAlert(message, type = 'info') {
+            const alertEl = document.getElementById('userManagementAlert');
+            let bgColor, textColor, borderColor;
+            
+            switch(type) {
+                case 'success':
+                    bgColor = '#d4edda';
+                    textColor = '#155724';
+                    borderColor = '#c3e6cb';
+                    break;
+                case 'error':
+                    bgColor = '#f8d7da';
+                    textColor = '#721c24';
+                    borderColor = '#f5c6cb';
+                    break;
+                default:
+                    bgColor = '#d1ecf1';
+                    textColor = '#0c5460';
+                    borderColor = '#bee5eb';
+            }
+            
+            alertEl.style.display = 'block';
+            alertEl.style.padding = '15px';
+            alertEl.style.borderRadius = '6px';
+            alertEl.style.border = `1px solid ${borderColor}`;
+            alertEl.style.background = bgColor;
+            alertEl.style.color = textColor;
+            alertEl.style.fontSize = '12px';
+            alertEl.textContent = message;
+            
+            setTimeout(() => {
+                alertEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // 显示创建用户模态框
+        function showCreateUserModal() {
+            document.getElementById('createUserModal').style.display = 'block';
+            // 清空表单
+            document.getElementById('createUserForm').reset();
+            document.getElementById('schoolNameGroup').style.display = 'none';
+        }
+
+        // 隐藏创建用户模态框
+        function hideCreateUserModal() {
+            document.getElementById('createUserModal').style.display = 'none';
+        }
+
+        // 切换学校名称字段显示
+        function toggleSchoolNameField() {
+            const roleSelect = document.getElementById('createRole');
+            const schoolNameGroup = document.getElementById('schoolNameGroup');
+            
+            if (roleSelect.value === 'school') {
+                schoolNameGroup.style.display = 'block';
+            } else {
+                schoolNameGroup.style.display = 'none';
+            }
+        }
+
+        // 创建用户
+        async function createUser() {
+            const form = document.getElementById('createUserForm');
+            const formData = new FormData(form);
+            
+            const userData = {
+                username: formData.get('username'),
+                password: formData.get('password'),
+                real_name: formData.get('real_name'),
+                email: formData.get('email'),
+                role: formData.get('role'),
+                school_name: formData.get('school_name')
+            };
+            
+            // 基本验证
+            if (!userData.username || !userData.password || !userData.role) {
+                showUserManagementAlert('请填写必填字段', 'error');
+                return;
+            }
+            
+            if (userData.role === 'school' && !userData.school_name) {
+                showUserManagementAlert('学校用户必须选择学校名称', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/auth/create-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showUserManagementAlert('用户创建成功', 'success');
+                    hideCreateUserModal();
+                    loadUserList(); // 重新加载用户列表
+                } else {
+                    showUserManagementAlert(result.message || '创建用户失败', 'error');
+                }
+            } catch (error) {
+                console.error('创建用户失败:', error);
+                showUserManagementAlert('网络错误，请稍后重试', 'error');
+            }
+        }
+
+        // 切换用户状态
+        async function toggleUserStatus(userId, newStatus) {
+            try {
+                const response = await fetch(`/api/auth/user/${userId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showUserManagementAlert(result.message, 'success');
+                    loadUserList(); // 重新加载用户列表
+                } else {
+                    showUserManagementAlert(result.message || '更新用户状态失败', 'error');
+                }
+            } catch (error) {
+                console.error('更新用户状态失败:', error);
+                showUserManagementAlert('网络错误，请稍后重试', 'error');
+            }
+        }
+
+        // 删除用户确认
+        function deleteUserConfirm(userId, username) {
+            if (confirm(`确定要删除用户 "${username}" 吗？此操作不可撤销。`)) {
+                deleteUser(userId);
+            }
+        }
+
+        // 删除用户
+        async function deleteUser(userId) {
+            try {
+                const response = await fetch(`/api/auth/user/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showUserManagementAlert(result.message, 'success');
+                    loadUserList(); // 重新加载用户列表
+                } else {
+                    showUserManagementAlert(result.message || '删除用户失败', 'error');
+                }
+            } catch (error) {
+                console.error('删除用户失败:', error);
+                showUserManagementAlert('网络错误，请稍后重试', 'error');
+            }
+        }
     </script>
 </body>
 </html>

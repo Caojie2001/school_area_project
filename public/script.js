@@ -125,7 +125,7 @@ function generateSubsidyTable(subsidyDetails) {
     }
     
     let tableHTML = '<table class="subsidy-table">';
-    tableHTML += '<thead><tr><th>补助项目名称</th><th>补助面积(㎡)</th></tr></thead>';
+    tableHTML += '<thead><tr><th>补助名称</th><th>补助面积(㎡)</th></tr></thead>';
     tableHTML += '<tbody>';
     
     subsidyDetails.forEach(item => {
@@ -404,6 +404,16 @@ function showAnalysisResults(analysisData) {
                 下载完整分析报告
             </button>
         </div>
+        <div class="summary-note" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; color: #5a6c7d; font-size: 14px; line-height: 1.5;">
+            <strong>计算说明：</strong>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>现状面积 = 既有建筑面积 + 在建建筑面积</li>
+                <li>测算面积 = 各类用房面积系数 × 全日制学生数 + 全日制及留学硕博生补助面积</li>
+                <li>缺额面积（不含补助） = 测算面积 − 现状面积</li>
+                <li>缺额面积（含补助） = 测算面积 + 特殊用房补助面积 − 现状面积</li>
+                <li>若缺额面积 > 0，则存在缺口；否则无缺口。</li>
+            </ul>
+        </div>
     `;
     
     if (analysisResultsContent) {
@@ -624,7 +634,7 @@ function addSubsidy() {
                     <input type="text" name="subsidyName[]" placeholder="如：重点实验室建设补助" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label>补助面积 (m²)</label>
+                    <label>补助建筑面积 (m²)</label>
                     <input type="number" name="subsidyArea[]" min="0" step="0.01" value="0.00" placeholder="请输入补助面积" class="form-control" onblur="formatSubsidyArea(this)">
                 </div>
                 <div class="form-group">
@@ -754,12 +764,12 @@ function updateSubsidySummary() {
     summaryRow.innerHTML = `
         <div class="form-row">
             <div class="form-group">
-                <label>特殊补助项目数 (个)</label>
-                <input type="text" value="${totalCount}" readonly class="form-control" style="background: #f5f5f5; border: 1px solid #ddd; font-weight: bold; text-align: center;">
+                <label>补助数量</label>
+                <input type="text" value="${totalCount}" readonly class="form-control" style="background: #f5f5f5; border: none; font-weight: bold; text-align: center;">
             </div>
             <div class="form-group">
-                <label>特殊补助总面积 (m²)</label>
-                <input type="text" value="${formatToTwoDecimals(totalArea)}" readonly class="form-control" style="background: #f5f5f5; border: 1px solid #ddd; font-weight: bold; text-align: center;">
+                <label>补助建筑总面积(m²)</label>
+                <input type="text" value="${formatToTwoDecimals(totalArea)}" readonly class="form-control" style="background: #f5f5f5; border: none; font-weight: bold; text-align: center;">
             </div>
             <div class="form-group">
                 <label>&nbsp;</label>
@@ -821,24 +831,39 @@ async function handleOnlineFormSubmit(event) {
     
     for (let i = 0; i < subsidyNames.length; i++) {
         if (subsidyNames[i].trim() && subsidyAreas[i] && parseFloat(subsidyAreas[i]) > 0) {
+            const areaValue = parseFloat(subsidyAreas[i]);
             specialSubsidies.push({
                 '特殊用房补助名称': subsidyNames[i].trim(),
-                '补助面积（m²）': parseFloat(subsidyAreas[i])
+                '补助面积（m²）': parseFloat(areaValue.toFixed(2)) // 保持两位小数格式
             });
         }
     }
     
     // 构造数据对象
     const selectedSchoolName = formData.get('schoolName');
+    // 如果FormData中没有学校名称（可能因为disabled），尝试从DOM元素或当前用户获取
+    let finalSchoolName = selectedSchoolName;
+    if (!finalSchoolName) {
+        const schoolNameSelect = document.getElementById('schoolName');
+        if (schoolNameSelect) {
+            finalSchoolName = schoolNameSelect.value;
+        }
+        // 如果还是没有，尝试从全局用户信息获取
+        if (!finalSchoolName && typeof currentUser !== 'undefined' && currentUser && currentUser.school_name) {
+            finalSchoolName = currentUser.school_name;
+        }
+    }
+    
     const schoolTypeDisplay = document.getElementById('schoolTypeDisplay');
     const schoolTypeText = schoolTypeDisplay ? schoolTypeDisplay.textContent : '';
     const schoolType = schoolTypeText ? schoolTypeText.replace('学校类型: ', '') : null;
     
     const schoolData = {
-        '学校名称': selectedSchoolName,
+        '学校名称': finalSchoolName,
         '学校类型': schoolType,
         '年份': parseInt(formData.get('year')),
-        '基准年份': parseInt(formData.get('base_year')),
+        '学生统计年份': parseInt(formData.get('student_stat_year')),
+        '建筑面积统计年份': parseInt(formData.get('building_stat_year')),
         '全日制本科生人数': parseInt(formData.get('fullTimeUndergraduate')),
         '全日制专科生人数': parseInt(formData.get('fullTimeSpecialist')) || 0,
         '全日制硕士生人数': parseInt(formData.get('fullTimeMaster')) || 0,
@@ -933,23 +958,23 @@ function showOnlineResultDownload(result) {
         
         resultContent.innerHTML = `
             <div style="text-align: center; padding: 30px;">
-                <h4 style="color: ${isCompliant ? '#16a34a' : '#dc2626'}; font-size: 1.5rem; margin-bottom: 15px;">
+                <h4 style="font-size: 1.5rem; margin-bottom: 15px;">
                     ${isCompliant ? '建筑面积已达标' : '分析完成，发现建筑面积缺口'}
                 </h4>
-                <div style="background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 12px; padding: 25px; margin: 20px 0; border-left: 5px solid ${isCompliant ? '#16a34a' : '#3b82f6'};">
+                <div style="background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 12px; padding: 25px; margin: 20px 0; border-left: 5px solid #3b82f6;">
                     <p style="font-size: 1.1rem; margin-bottom: 10px; color: #374151;">
                         <strong>学校：</strong>${schoolName}
                     </p>
                     <p style="font-size: 1.1rem; margin-bottom: 10px; color: #374151;">
                         <strong>分析状态：</strong>
-                        <span style="color: ${isCompliant ? '#16a34a' : '#dc2626'}; font-weight: 600;">
+                        <span style="font-weight: 600;">
                             ${isCompliant ? '整体达标' : '存在缺口'}
                         </span>
                     </p>
                     ${!isCompliant ? `
                     <p style="font-size: 1.1rem; margin-bottom: 10px; color: #374151;">
                         <strong>总缺口面积：</strong>
-                        <span style="color: #dc2626; font-weight: 700; font-size: 1.2rem;">
+                        <span style="font-weight: 700; font-size: 1.2rem;">
                             ${formatNumber(Math.abs(totalGap))}㎡
                         </span>
                     </p>
@@ -977,6 +1002,9 @@ async function downloadOnlineResult() {
         
         const result = globalAnalysisResult;
         
+        console.log('准备下载，数据包含:', Object.keys(result.schoolData));
+        console.log('填报单位信息:', result.schoolData['填报单位']);
+        
         // 发送到服务器生成Excel文件
         const response = await fetch('/online-download', {
             method: 'POST',
@@ -984,8 +1012,8 @@ async function downloadOnlineResult() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                schoolData: result.schoolData,
-                analysisResult: result.schoolData // 使用schoolData作为analysisResult，因为它包含了所有计算结果
+                processedSchoolData: [result.schoolData], // 使用正确的参数名，并包装为数组
+                analysisResult: result.schoolData
             })
         });
         
@@ -1007,5 +1035,155 @@ async function downloadOnlineResult() {
         console.error('下载失败:', error);
         alert('下载失败: ' + error.message);
     }
+}
+
+// ========== 特殊补助管理功能 ==========
+
+// 添加特殊补助项
+function addSubsidy() {
+    const container = document.getElementById('specialSubsidies');
+    if (!container) {
+        console.error('找不到特殊补助容器');
+        return;
+    }
+    
+    // 如果是第一个补助项，添加表头
+    if (container.children.length === 0) {
+        const headerHtml = `
+            <div class="subsidy-header" style="display: flex; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-weight: bold; color: #495057;">
+                <div style="flex: 2; margin-right: 15px;">补助名称</div>
+                <div style="flex: 1; margin-right: 15px;">补助建筑面积(m²)</div>
+                <div style="width: 80px;">操作</div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', headerHtml);
+    }
+    
+    // 创建新的补助项
+    const subsidyIndex = container.querySelectorAll('.subsidy-item:not(.subsidy-summary)').length;
+    const subsidyHtml = `
+        <div class="subsidy-item" style="display: flex; align-items: center; margin-bottom: 10px; padding: 10px; background: white; border: 1px solid #e9ecef; border-radius: 5px;">
+            <div style="flex: 2; margin-right: 15px;">
+                <input type="text" name="subsidyName[]" placeholder="例如：重点实验室补助" class="form-control" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
+            </div>
+            <div style="flex: 1; margin-right: 15px;">
+                <input type="number" name="subsidyArea[]" value="0.00" min="0" step="0.01" class="form-control" oninput="updateSubsidySummary()" onblur="formatSubsidyArea(this)" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
+            </div>
+            <div style="width: 80px;">
+                <button type="button" onclick="removeSubsidy(this)" style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">删除</button>
+            </div>
+        </div>
+    `;
+    
+    // 插入到汇总行之前
+    const summaryRow = container.querySelector('.subsidy-summary');
+    if (summaryRow) {
+        summaryRow.insertAdjacentHTML('beforebegin', subsidyHtml);
+    } else {
+        container.insertAdjacentHTML('beforeend', subsidyHtml);
+        // 添加汇总行
+        addSubsidySummary();
+    }
+    
+    updateSubsidySummary();
+}
+
+// 删除特殊补助项
+function removeSubsidy(button) {
+    const subsidyItem = button.closest('.subsidy-item');
+    if (subsidyItem) {
+        subsidyItem.remove();
+        
+        // 检查是否还有补助项（除了汇总行）
+        const container = document.getElementById('specialSubsidies');
+        const remainingItems = container.querySelectorAll('.subsidy-item:not(.subsidy-summary)');
+        
+        if (remainingItems.length === 0) {
+            // 如果没有补助项了，清空整个容器（包括表头和汇总行）
+            container.innerHTML = '';
+        } else {
+            updateSubsidySummary();
+        }
+    }
+}
+
+// 添加补助汇总行
+function addSubsidySummary() {
+    const container = document.getElementById('specialSubsidies');
+    if (!container) return;
+    
+    // 检查是否已经有汇总行
+    if (container.querySelector('.subsidy-summary')) return;
+    
+    const summaryHtml = `
+        <div class="subsidy-summary subsidy-item" style="display: flex; align-items: center; margin-top: 15px; padding: 10px; background: transparent; border: none; border-radius: 5px; font-weight: bold;">
+            <div style="flex: 2; margin-right: 15px;">
+                <div style="margin-bottom: 5px; color: #495057; font-size: 14px;">补助数量</div>
+                <input type="text" id="subsidyTotalCount" readonly class="form-control calculated-field" value="0" style="background: #f5f5f5; border: none; padding: 8px; border-radius: 4px; width: 100%; font-weight: bold; text-align: center;">
+            </div>
+            <div style="flex: 1; margin-right: 15px;">
+                <div style="margin-bottom: 5px; color: #495057; font-size: 14px;">补助建筑总面积(m²)</div>
+                <input type="text" id="subsidyTotalArea" readonly class="form-control calculated-field" value="0.00" style="background: #f5f5f5; border: none; padding: 8px; border-radius: 4px; width: 100%; font-weight: bold; text-align: center;">
+            </div>
+            <div style="width: 80px;"></div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', summaryHtml);
+}
+
+// 更新补助汇总
+function updateSubsidySummary() {
+    const container = document.getElementById('specialSubsidies');
+    if (!container) return;
+    
+    const subsidyInputs = container.querySelectorAll('input[name="subsidyArea[]"]');
+    const nameInputs = container.querySelectorAll('input[name="subsidyName[]"]');
+    let total = 0;
+    let count = 0;
+    
+    subsidyInputs.forEach((input, index) => {
+        const value = parseFloat(input.value) || 0;
+        total += value;
+        
+        // 计算有效的补助项目数量（有名称的项目）
+        if (nameInputs[index] && nameInputs[index].value.trim()) {
+            count++;
+        }
+    });
+    
+    const totalInput = document.getElementById('subsidyTotalArea');
+    if (totalInput) {
+        totalInput.value = total.toFixed(2);
+    }
+    
+    const countInput = document.getElementById('subsidyTotalCount');
+    if (countInput) {
+        countInput.value = count;
+    }
+}
+
+// 获取特殊补助数据
+function getSpecialSubsidiesData() {
+    const container = document.getElementById('specialSubsidies');
+    if (!container) return [];
+    
+    const subsidies = [];
+    const nameInputs = container.querySelectorAll('input[name="subsidyName[]"]');
+    const areaInputs = container.querySelectorAll('input[name="subsidyArea[]"]');
+    
+    for (let i = 0; i < nameInputs.length; i++) {
+        const name = nameInputs[i].value.trim();
+        const area = parseFloat(areaInputs[i].value) || 0;
+        
+        if (name && area > 0) {
+            subsidies.push({
+                name: name,
+                area: parseFloat(area.toFixed(2)) // 保持两位小数格式
+            });
+        }
+    }
+    
+    return subsidies;
 }
 

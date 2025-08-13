@@ -96,10 +96,11 @@ async function initializeTables() {
         await pool.execute(`
             CREATE TABLE IF NOT EXISTS school_info (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                school_name VARCHAR(100) NOT NULL,
+                school_name VARCHAR(255) NOT NULL,
                 school_type VARCHAR(50),
                 year INT,
-                base_year INT,
+                student_stat_year INT,
+                building_stat_year INT,
                 full_time_undergraduate INT DEFAULT 0,
                 full_time_specialist INT DEFAULT 0,
                 full_time_master INT DEFAULT 0,
@@ -121,7 +122,8 @@ async function initializeTables() {
                 dormitory_area_gap DECIMAL(12,2) DEFAULT 0,
                 other_living_area_gap DECIMAL(12,2) DEFAULT 0,
                 logistics_area_gap DECIMAL(12,2) DEFAULT 0,
-                total_area_gap DECIMAL(12,2) DEFAULT 0,
+                total_area_gap_with_subsidy DECIMAL(12,2) DEFAULT 0,
+                total_area_gap_without_subsidy DECIMAL(12,2) DEFAULT 0,
                 special_subsidy_total DECIMAL(12,2) DEFAULT 0,
                 overall_compliance BOOLEAN DEFAULT FALSE,
                 calculation_results LONGTEXT,
@@ -130,17 +132,72 @@ async function initializeTables() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // 为现有表添加base_year字段（如果不存在）
+        // 添加新字段（如果不存在）
         try {
             await pool.execute(`
-                ALTER TABLE school_info ADD COLUMN base_year INT AFTER year;
+                ALTER TABLE school_info ADD COLUMN student_stat_year INT AFTER year;
             `);
-            console.log('base_year字段已添加到school_info表');
+            console.log('student_stat_year字段已添加到school_info表');
         } catch (err) {
             if (err.message.includes('Duplicate column name')) {
-                console.log('base_year字段已存在，跳过添加');
+                console.log('student_stat_year字段已存在，跳过添加');
             } else {
-                console.warn('添加base_year字段失败:', err.message);
+                console.warn('添加student_stat_year字段失败:', err.message);
+            }
+        }
+
+        try {
+            await pool.execute(`
+                ALTER TABLE school_info ADD COLUMN building_stat_year INT AFTER student_stat_year;
+            `);
+            console.log('building_stat_year字段已添加到school_info表');
+        } catch (err) {
+            if (err.message.includes('Duplicate column name')) {
+                console.log('building_stat_year字段已存在，跳过添加');
+            } else {
+                console.warn('添加building_stat_year字段失败:', err.message);
+            }
+        }
+
+        // 添加填报单位字段
+        try {
+            await pool.execute(`
+                ALTER TABLE school_info ADD COLUMN submitter_username VARCHAR(50) NULL COMMENT '填报单位用户名' AFTER building_stat_year;
+            `);
+            console.log('submitter_username字段已添加到school_info表');
+        } catch (err) {
+            if (err.message.includes('Duplicate column name')) {
+                console.log('submitter_username字段已存在，跳过添加');
+            } else {
+                console.warn('添加submitter_username字段失败:', err.message);
+            }
+        }
+
+        // 添加不含特殊补助的总缺口字段
+        try {
+            await pool.execute(`
+                ALTER TABLE school_info ADD COLUMN total_area_gap_without_subsidy DECIMAL(12,2) DEFAULT 0 COMMENT '建筑面积总缺口（不含特殊补助）' AFTER total_area_gap;
+            `);
+            console.log('total_area_gap_without_subsidy字段已添加到school_info表');
+        } catch (err) {
+            if (err.message.includes('Duplicate column name')) {
+                console.log('total_area_gap_without_subsidy字段已存在，跳过添加');
+            } else {
+                console.warn('添加total_area_gap_without_subsidy字段失败:', err.message);
+            }
+        }
+
+        // 重命名total_area_gap字段为total_area_gap_with_subsidy以避免误解
+        try {
+            await pool.execute(`
+                ALTER TABLE school_info CHANGE total_area_gap total_area_gap_with_subsidy DECIMAL(12,2) DEFAULT 0 COMMENT '建筑面积总缺口（含特殊补助）';
+            `);
+            console.log('total_area_gap字段已重命名为total_area_gap_with_subsidy');
+        } catch (err) {
+            if (err.message.includes('Unknown column') || err.message.includes("doesn't exist")) {
+                console.log('total_area_gap字段不存在或已重命名，跳过重命名');
+            } else {
+                console.warn('重命名total_area_gap字段失败:', err.message);
             }
         }
 
@@ -155,6 +212,64 @@ async function initializeTables() {
                 FOREIGN KEY (school_info_id) REFERENCES school_info(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
+
+        // 创建用户表
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(50) NOT NULL UNIQUE,
+                password VARCHAR(255) NOT NULL,
+                real_name VARCHAR(100),
+                email VARCHAR(100),
+                role ENUM('admin', 'construction_center', 'school') DEFAULT 'school',
+                school_name VARCHAR(200) NULL COMMENT '学校用户对应的学校名称',
+                status ENUM('active', 'inactive') DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                last_login TIMESTAMP NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
+        // 添加school_name字段（如果表已存在但没有该字段）
+        try {
+            await pool.execute(`
+                ALTER TABLE users ADD COLUMN school_name VARCHAR(200) NULL COMMENT '学校用户对应的学校名称' AFTER role;
+            `);
+            console.log('school_name字段已添加到users表');
+        } catch (err) {
+            if (err.message.includes('Duplicate column name')) {
+                console.log('school_name字段已存在，跳过添加');
+            } else {
+                console.warn('添加school_name字段失败:', err.message);
+            }
+        }
+
+        // 更新role字段类型（如果需要）
+        try {
+            await pool.execute(`
+                ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'construction_center', 'school') DEFAULT 'school';
+            `);
+            console.log('用户角色类型已更新');
+        } catch (err) {
+            console.warn('更新用户角色类型失败:', err.message);
+        }
+
+        // 创建默认管理员账户（如果不存在）
+        try {
+            const [existingAdmin] = await pool.execute('SELECT id FROM users WHERE username = ?', ['admin']);
+            if (existingAdmin.length === 0) {
+                // 密码: admin123 的bcrypt哈希值
+                const bcrypt = require('bcrypt');
+                const defaultPassword = await bcrypt.hash('admin123', 10);
+                await pool.execute(`
+                    INSERT INTO users (username, password, real_name, role) 
+                    VALUES (?, ?, ?, ?)
+                `, ['admin', defaultPassword, '系统管理员', 'admin']);
+                console.log('默认管理员账户已创建 (用户名: admin, 密码: admin123)');
+            }
+        } catch (err) {
+            console.warn('创建默认管理员账户失败:', err.message);
+        }
 
         // 创建索引（MySQL兼容方式）
         try {

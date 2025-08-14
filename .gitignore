@@ -98,7 +98,12 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public
+
+# 注意：注释掉 public 规则，因为我们需要追踪 public/ 目录中的前端资源
+# 如果使用 Gatsby，可以具体指定要忽略的 Gatsby 构建文件：
+# public/static/
+# public/page-data/
 
 # Storybook build outputs
 .out

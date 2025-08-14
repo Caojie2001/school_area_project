@@ -7,7 +7,7 @@ const session = require('express-session');
 
 // 引入数据库相关模块
 require('dotenv').config();
-const { testConnection, initializeTables } = require('./database');
+const { testConnection, initializeTables, getPool } = require('./database');
 const dataService = require('./dataService');
 const AuthService = require('./authService');
 
@@ -294,6 +294,47 @@ setInterval(cleanupOldFiles, 2 * 60 * 60 * 1000);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 数据库状态检查端点
+app.get('/api/database/status', (req, res) => {
+    try {
+        // 检查数据库连接是否正常
+        if (dataService && dataService.testConnection) {
+            dataService.testConnection()
+                .then(() => {
+                    res.json({ 
+                        success: true, 
+                        status: 'connected', 
+                        timestamp: new Date().toISOString() 
+                    });
+                })
+                .catch(error => {
+                    console.error('数据库连接测试失败:', error);
+                    res.json({ 
+                        success: false, 
+                        status: 'disconnected', 
+                        error: error.message,
+                        timestamp: new Date().toISOString() 
+                    });
+                });
+        } else {
+            res.json({ 
+                success: true, 
+                status: 'unknown', 
+                message: '数据库服务状态未知',
+                timestamp: new Date().toISOString() 
+            });
+        }
+    } catch (error) {
+        console.error('数据库状态检查出错:', error);
+        res.status(500).json({ 
+            success: false, 
+            status: 'error', 
+            error: error.message,
+            timestamp: new Date().toISOString() 
+        });
+    }
 });
 
 // 在线计算路由
@@ -623,6 +664,53 @@ app.post('/online-download', (req, res) => {
 
 // 数据管理API路由
 
+// 获取学校选项列表（用于表单下拉框）
+app.get('/api/school-options', requireAuth, (req, res) => {
+    try {
+        // 预定义的学校列表
+        const schoolOptions = [
+            '上海大学',
+            '上海交通大学医学院',
+            '上海理工大学',
+            '上海师范大学',
+            '上海科技大学',
+            '华东政法大学',
+            '上海海事大学',
+            '上海海洋大学',
+            '上海中医药大学',
+            '上海体育大学',
+            '上海音乐学院',
+            '上海戏剧学院',
+            '上海电力大学',
+            '上海对外经贸大学',
+            '上海应用技术大学',
+            '上海立信会计金融学院',
+            '上海工程技术大学',
+            '上海第二工业大学',
+            '上海商学院',
+            '上海电机学院',
+            '上海政法学院',
+            '上海健康医学院',
+            '上海出版印刷高等专科学校',
+            '上海旅游高等专科学校',
+            '上海城建职业学院',
+            '上海电子信息职业技术学院',
+            '上海工艺美术职业学院',
+            '上海农林职业技术学院',
+            '上海健康医学院附属卫生学校(上海健康护理职业学院(筹))'
+        ];
+
+        const schools = schoolOptions.map(name => ({
+            school_name: name
+        }));
+
+        res.json({ success: true, schools: schools });
+    } catch (error) {
+        console.error('获取学校选项失败:', error);
+        res.status(500).json({ success: false, error: '获取学校选项失败' });
+    }
+});
+
 // 获取所有学校历史数据（支持年份筛选）
 app.get('/api/schools', requireAuth, async (req, res) => {
     try {
@@ -659,7 +747,7 @@ app.get('/api/schools', requireAuth, async (req, res) => {
             special_subsidy_total: formatAreaToTwoDecimals(school.special_subsidy_total)
         }));
         
-        res.json({ success: true, data: formattedSchools });
+        res.json({ success: true, schools: formattedSchools });
     } catch (error) {
         console.error('获取学校历史数据失败:', error);
         res.status(500).json({ success: false, error: '获取数据失败' });
@@ -716,7 +804,7 @@ app.get('/api/schools/latest', requireAuth, async (req, res) => {
 app.get('/api/years', async (req, res) => {
     try {
         const years = await dataService.getAvailableYears();
-        res.json({ success: true, years: years });
+        res.json({ success: true, data: years });
     } catch (error) {
         console.error('获取年份数据失败:', error);
         res.status(500).json({ success: false, error: '获取年份数据失败' });
@@ -847,6 +935,112 @@ app.get('/api/statistics', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('获取统计数据失败:', error);
         res.status(500).json({ error: '获取统计数据失败: ' + error.message });
+    }
+});
+
+// 获取学校统计数据
+app.get('/api/statistics/schools', requireAuth, async (req, res) => {
+    try {
+        const { year } = req.query;
+        const yearFilter = year && year !== 'all' ? parseInt(year) : null;
+        
+        // 学校用户不能访问统计数据（统计数据是跨学校的）
+        if (req.session.user.role === 'school') {
+            return res.status(403).json({ success: false, error: '没有权限查看统计数据' });
+        }
+        
+        const stats = await dataService.getStatistics(yearFilter);
+        
+        // 格式化统计数据中的面积相关数值
+        const formattedStats = {
+            ...stats,
+            // 如果统计数据中包含面积相关字段，也进行格式化
+            ...(stats.overall && stats.overall.total_current_area && { 
+                overall: {
+                    ...stats.overall,
+                    total_current_area: formatAreaToTwoDecimals(stats.overall.total_current_area),
+                    total_required_area: formatAreaToTwoDecimals(stats.overall.total_required_area),
+                    total_gap: formatAreaToTwoDecimals(stats.overall.total_gap),
+                    avg_current_area: formatAreaToTwoDecimals(stats.overall.avg_current_area)
+                }
+            })
+        };
+        
+        res.json({
+            success: true,
+            data: formattedStats,
+            message: '获取学校统计数据成功'
+        });
+    } catch (error) {
+        console.error('获取学校统计数据失败:', error);
+        res.status(500).json({ success: false, error: '获取学校统计数据失败: ' + error.message });
+    }
+});
+
+// 获取统计概览数据
+app.get('/api/statistics/overview', requireAuth, async (req, res) => {
+    try {
+        const { year } = req.query;
+        const yearFilter = year && year !== 'all' ? parseInt(year) : null;
+        
+        // 学校用户不能访问统计数据
+        if (req.session.user.role === 'school') {
+            return res.status(403).json({ success: false, error: '没有权限查看统计数据' });
+        }
+        
+        const stats = await dataService.getStatistics(yearFilter);
+        
+        res.json({
+            success: true,
+            data: stats.overall || {},
+            message: '获取统计概览成功'
+        });
+    } catch (error) {
+        console.error('获取统计概览失败:', error);
+        res.status(500).json({ success: false, error: '获取统计概览失败: ' + error.message });
+    }
+});
+
+// 获取趋势数据
+app.get('/api/statistics/trends', requireAuth, async (req, res) => {
+    try {
+        // 学校用户不能访问统计数据
+        if (req.session.user.role === 'school') {
+            return res.status(403).json({ success: false, error: '没有权限查看统计数据' });
+        }
+        
+        // 获取多年统计数据用于趋势分析
+        const pool = await getPool();
+        const [rows] = await pool.execute(`
+            SELECT 
+                year,
+                COUNT(*) as total_schools,
+                SUM(total_students) as total_students,
+                SUM(current_building_area) as total_current_area,
+                SUM(required_building_area) as total_required_area,
+                SUM(total_area_gap_with_subsidy) as total_gap,
+                SUM(CASE WHEN overall_compliance = 1 THEN 1 ELSE 0 END) as compliant_schools
+            FROM school_info
+            GROUP BY year
+            ORDER BY year ASC
+        `);
+        
+        // 格式化数据
+        const trends = rows.map(row => ({
+            ...row,
+            total_current_area: formatAreaToTwoDecimals(row.total_current_area),
+            total_required_area: formatAreaToTwoDecimals(row.total_required_area),
+            total_gap: formatAreaToTwoDecimals(row.total_gap)
+        }));
+        
+        res.json({
+            success: true,
+            data: trends,
+            message: '获取趋势数据成功'
+        });
+    } catch (error) {
+        console.error('获取趋势数据失败:', error);
+        res.status(500).json({ success: false, error: '获取趋势数据失败: ' + error.message });
     }
 });
 

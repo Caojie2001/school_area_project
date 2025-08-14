@@ -1,0 +1,163 @@
+/* ==================== 表格样式 ==================== */
+
+/* === 表格容器 === */
+.table-container {
+    overflow: visible;
+    margin-top: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    position: relative;
+}
+
+/* === 分栏表格布局（主要使用的表格实现方案） === */
+
+/* 表格包装器 */
+.data-table-wrapper {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+}
+
+/* 滚动区域 */
+.data-table-scroll-area {
+    margin-left: 240px;
+    margin-right: 260px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* 左侧冻结列容器 */
+.frozen-left-columns {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 240px;
+    z-index: 20;
+    background: #f8f9fa;
+    border-right: 2px solid #dee2e6;
+}
+
+/* 中间滚动列容器 */
+.scrollable-middle-columns {
+    margin-left: 240px;
+    margin-right: 200px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* 右侧冻结列容器 */
+.frozen-right-columns {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 200px;
+    z-index: 20;
+    background: #f8f9fa;
+    border-left: 2px solid #dee2e6;
+}
+
+/* 分栏表格基础样式 */
+.data-table-frozen-left,
+.data-table-scrollable,
+.data-table-frozen-right {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: white;
+}
+
+/* 分栏表格单元格样式 */
+.data-table-frozen-left th,
+.data-table-frozen-left td,
+.data-table-scrollable th,
+.data-table-scrollable td,
+.data-table-frozen-right th,
+.data-table-frozen-right td {
+    padding: 10px 8px;
+    text-align: center;
+    border-bottom: 1px solid #e9ecef;
+    border-right: 1px solid #e9ecef;
+    font-size: 12px;
+    white-space: nowrap;
+    background: white;
+}
+
+/* 分栏表格冻结列背景 */
+.data-table-frozen-left th,
+.data-table-frozen-left td,
+.data-table-frozen-right th,
+.data-table-frozen-right td {
+    background: #f8f9fa;
+}
+
+/* 分栏表格表头样式 */
+.data-table-frozen-left th,
+.data-table-scrollable th,
+.data-table-frozen-right th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 11px;
+    letter-spacing: 0.3px;
+    position: sticky;
+    top: 0;
+    z-index: 25;
+}
+
+/* 分栏表格hover效果 */
+.data-table-frozen-left tr:hover,
+.data-table-scrollable tr:hover,
+.data-table-frozen-right tr:hover {
+    background: #f8f9fa;
+}
+
+.data-table-frozen-left tr:hover td,
+.data-table-frozen-right tr:hover td {
+    background: #e9ecef;
+}
+
+.data-table-scrollable tr:hover td {
+    background: #f8f9fa;
+}
+
+/* 分栏表格列宽设置 */
+.data-table-frozen-left th:first-child,
+.data-table-frozen-left td:first-child {
+    width: 80px;
+    min-width: 80px;
+}
+
+.data-table-frozen-left th:last-child,
+.data-table-frozen-left td:last-child {
+    width: 160px;
+    min-width: 160px;
+    text-align: left;
+    padding-left: 12px;
+}
+
+.data-table-scrollable th,
+.data-table-scrollable td {
+    width: 140px;
+    min-width: 140px;
+}
+
+.data-table-scrollable td:nth-child(1),
+.data-table-scrollable td:nth-child(2),
+.data-table-scrollable td:nth-child(3),
+.data-table-scrollable td:nth-child(4),
+.data-table-scrollable td:nth-child(5) {
+    text-align: right;
+    padding-right: 12px;
+}
+
+.data-table-scrollable td:nth-child(6),
+.data-table-scrollable td:nth-child(7) {
+    width: 120px;
+    min-width: 120px;
+}
+
+.data-table-frozen-right th,
+.data-table-frozen-right td {
+    width: 200px;
+    min-width: 200px;
+}

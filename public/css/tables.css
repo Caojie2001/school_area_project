@@ -4,7 +4,28 @@
 .table-container {
     overflow: visible;
     margin-top: 20px;
-    border-radius: 8px;
+    /* 表格头部样式 */
+.data-table-frozen-left th,
+.data-table-scrollable th,
+.data-table-frozen-right th {
+    background-color: #f8f9fa !important;
+    font-weight: bold !important;
+    color: #495057 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+    height: 42px !important; /* 固定头部高度 */
+    line-height: 20px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+}
+
+/* 表格容器 */
+.table-container {
+    background: white;
+    border-radius: 6px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     position: relative;
 }
@@ -16,14 +37,9 @@
     position: relative;
     overflow: hidden;
     display: flex;
-}
-
-/* 滚动区域 */
-.data-table-scroll-area {
-    margin-left: 240px;
-    margin-right: 260px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    border-radius: 8px;
+    max-height: 600px; /* 限制最大高度，避免页面过长 */
+    /* min-height: 200px; */ /* 取消最小高度限制，让表格根据内容自适应 */
 }
 
 /* 左侧冻结列容器 */
@@ -31,18 +47,28 @@
     position: absolute;
     left: 0;
     top: 0;
-    width: 240px;
+    width: 280px; /* 增加宽度以容纳更长的文字 */
     z-index: 20;
     background: #f8f9fa;
     border-right: 2px solid #dee2e6;
+    overflow-y: auto; /* 允许垂直滚动 */
+    max-height: 600px;
+    scrollbar-width: none; /* Firefox隐藏滚动条 */
+    -ms-overflow-style: none; /* IE隐藏滚动条 */
+}
+
+.frozen-left-columns::-webkit-scrollbar {
+    display: none; /* Chrome/Safari隐藏滚动条 */
 }
 
 /* 中间滚动列容器 */
 .scrollable-middle-columns {
-    margin-left: 240px;
-    margin-right: 200px;
+    margin-left: 280px; /* 对应左侧容器的新宽度 */
+    margin-right: 250px; /* 对应右侧容器的新宽度 */
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto; /* 允许垂直滚动 */
+    max-height: 600px;
+    /* 保留滚动条显示，作为主要滚动控制 */
 }
 
 /* 右侧冻结列容器 */
@@ -50,10 +76,18 @@
     position: absolute;
     right: 0;
     top: 0;
-    width: 200px;
+    width: 250px; /* 增加宽度以容纳更长的文字 */
     z-index: 20;
     background: #f8f9fa;
     border-left: 2px solid #dee2e6;
+    overflow-y: auto; /* 允许垂直滚动 */
+    max-height: 600px;
+    scrollbar-width: none; /* Firefox隐藏滚动条 */
+    -ms-overflow-style: none; /* IE隐藏滚动条 */
+}
+
+.frozen-right-columns::-webkit-scrollbar {
+    display: none; /* Chrome/Safari隐藏滚动条 */
 }
 
 /* 分栏表格基础样式 */
@@ -64,6 +98,32 @@
     border-collapse: separate;
     border-spacing: 0;
     background: white;
+    table-layout: auto; /* 自动表格布局，允许根据内容调整列宽 */
+}
+
+/* 中间滚动表格特殊设置 */
+.data-table-scrollable {
+    min-width: 1100px; /* 设置最小宽度确保产生水平滚动 */
+}
+
+/* 重置表格默认样式，确保一致性 */
+.data-table-frozen-left *,
+.data-table-scrollable *,
+.data-table-frozen-right * {
+    box-sizing: border-box;
+}
+
+/* 强制移除所有可能影响对齐的默认样式 */
+.data-table-frozen-left tr, .data-table-frozen-left td, .data-table-frozen-left th,
+.data-table-scrollable tr, .data-table-scrollable td, .data-table-scrollable th,
+.data-table-frozen-right tr, .data-table-frozen-right td, .data-table-frozen-right th {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    font-size: 100%;
+    vertical-align: baseline;
+    background: transparent;
 }
 
 /* 分栏表格单元格样式 */
@@ -73,13 +133,30 @@
 .data-table-scrollable td,
 .data-table-frozen-right th,
 .data-table-frozen-right td {
-    padding: 10px 8px;
-    text-align: center;
-    border-bottom: 1px solid #e9ecef;
-    border-right: 1px solid #e9ecef;
-    font-size: 12px;
-    white-space: nowrap;
-    background: white;
+    padding: 8px 6px !important;
+    text-align: center !important;
+    border-bottom: 1px solid #e9ecef !important;
+    border-right: 1px solid #e9ecef !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    background: white !important;
+    vertical-align: middle !important; /* 确保垂直居中 */
+    height: 42px !important; /* 固定行高 */
+    line-height: 20px !important; /* 设定行高 */
+    box-sizing: border-box !important; /* 包含padding和border在内 */
+    min-height: 42px !important; /* 最小高度 */
+    max-height: 42px !important; /* 最大高度 */
+    width: auto !important; /* 允许宽度自动调整 */
+    min-width: auto !important; /* 移除最小宽度限制 */
+}
+
+/* 确保表格行也有固定高度 */
+.data-table-frozen-left tr,
+.data-table-scrollable tr,
+.data-table-frozen-right tr {
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
 }
 
 /* 分栏表格冻结列背景 */
@@ -102,6 +179,23 @@
     position: sticky;
     top: 0;
     z-index: 25;
+    height: 42px; /* 与数据行相同高度 */
+    min-height: 42px;
+    max-height: 42px;
+}
+
+/* 强制所有表格tbody具有相同的行高 */
+.data-table-frozen-left tbody,
+.data-table-scrollable tbody,
+.data-table-frozen-right tbody {
+    border-spacing: 0;
+}
+
+/* 确保表格容器具有相同的基础样式 */
+.data-table-frozen-left thead,
+.data-table-scrollable thead,
+.data-table-frozen-right thead {
+    height: 42px;
 }
 
 /* 分栏表格hover效果 */
@@ -120,25 +214,28 @@
     background: #f8f9fa;
 }
 
-/* 分栏表格列宽设置 */
+/* 分栏表格列宽设置 - 修改为自适应宽度 */
 .data-table-frozen-left th:first-child,
 .data-table-frozen-left td:first-child {
-    width: 80px;
-    min-width: 80px;
+    /* width: 80px; */
+    /* min-width: 80px; */
+    min-width: 60px; /* 设置较小的最小宽度，允许内容决定实际宽度 */
 }
 
 .data-table-frozen-left th:last-child,
 .data-table-frozen-left td:last-child {
-    width: 160px;
-    min-width: 160px;
+    /* width: 160px; */
+    /* min-width: 160px; */
+    min-width: 100px; /* 设置较小的最小宽度 */
     text-align: left;
     padding-left: 12px;
 }
 
 .data-table-scrollable th,
 .data-table-scrollable td {
-    width: 140px;
-    min-width: 140px;
+    /* width: 140px; */
+    /* min-width: 140px; */
+    min-width: 220px; /* 进一步增加最小宽度以确保产生水平滚动 */
 }
 
 .data-table-scrollable td:nth-child(1),
@@ -152,12 +249,15 @@
 
 .data-table-scrollable td:nth-child(6),
 .data-table-scrollable td:nth-child(7) {
-    width: 120px;
-    min-width: 120px;
+    /* width: 120px; */
+    /* min-width: 120px; */
+    min-width: 80px; /* 设置较小的最小宽度 */
 }
 
 .data-table-frozen-right th,
 .data-table-frozen-right td {
-    width: 200px;
-    min-width: 200px;
+    /* width: 200px; */
+    /* min-width: 200px; */
+    min-width: 120px; /* 设置较小的最小宽度 */
+}
 }

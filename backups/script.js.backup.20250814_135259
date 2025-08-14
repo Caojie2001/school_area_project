@@ -1,39 +1,18 @@
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     initializeOnlineForm();
-    // 初始化计算函数 - 增加错误处理
+    // 初始化计算函数
     setTimeout(() => {
-        try {
-            calculateTotalStudents();
-            calculateOtherLivingArea();
-            calculateTotalBuildingArea();
-            updateSubsidySummary();
-        } catch (error) {
-            console.warn('初始化计算函数时出现错误:', error);
-            // 如果初始化失败，设置默认值
-            setDefaultValues();
-        }
-    }, 200); // 增加延迟时间确保DOM完全加载
+        calculateTotalStudents();
+        calculateOtherLivingArea();
+        calculateTotalBuildingArea();
+        updateSubsidySummary();
+    }, 100);
 });
-
-// 设置默认值的辅助函数
-function setDefaultValues() {
-    const defaultElements = [
-        'fullTimeTotal', 'internationalTotal', 'totalStudents',
-        'otherLivingArea', 'totalBuildingArea'
-    ];
-    
-    defaultElements.forEach(id => {
-        const element = document.getElementById(id);
-        if (element && !element.value) {
-            element.value = '0';
-        }
-    });
-}
 
 // 计算学生总数
 function calculateTotalStudents() {
-    // 全日制学生 - 使用安全检查
+    // 全日制学生
     const fullTimeSpecialist = parseInt((document.getElementById('fullTimeSpecialist') && document.getElementById('fullTimeSpecialist').value) || 0);
     const fullTimeUndergraduate = parseInt((document.getElementById('fullTimeUndergraduate') && document.getElementById('fullTimeUndergraduate').value) || 0);
     const fullTimeMaster = parseInt((document.getElementById('fullTimeMaster') && document.getElementById('fullTimeMaster').value) || 0);
@@ -41,25 +20,24 @@ function calculateTotalStudents() {
     
     const fullTimeTotal = fullTimeSpecialist + fullTimeUndergraduate + fullTimeMaster + fullTimeDoctor;
     
-    // 留学生 - 包括专科生，使用安全检查
+    // 留学生（不包括专科生）
     const internationalUndergraduate = parseInt((document.getElementById('internationalUndergraduate') && document.getElementById('internationalUndergraduate').value) || 0);
-    const internationalSpecialist = parseInt((document.getElementById('internationalSpecialist') && document.getElementById('internationalSpecialist').value) || 0);
     const internationalMaster = parseInt((document.getElementById('internationalMaster') && document.getElementById('internationalMaster').value) || 0);
     const internationalDoctor = parseInt((document.getElementById('internationalDoctor') && document.getElementById('internationalDoctor').value) || 0);
     
-    const internationalTotal = internationalUndergraduate + internationalSpecialist + internationalMaster + internationalDoctor;
+    const internationalTotal = internationalUndergraduate + internationalMaster + internationalDoctor;
     
-    // 更新显示 - 使用格式化数字
+    // 更新显示
     const fullTimeTotalEl = document.getElementById('fullTimeTotal');
-    if (fullTimeTotalEl) fullTimeTotalEl.value = fullTimeTotal.toLocaleString();
+    if (fullTimeTotalEl) fullTimeTotalEl.value = fullTimeTotal;
     
     const internationalTotalEl = document.getElementById('internationalTotal');
-    if (internationalTotalEl) internationalTotalEl.value = internationalTotal.toLocaleString();
+    if (internationalTotalEl) internationalTotalEl.value = internationalTotal;
     
     // 计算总学生数
     const totalStudents = fullTimeTotal + internationalTotal;
     const totalStudentsEl = document.getElementById('totalStudents');
-    if (totalStudentsEl) totalStudentsEl.value = totalStudents.toLocaleString();
+    if (totalStudentsEl) totalStudentsEl.value = totalStudents;
     
     console.log('计算学生总数:', { fullTimeTotal, internationalTotal, totalStudents });
     
@@ -490,7 +468,41 @@ function calculateOtherLivingArea() {
     }
 }
 
-// 注意：calculateTotalStudents函数已在文件开头定义，避免重复定义
+// 计算学生总人数 - 全局函数
+function calculateTotalStudents() {
+    // 全日制学生
+    const fullTimeUndergraduate = parseFloat(document.getElementById('fullTimeUndergraduate').value) || 0;
+    const fullTimeSpecialist = parseFloat(document.getElementById('fullTimeSpecialist').value) || 0;
+    const fullTimeMaster = parseFloat(document.getElementById('fullTimeMaster').value) || 0;
+    const fullTimeDoctor = parseFloat(document.getElementById('fullTimeDoctor').value) || 0;
+    
+    // 留学生
+    const internationalUndergraduate = parseFloat(document.getElementById('internationalUndergraduate').value) || 0;
+    const internationalSpecialist = parseFloat(document.getElementById('internationalSpecialist').value) || 0;
+    const internationalMaster = parseFloat(document.getElementById('internationalMaster').value) || 0;
+    const internationalDoctor = parseFloat(document.getElementById('internationalDoctor').value) || 0;
+    
+    // 计算全日制学生总数
+    const fullTimeTotal = fullTimeUndergraduate + fullTimeSpecialist + fullTimeMaster + fullTimeDoctor;
+    const fullTimeTotalEl = document.getElementById('fullTimeTotal');
+    if (fullTimeTotalEl) {
+        fullTimeTotalEl.value = fullTimeTotal.toLocaleString();
+    }
+    
+    // 计算留学生总数
+    const internationalTotal = internationalUndergraduate + internationalSpecialist + internationalMaster + internationalDoctor;
+    const internationalTotalEl = document.getElementById('internationalTotal');
+    if (internationalTotalEl) {
+        internationalTotalEl.value = internationalTotal.toLocaleString();
+    }
+    
+    // 计算学生总人数
+    const total = fullTimeTotal + internationalTotal;
+    const totalStudentsEl = document.getElementById('totalStudents');
+    if (totalStudentsEl) {
+        totalStudentsEl.value = total.toLocaleString();
+    }
+}
 
 // 计算建筑总面积 - 全局函数
 function calculateTotalBuildingArea() {

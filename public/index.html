@@ -27,11 +27,11 @@
                     测算数据管理
                 </a>
                 <!-- 测算数据统计菜单项（仅基建中心和管理员可见） -->
-                <a class="menu-item" onclick="showPage('statistics')" id="menu-statistics" style="display: none;">
+                <a class="menu-item menu-restricted" onclick="showPage('statistics')" id="menu-statistics">
                     测算数据统计
                 </a>
                 <!-- 用户管理菜单项（仅管理员可见） -->
-                <a class="menu-item" onclick="showPage('user-management')" id="menu-user-management" style="display: none;">
+                <a class="menu-item menu-restricted" onclick="showPage('user-management')" id="menu-user-management">
                     系统用户管理
                 </a>
             </div>
@@ -599,598 +599,66 @@
     </div>
 
     <!-- 引入外部脚本 -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/dataEntry.js"></script>
+    <script src="js/dataManagement.js"></script>
+    <script src="js/statistics.js"></script>
+    <script src="js/userManagement.js"></script>
     <script src="script.js"></script>
     
     <script>
-        // 页面加载时检查用户登录状态
+        // 页面加载时初始化认证模块和主应用
         document.addEventListener('DOMContentLoaded', async function() {
-            await checkUserStatus();
+            try {
+                console.log('页面加载完成，开始初始化应用...');
+                
+                // 初始化主应用管理器
+                await AppManager.initialize();
+                console.log('主应用管理器初始化完成');
+                
+                // 初始化认证模块
+                await AuthManager.initialize();
+                console.log('认证模块初始化完成');
+                
+                // 立即更新用户信息显示和菜单
+                const user = AuthManager.getCurrentUser();
+                if (user) {
+                    console.log('更新用户界面显示...');
+                    AuthManager.updateUserInfo(user);
+                    
+                    // 立即验证用户名元素，无延迟
+                    const userName1 = document.getElementById('userName');
+                    if (userName1 && userName1.textContent === '加载中...') {
+                        console.log('手动更新用户名显示');
+                        userName1.textContent = user.real_name || user.username || '未知用户';
+                    }
+                }
+                
+            } catch (error) {
+                console.error('认证模块初始化失败:', error);
+                // 如果认证失败，重定向到登录页
+                if (error.message.includes('unauthorized') || error.message.includes('login')) {
+                    window.location.href = '/login.html';
+                }
+            }
         });
 
-        // 检查用户登录状态
-        async function checkUserStatus() {
-            try {
-                const response = await fetch('/api/auth/status');
-                const result = await response.json();
-                
-                if (result.success && result.isLoggedIn) {
-                    updateUserInfo(result.user);
-                } else {
-                    // 如果未登录，重定向到登录页
-                    window.location.href = '/login.html';
-                }
-            } catch (error) {
-                console.error('检查用户状态失败:', error);
-                // 网络错误时也重定向到登录页
-                window.location.href = '/login.html';
-            }
-        }
+        // updateSchoolType 函数已迁移到 dataEntry.js 模块
 
-        // 更新用户信息显示
-        function updateUserInfo(user) {
-            // 保存当前用户信息到全局变量
-            currentUser = user;
-            
-            const userElements = [
-                { avatar: 'userAvatar', name: 'userName', role: 'userRole' },
-                { avatar: 'userAvatar2', name: 'userName2', role: 'userRole2' }
-            ];
+        // calculateTotalStudents 函数已迁移到 dataEntry.js 模块
 
-            userElements.forEach(elements => {
-                const avatarEl = document.getElementById(elements.avatar);
-                const nameEl = document.getElementById(elements.name);
-                const roleEl = document.getElementById(elements.role);
-
-                if (avatarEl) {
-                    avatarEl.textContent = (user.real_name || user.username || 'U').charAt(0).toUpperCase();
-                }
-                if (nameEl) {
-                    nameEl.textContent = user.real_name || user.username || '未知用户';
-                }
-                if (roleEl) {
-                    let roleText = '用户';
-                    if (user.role === 'admin') {
-                        roleText = '管理员';
-                    } else if (user.role === 'construction_center') {
-                        roleText = '基建中心';
-                    } else if (user.role === 'school') {
-                        roleText = '学校用户';
-                    }
-                    roleEl.textContent = roleText;
-                }
-            });
-
-            // 根据用户角色显示/隐藏用户管理菜单
-            const userManagementMenu = document.getElementById('menu-user-management');
-            if (userManagementMenu && user.role === 'admin') {
-                userManagementMenu.style.display = 'block';
-            }
-
-            // 根据用户角色显示/隐藏统计分析菜单
-            const statisticsMenu = document.getElementById('menu-statistics');
-            if (statisticsMenu && (user.role === 'admin' || user.role === 'construction_center')) {
-                statisticsMenu.style.display = 'block';
-            }
-
-            // 根据用户角色调整界面
-            adjustInterfaceByRole(user);
-            
-            // 初始化年份数据（适用于有权限访问统计分析的用户）
-            if (user.role === 'admin' || user.role === 'construction_center') {
-                setTimeout(() => {
-                    console.log('初始化年份数据...');
-                    loadOverviewAvailableYears();
-                }, 500);
-            }
-        }
-
-        // 登出功能
-        async function logout() {
-            if (!confirm('确定要退出登录吗？')) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-
-                const result = await response.json();
-                
-                if (result.success) {
-                    // 清除本地状态
-                    window.location.href = '/login.html';
-                } else {
-                    alert('退出登录失败: ' + result.message);
-                }
-            } catch (error) {
-                console.error('退出登录失败:', error);
-                alert('网络错误，请稍后重试');
-            }
-        }
-
-        // 根据用户角色调整界面
-        function adjustInterfaceByRole(user) {
-            // 如果是学校用户，自动选择并锁定学校名称
-            if (user.role === 'school' && user.school_name) {
-                const schoolNameSelect = document.getElementById('schoolName');
-                if (schoolNameSelect) {
-                    schoolNameSelect.value = user.school_name;
-                    // 不使用disabled，而是通过样式和事件阻止更改，保持表单提交时的值
-                    schoolNameSelect.style.backgroundColor = '#f5f5f5';
-                    schoolNameSelect.style.cursor = 'not-allowed';
-                    schoolNameSelect.style.pointerEvents = 'none';
-                    // 添加只读属性标记
-                    schoolNameSelect.setAttribute('data-locked', 'true');
-                    // 更新学校类型显示
-                    updateSchoolType();
-                }
-            }
-            
-            // 根据角色隐藏某些菜单项
-            if (user.role === 'school') {
-                // 学校用户隐藏统计分析菜单
-                const statsMenu = document.getElementById('menu-statistics');
-                if (statsMenu) {
-                    statsMenu.style.display = 'none';
-                }
-            }
-            
-            // 基建中心用户不能访问用户管理
-            if (user.role === 'construction_center') {
-                const userManagementMenu = document.getElementById('menu-user-management');
-                if (userManagementMenu) {
-                    userManagementMenu.style.display = 'none';
-                }
-            }
-        }
-
-        // 添加缺少的hideOnlineForm函数
-        function hideOnlineForm() {
-            // 此函数不需要实际功能，因为表单已经直接嵌入页面
-            console.log('Form is embedded, no need to hide');
-        }
-
-        // 更新学校类型显示
-        async function updateSchoolType() {
-            const schoolNameSelect = document.getElementById('schoolName');
-            const schoolTypeDisplay = document.getElementById('schoolTypeDisplay');
-            
-            if (!schoolNameSelect || !schoolTypeDisplay) {
-                return;
-            }
-            
-            const selectedSchool = schoolNameSelect.value;
-            if (!selectedSchool) {
-                schoolTypeDisplay.textContent = '';
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/school-type/${encodeURIComponent(selectedSchool)}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    schoolTypeDisplay.textContent = `院校类别: ${data.schoolType}`;
-                } else {
-                    schoolTypeDisplay.textContent = '院校类别: 未指定';
-                }
-            } catch (error) {
-                console.error('获取学校类型失败:', error);
-                schoolTypeDisplay.textContent = '院校类别: 获取失败';
-            }
-        }
-
-        // 计算学生总数
-        function calculateTotalStudents() {
-            console.log('开始计算学生总数...');
-            
-            // 全日制学生
-            const fullTimeSpecialistEl = document.getElementById('fullTimeSpecialist');
-            const fullTimeUndergraduateEl = document.getElementById('fullTimeUndergraduate');
-            const fullTimeMasterEl = document.getElementById('fullTimeMaster');
-            const fullTimeDoctorEl = document.getElementById('fullTimeDoctor');
-            
-            const fullTimeSpecialist = parseInt(fullTimeSpecialistEl ? fullTimeSpecialistEl.value : 0) || 0;
-            const fullTimeUndergraduate = parseInt(fullTimeUndergraduateEl ? fullTimeUndergraduateEl.value : 0) || 0;
-            const fullTimeMaster = parseInt(fullTimeMasterEl ? fullTimeMasterEl.value : 0) || 0;
-            const fullTimeDoctor = parseInt(fullTimeDoctorEl ? fullTimeDoctorEl.value : 0) || 0;
-            
-            const fullTimeTotal = fullTimeSpecialist + fullTimeUndergraduate + fullTimeMaster + fullTimeDoctor;
-            
-            // 留学生（不包括专科生）
-            const internationalUndergraduateEl = document.getElementById('internationalUndergraduate');
-            const internationalMasterEl = document.getElementById('internationalMaster');
-            const internationalDoctorEl = document.getElementById('internationalDoctor');
-            
-            const internationalUndergraduate = parseInt(internationalUndergraduateEl ? internationalUndergraduateEl.value : 0) || 0;
-            const internationalMaster = parseInt(internationalMasterEl ? internationalMasterEl.value : 0) || 0;
-            const internationalDoctor = parseInt(internationalDoctorEl ? internationalDoctorEl.value : 0) || 0;
-            
-            const internationalTotal = internationalUndergraduate + internationalMaster + internationalDoctor;
-            
-            // 更新显示
-            const fullTimeTotalEl = document.getElementById('fullTimeTotal');
-            if (fullTimeTotalEl) {
-                fullTimeTotalEl.value = fullTimeTotal;
-                console.log('设置全日制总数:', fullTimeTotal);
-            }
-            
-            const internationalTotalEl = document.getElementById('internationalTotal');
-            if (internationalTotalEl) {
-                internationalTotalEl.value = internationalTotal;
-                console.log('设置留学生总数:', internationalTotal);
-            }
-            
-            // 计算总学生数
-            const totalStudents = fullTimeTotal + internationalTotal;
-            const totalStudentsEl = document.getElementById('totalStudents');
-            if (totalStudentsEl) {
-                totalStudentsEl.value = totalStudents;
-                console.log('设置学生总人数:', totalStudents);
-            }
-            
-            console.log('计算完成:', { fullTimeTotal, internationalTotal, totalStudents });
-            
-            return {
-                fullTimeTotal,
-                internationalTotal,
-                totalStudents
-            };
-        }
-
-        // 页面切换函数
-        function showPage(pageId) {
-            // 隐藏所有页面
-            const allPages = document.querySelectorAll('.page-content');
-            allPages.forEach(page => page.classList.remove('active'));
-            
-            // 移除所有菜单项的活动状态
-            const allMenuItems = document.querySelectorAll('.menu-item');
-            allMenuItems.forEach(item => item.classList.remove('active'));
-            
-            // 显示选中的页面
-            const targetPage = document.getElementById(`page-${pageId}`);
-            const targetMenu = document.getElementById(`menu-${pageId}`);
-            
-            if (targetPage) targetPage.classList.add('active');
-            if (targetMenu) targetMenu.classList.add('active');
-            
-            // 根据页面类型加载相应内容
-            if (pageId === 'data-management') {
-                setTimeout(() => loadDataManagementContent(), 300);
-            } else if (pageId === 'statistics') {
-                // 加载统计分析内容
-                setTimeout(() => {
-                    loadOverviewAvailableYears();
-                    searchOverviewRecords();
-                    // 更新用户信息
-                    if (currentUser) {
-                        updateStatisticsUserInfo(currentUser);
-                    }
-                }, 300);
-            } else if (pageId === 'user-management') {
-                // 加载用户管理内容
-                setTimeout(() => {
-                    loadUserManagementContent();
-                    // 更新用户信息
-                    if (currentUser) {
-                        updateUserManagementUserInfo(currentUser);
-                    }
-                }, 300);
-            }
-            
-            // 移动端自动关闭菜单
-            if (window.innerWidth <= 768) {
-                closeSidebar();
-            }
-        }
-
-        // 移动端菜单切换
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('open');
-        }
-
-        function closeSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.remove('open');
-        }
+        // 这些函数已迁移到 main.js 模块
+        // showPage(), toggleSidebar(), closeSidebar() 函数现在由 main.js 提供
 
         // 更新统计分析页面的用户信息
-        function updateStatisticsUserInfo(user) {
-            const avatarEl = document.getElementById('userAvatar3');
-            const nameEl = document.getElementById('userName3');
-            const roleEl = document.getElementById('userRole3');
-            
-            if (avatarEl && nameEl && roleEl) {
-                avatarEl.textContent = user.real_name ? user.real_name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase();
-                nameEl.textContent = user.real_name || user.username;
-                
-                let roleText = '用户';
-                if (user.role === 'admin') roleText = '管理员';
-                else if (user.role === 'construction_center') roleText = '基建中心';
-                else if (user.role === 'school') roleText = '学校用户';
-                
-                roleEl.textContent = roleText;
-            }
-        }
-
-        // ========== 填报概览页面功能 ==========
-        
-        // 搜索填报概览记录
-        async function searchOverviewRecords() {
-            const yearFilter = document.getElementById('overviewYearFilter');
-            const userTypeFilter = document.getElementById('overviewUserTypeFilter');
-            const year = yearFilter ? yearFilter.value : '2025';
-            const userType = userTypeFilter ? userTypeFilter.value : 'construction_center';
-            
-            console.log('开始搜索填报概览记录，筛选条件:', { year, userType });
-            
-            const resultsContainer = document.getElementById('overviewDataResults');
-            const recordCount = document.getElementById('overviewRecordCount');
-            
-            resultsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
-            
-            // 隐藏记录计数
-            if (recordCount) recordCount.style.display = 'none';
-            
-            try {
-                // 构建查询参数
-                let queryParams = [];
-                if (year !== 'all') queryParams.push(`year=${encodeURIComponent(year)}`);
-                if (userType !== 'all') queryParams.push(`userType=${encodeURIComponent(userType)}`);
-                
-                const queryString = queryParams.length > 0 ? '?' + queryParams.join('&') : '';
-                const response = await fetch(`/api/overview/records${queryString}`);
-                const result = await response.json();
-                
-                if (result.success) {
-                    displayOverviewResults(result.data);
-                    updateOverviewSummary(result.data);
-                    
-                    // 显示记录计数
-                    if (recordCount) {
-                        const totalCount = document.getElementById('overviewTotalCount');
-                        if (totalCount) totalCount.textContent = result.data.length;
-                        recordCount.style.display = 'block';
-                    }
-                } else {
-                    console.error('搜索失败:', result.error);
-                    resultsContainer.innerHTML = `<div class="alert alert-danger">搜索失败: ${result.error}</div>`;
-                }
-            } catch (error) {
-                console.error('搜索填报概览记录失败:', error);
-                resultsContainer.innerHTML = '<div class="alert alert-danger">网络错误，请稍后重试</div>';
-            }
-        }
-        
-        // 显示填报概览搜索结果
-        function displayOverviewResults(data) {
-            const resultsContainer = document.getElementById('overviewDataResults');
-            
-            if (data.length === 0) {
-                resultsContainer.innerHTML = '<div class="alert alert-info">未找到符合条件的记录</div>';
-                return;
-            }
-            
-            // 复用数据管理的表格结构，但去掉操作列和右侧空间
-            let html = '<div class="table-container">';
-            html += '<div class="data-table-wrapper">';
-            
-            // 左侧冻结列
-            html += '<div class="frozen-left-columns">';
-            html += '<table class="data-table-frozen-left"><thead><tr>';
-            html += '<th>测算年份</th>';
-            html += '<th>学校名称</th>';
-            html += '</tr></thead><tbody>';
-            
-            data.forEach(record => {
-                html += `<tr>
-                    <td><strong>${record.year || '未知'}</strong></td>
-                    <td><strong>${record.school_name || '未知'}</strong></td>
-                </tr>`;
-            });
-            
-            html += '</tbody></table></div>';
-            
-            // 中间滚动数据列（去掉右侧margin，占满剩余空间）
-            html += '<div class="scrollable-middle-columns" style="margin-left: 240px; margin-right: 0; overflow-x: auto; overflow-y: hidden;">';
-            html += '<table class="data-table-scrollable"><thead><tr>';
-            html += '<th>现状建筑总面积(m²)</th>';
-            html += '<th>学生规模测算建筑总面积(m²)</th>';
-            html += '<th>学生规模测算建筑面积总缺额(不含补助)(m²)</th>';
-            html += '<th>补助建筑总面积(m²)</th>';
-            html += '<th>学生规模测算建筑面积总缺额(含补助)(m²)</th>';
-            html += '</tr></thead><tbody>';
-            
-            data.forEach(record => {
-                // 直接使用API返回的正确值
-                const gapWithoutSubsidy = record.gap_without_subsidy || 0;
-                const gapWithSubsidy = record.gap_with_subsidy || 0;
-                
-                html += `<tr>
-                    <td>${formatNumber(record.current_total_area || 0)}</td>
-                    <td>${formatNumber(record.required_total_area || 0)}</td>
-                    <td>${gapWithoutSubsidy > 0 ? '+' : ''}${formatNumber(gapWithoutSubsidy)}</td>
-                    <td>${formatNumber(record.total_subsidy_area || 0)}</td>
-                    <td>${gapWithSubsidy > 0 ? '+' : ''}${formatNumber(gapWithSubsidy)}</td>
-                </tr>`;
-            });
-            
-            html += '</tbody></table></div>';
-            
-            // 不需要右侧操作列，直接结束
-            html += '</div>'; // data-table-wrapper
-            html += '</div>'; // table-container
-            
-            html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
-                <p style="margin: 0; color: #6c757d; font-size: 14px;">
-                    <strong>共找到 ${data.length} 条记录</strong>
-                </p>
-            </div>`;
-            
-            resultsContainer.innerHTML = html;
-            
-            // 更新汇总数据
-            updateOverviewSummary(data);
-            
-            // 同步表格行高度和滚动
-            setTimeout(() => {
-                syncOverviewTableRows();
-                syncOverviewTableScroll();
-            }, 0);
-        }
-        
-        // 同步填报概览表格行高度
-        function syncOverviewTableRows() {
-            const leftRows = document.querySelectorAll('.data-table-frozen-left tbody tr');
-            const middleRows = document.querySelectorAll('.data-table-scrollable tbody tr');
-            
-            if (leftRows.length === middleRows.length) {
-                for (let i = 0; i < leftRows.length; i++) {
-                    const maxHeight = Math.max(
-                        leftRows[i].offsetHeight,
-                        middleRows[i].offsetHeight
-                    );
-                    
-                    leftRows[i].style.height = maxHeight + 'px';
-                    middleRows[i].style.height = maxHeight + 'px';
-                }
-            }
-        }
-
-        // 同步填报概览表格垂直滚动
-        function syncOverviewTableScroll() {
-            const leftTable = document.querySelector('.frozen-left-columns');
-            const middleTable = document.querySelector('.scrollable-middle-columns');
-            
-            if (!leftTable || !middleTable) return;
-            
-            let isScrolling = false;
-            
-            function syncScroll(source, targets) {
-                if (isScrolling) return;
-                isScrolling = true;
-                
-                targets.forEach(target => {
-                    target.scrollTop = source.scrollTop;
-                });
-                
-                setTimeout(() => {
-                    isScrolling = false;
-                }, 10);
-            }
-            
-            leftTable.addEventListener('scroll', () => {
-                syncScroll(leftTable, [middleTable]);
-            });
-            
-            middleTable.addEventListener('scroll', () => {
-                syncScroll(middleTable, [leftTable]);
-            });
-        }
-        
-        // 更新填报概览汇总数据
-        function updateOverviewSummary(data) {
-            const currentAreaEl = document.getElementById('overviewCurrentArea');
-            const requiredAreaEl = document.getElementById('overviewRequiredArea');
-            const gapWithoutSubsidyEl = document.getElementById('overviewGapWithoutSubsidy');
-            const gapWithSubsidyEl = document.getElementById('overviewGapWithSubsidy');
-            
-            let totalCurrent = 0;
-            let totalRequired = 0;
-            let totalGapWithoutSubsidy = 0;
-            let totalGapWithSubsidy = 0;
-            
-            data.forEach(record => {
-                totalCurrent += parseFloat(record.current_total_area) || 0;
-                totalRequired += parseFloat(record.required_total_area) || 0;
-                totalGapWithoutSubsidy += parseFloat(record.gap_without_subsidy) || 0;
-                totalGapWithSubsidy += parseFloat(record.gap_with_subsidy) || 0;
-            });
-            
-            if (currentAreaEl) currentAreaEl.textContent = formatNumber(totalCurrent);
-            if (requiredAreaEl) requiredAreaEl.textContent = formatNumber(totalRequired);
-            if (gapWithoutSubsidyEl) gapWithoutSubsidyEl.textContent = (totalGapWithoutSubsidy > 0 ? '+' : '') + formatNumber(totalGapWithoutSubsidy);
-            if (gapWithSubsidyEl) gapWithSubsidyEl.textContent = (totalGapWithSubsidy > 0 ? '+' : '') + formatNumber(totalGapWithSubsidy);
-        }
-        
-        // 加载填报概览可用年份
-        async function loadOverviewAvailableYears() {
-            console.log('开始加载年份数据...');
-            try {
-                const response = await fetch('/api/years');
-                const result = await response.json();
-                console.log('API响应:', result);
-                
-                if (result.success && result.years) {
-                    const yearFilter = document.getElementById('overviewYearFilter');
-                    console.log('年份筛选器元素:', yearFilter);
-                    if (yearFilter) {
-                        console.log('清空前的选项:', yearFilter.innerHTML);
-                        
-                        // 清空现有选项
-                        yearFilter.innerHTML = '';
-                        
-                        // 添加年份选项，按降序排列
-                        const sortedYears = result.years.sort((a, b) => b - a);
-                        console.log('排序后的年份:', sortedYears);
-                        
-                        sortedYears.forEach(year => {
-                            const option = document.createElement('option');
-                            option.value = year;
-                            option.textContent = `${year}年`;
-                            yearFilter.appendChild(option);
-                            console.log(`添加年份选项: ${year}年`);
-                        });
-                        
-                        console.log('添加后的选项:', yearFilter.innerHTML);
-                        
-                        // 默认选择最新年份
-                        if (sortedYears.length > 0) {
-                            yearFilter.value = sortedYears[0];
-                            console.log(`设置默认选择年份: ${sortedYears[0]}`);
-                            console.log('当前选择的值:', yearFilter.value);
-                        }
-                    } else {
-                        console.error('找不到年份筛选器元素');
-                    }
-                } else {
-                    console.error('API响应格式错误:', result);
-                }
-            } catch (error) {
-                console.error('加载年份失败:', error);
-            }
-        }
-
-        // 格式化数字显示
-        function formatNumber(num) {
-            if (num === null || num === undefined || isNaN(num)) return '0.00';
-            return parseFloat(num).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-
-        // 格式化日期时间显示
-        function formatDateTime(dateString) {
-            if (!dateString) return '-';
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return '-';
-            
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            
-            return `${year}-${month}-${day} ${hours}:${minutes}`;
-        }
+        // updateStatisticsUserInfo 函数已迁移到 main.js 模块
 
         // ===== 数据管理页面功能 =====
-        let allDataSchoolsData = []; // 存储所有学校数据
-        let currentUser = null; // 存储当前用户信息
+        // allDataSchoolsData 由 dataManagement.js 模块管理
+        // currentUser 已在 auth.js 中声明，这里不需要重复声明
 
         // 加载数据管理页面内容
         async function loadDataManagementContent() {
@@ -1253,167 +721,6 @@
             }, 100);
         }
 
-        // 搜索数据记录
-        async function searchDataRecords() {
-            const yearFilter = document.getElementById('dataYearFilter');
-            const schoolFilter = document.getElementById('dataSchoolNameFilter');
-            const userFilter = document.getElementById('dataUserFilter');
-            const year = yearFilter ? yearFilter.value : 'all';
-            const school = schoolFilter ? schoolFilter.value : 'all';
-            const user = userFilter ? userFilter.value : 'all';
-            
-            console.log('开始搜索数据记录，筛选条件:', { year, school, user });
-            
-            const resultsContainer = document.getElementById('dataHistoryResults');
-            const batchDownloadBtn = document.getElementById('batchDownloadBtn');
-            resultsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
-            
-            // 搜索时隐藏汇总栏
-            const summarySection = document.getElementById('dataSummarySection');
-            if (summarySection) {
-                summarySection.style.display = 'none';
-            }
-            
-            // 禁用批量下载按钮
-            if (batchDownloadBtn) {
-                batchDownloadBtn.disabled = true;
-            }
-            
-            try {
-                let url = '/api/schools/latest';
-                const params = [];
-                
-                if (year !== 'all') {
-                    params.push(`year=${year}`);
-                }
-                
-                if (school !== 'all') {
-                    params.push(`school=${encodeURIComponent(school)}`);
-                }
-                
-                if (user !== 'all') {
-                    params.push(`user=${encodeURIComponent(user)}`);
-                }
-                
-                if (params.length > 0) {
-                    url += '?' + params.join('&');
-                }
-                
-                console.log('请求URL:', url);
-                
-                const response = await fetch(url, {
-                    cache: 'no-cache',  // 禁用缓存
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                    }
-                });
-                const result = await response.json();
-                
-                console.log('搜索API响应:', result);
-                
-                if (result.success) {
-                    allDataSchoolsData = result.data;
-                    console.log('搜索成功，加载了', result.data.length, '条记录');
-                    console.log('记录ID列表:', result.data.map(r => r.id));
-                    displayDataSchoolsResults(result.data);
-                    
-                    // 如果有搜索结果，启用批量下载按钮
-                    if (batchDownloadBtn && result.data.length > 0) {
-                        batchDownloadBtn.disabled = false;
-                    }
-                } else {
-                    console.error('搜索失败:', result.error);
-                    showDataError('搜索失败: ' + result.error);
-                }
-            } catch (error) {
-                console.error('搜索失败:', error);
-                showDataError('搜索失败: ' + error.message);
-            }
-        }
-
-        // 加载可用年份
-        async function loadDataAvailableYears() {
-            try {
-                const response = await fetch('/api/years');
-                const result = await response.json();
-                
-                if (result.success) {
-                    const yearSelect = document.getElementById('dataYearFilter');
-                    if (yearSelect) {
-                        yearSelect.innerHTML = '<option value="all">所有测算年份</option>';
-                        
-                        result.data.forEach(year => {
-                            const option = document.createElement('option');
-                            option.value = year;
-                            option.textContent = year + '年';
-                            yearSelect.appendChild(option);
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('加载年份失败:', error);
-            }
-        }
-
-        // 加载可用的测算用户
-        async function loadDataAvailableUsers() {
-            try {
-                const response = await fetch('/api/users');
-                const result = await response.json();
-                
-                if (result.success) {
-                    const userSelect = document.getElementById('dataUserFilter');
-                    if (userSelect) {
-                        userSelect.innerHTML = '<option value="all">所有测算用户</option>';
-                        
-                        result.data.forEach(user => {
-                            const option = document.createElement('option');
-                            // 使用真实姓名作为value进行筛选
-                            option.value = user.real_name || user.username || user;
-                            // 只显示真实姓名，不显示用户名
-                            option.textContent = user.real_name || user.username || user;
-                            userSelect.appendChild(option);
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('加载测算用户失败:', error);
-            }
-        }
-
-        // 加载学校数据（保留但不自动调用）
-        async function loadDataSchoolsData() {
-            // 该函数已被 searchDataRecords 替代
-            console.log('使用 searchDataRecords 函数进行搜索');
-        }
-
-        // 按学校名称筛选（已不再使用）
-        function filterDataSchools() {
-            // 该函数已被移除，使用下拉选择器替代
-            console.log('使用下拉选择器进行筛选');
-        }
-
-        // 清空筛选
-        function clearDataFilter() {
-            document.getElementById('dataYearFilter').value = 'all';
-            document.getElementById('dataSchoolNameFilter').value = 'all';
-            document.getElementById('dataUserFilter').value = 'all';
-            
-            // 清空结果显示
-            const resultsContainer = document.getElementById('dataHistoryResults');
-            resultsContainer.innerHTML = '<div class="alert alert-info">请选择筛选条件并点击查找按钮</div>';
-            
-            // 清空数据
-            allDataSchoolsData = [];
-            
-            // 禁用批量下载按钮
-            const batchDownloadBtn = document.getElementById('batchDownloadBtn');
-            if (batchDownloadBtn) {
-                batchDownloadBtn.disabled = true;
-            }
-        }
-
         // 批量下载搜索结果
         async function batchDownloadSearchResults() {
             const yearFilter = document.getElementById('dataYearFilter');
@@ -1454,17 +761,9 @@
                 console.log('批量下载请求参数:', requestBody);
                 
                 // 发送批量导出请求
-                const response = await fetch('/api/batch-export', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestBody)
-                });
+                const result = await CommonAPI.batchExport(requestBody);
                 
-                const result = await response.json();
-                
-                if (!response.ok) {
+                if (!result.success) {
                     throw new Error(result.error || '批量下载失败');
                 }
                 
@@ -1538,967 +837,9 @@
             }, 3000);
         }
 
-        // 显示数据错误
-        function showDataError(message) {
-            const container = document.getElementById('dataHistoryResults');
-            container.innerHTML = `<div class="alert alert-danger">${message}</div>`;
-            
-            // 隐藏汇总栏
-            const summarySection = document.getElementById('dataSummarySection');
-            if (summarySection) {
-                summarySection.style.display = 'none';
-            }
-        }
-
-        // 更新数据汇总
-        function updateDataSummary(schoolsData) {
-            if (!schoolsData || schoolsData.length === 0) {
-                // 隐藏汇总栏
-                const summarySection = document.getElementById('dataSummarySection');
-                if (summarySection) {
-                    summarySection.style.display = 'none';
-                }
-                return;
-            }
-            
-            // 计算汇总数据
-            let totalSchools = schoolsData.length;
-            let totalCurrentArea = 0;
-            let totalRequiredArea = 0;
-            let totalGapWithoutSubsidy = 0;
-            let totalGapWithSubsidy = 0;
-            
-            schoolsData.forEach(school => {
-                // 解析数字，确保是有效的数值
-                const currentArea = parseFloat(school.current_building_area) || 0;
-                const requiredArea = parseFloat(school.required_building_area) || 0;
-                const gapWithSubsidy = parseFloat(school.total_area_gap_with_subsidy) || 0;
-                const subsidyTotal = parseFloat(school.special_subsidy_total) || 0;
-                const gapWithoutSubsidy = school.total_area_gap_without_subsidy ? parseFloat(school.total_area_gap_without_subsidy) : (gapWithSubsidy - subsidyTotal);
-                
-                totalCurrentArea += currentArea;
-                totalRequiredArea += requiredArea;
-                totalGapWithoutSubsidy += gapWithoutSubsidy;
-                totalGapWithSubsidy += gapWithSubsidy;
-            });
-            
-            // 格式化数字为两位小数
-            const formatNumber = (num) => {
-                return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            };
-            
-            // 更新显示
-            const summarySection = document.getElementById('dataSummarySection');
-            if (summarySection) {
-                summarySection.style.display = 'block';
-                
-                const schoolCountEl = document.getElementById('summarySchoolCount');
-                const currentAreaEl = document.getElementById('summaryCurrentArea');
-                const requiredAreaEl = document.getElementById('summaryRequiredArea');
-                const gapWithoutSubsidyEl = document.getElementById('summaryGapWithoutSubsidy');
-                const gapWithSubsidyEl = document.getElementById('summaryGapWithSubsidy');
-                
-                if (schoolCountEl) schoolCountEl.textContent = totalSchools;
-                if (currentAreaEl) currentAreaEl.textContent = formatNumber(totalCurrentArea);
-                if (requiredAreaEl) requiredAreaEl.textContent = formatNumber(totalRequiredArea);
-                if (gapWithoutSubsidyEl) {
-                    gapWithoutSubsidyEl.textContent = formatNumber(totalGapWithoutSubsidy);
-                }
-                if (gapWithSubsidyEl) {
-                    gapWithSubsidyEl.textContent = formatNumber(totalGapWithSubsidy);
-                }
-            }
-        }
-
-        // 显示学校数据结果
-        function displayDataSchoolsResults(schoolsData) {
-            const container = document.getElementById('dataHistoryResults');
-            
-            if (!schoolsData || schoolsData.length === 0) {
-                container.innerHTML = '<div class="alert alert-info">没有找到相关数据</div>';
-                // 隐藏汇总栏
-                const summarySection = document.getElementById('dataSummarySection');
-                if (summarySection) {
-                    summarySection.style.display = 'none';
-                }
-                return;
-            }
-            
-            // 计算并显示汇总信息
-            updateDataSummary(schoolsData);
-            
-            let html = '<div class="table-container">';
-            html += '<div class="data-table-wrapper">';
-            
-            // 左侧冻结列
-            html += '<div class="frozen-left-columns">';
-            html += '<table class="data-table-frozen-left"><thead><tr>';
-            html += '<th>测算年份</th>';
-            html += '<th>学校名称</th>';
-            html += '</tr></thead><tbody>';
-            
-            schoolsData.forEach(school => {
-                html += `<tr>
-                    <td><strong>${school.year || '未知'}</strong></td>
-                    <td><strong>${school.school_name || '未知'}</strong></td>
-                </tr>`;
-            });
-            
-            html += '</tbody></table></div>';
-            
-            // 中间滚动数据列
-            html += '<div class="scrollable-middle-columns">';
-            html += '<table class="data-table-scrollable"><thead><tr>';
-            html += '<th>现状建筑总面积(m²)</th>';
-            html += '<th>学生规模测算建筑总面积(m²)</th>';
-            html += '<th>学生规模测算建筑面积总缺额(不含补助)(m²)</th>';
-            html += '<th>补助建筑总面积(m²)</th>';
-            html += '<th>学生规模测算建筑面积总缺额(含补助)(m²)</th>';
-            html += '<th>测算时间</th>';
-            html += '<th>测算用户</th>';
-            html += '</tr></thead><tbody>';
-            
-            schoolsData.forEach(school => {
-                const date = new Date(school.created_at).toLocaleDateString('zh-CN');
-                const time = new Date(school.created_at).toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
-                
-                // 计算不含补助的缺口
-                const gapWithoutSubsidy = school.total_area_gap_without_subsidy ? parseFloat(school.total_area_gap_without_subsidy) : ((school.total_area_gap_with_subsidy || 0) - (school.special_subsidy_total || 0));
-                
-                html += `<tr>
-                    <td>${school.current_building_area || '0.00'}</td>
-                    <td>${school.required_building_area || '0.00'}</td>
-                    <td>${gapWithoutSubsidy.toFixed ? gapWithoutSubsidy.toFixed(2) : '0.00'}</td>
-                    <td>${school.special_subsidy_total || '0.00'}</td>
-                    <td>${school.total_area_gap_with_subsidy || '0.00'}</td>
-                    <td>${date} ${time}</td>
-                    <td>${school.submitter_real_name || school.submitter_username || '未知用户'}</td>
-                </tr>`;
-            });
-            
-            html += '</tbody></table></div>';
-            
-            // 右侧冻结操作列
-            html += '<div class="frozen-right-columns">';
-            html += '<table class="data-table-frozen-right"><thead><tr>';
-            html += '<th>操作</th>';
-            html += '</tr></thead><tbody>';
-            
-            schoolsData.forEach(school => {
-                html += `<tr>
-                    <td>
-                        <button style="background: none; color: #3498db; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="viewDataSchoolDetails(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">详情</button>
-                        <button style="background: none; color: #3498db; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="downloadRecord(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">下载</button>
-                        <button style="background: none; color: #f39c12; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="editDataRecord(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">编辑</button>
-                        <button style="background: none; color: #e74c3c; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px; text-decoration: underline;" onclick="deleteSchoolCombination('${school.school_name}', ${school.year}, '${school.submitter_username || '未知用户'}')" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">删除</button>
-                    </td>
-                </tr>`;
-            });
-            
-            html += '</tbody></table></div>';
-            html += '</div>'; // data-table-wrapper
-            html += '</div>'; // table-container
-            
-            html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
-                <p style="margin: 0; color: #6c757d; font-size: 14px;">
-                    <strong>共找到 ${schoolsData.length} 条记录</strong> | 
-                    可以使用上方的"批量下载"按钮下载所有搜索结果
-                </p>
-            </div>`;
-            container.innerHTML = html;
-            
-            // 同步表格行高度和滚动
-            setTimeout(() => {
-                syncTableRows();
-                syncTableScroll();
-            }, 0);
-        }
-
-        // 同步表格行高度
-        function syncTableRows() {
-            const leftRows = document.querySelectorAll('.data-table-frozen-left tbody tr');
-            const middleRows = document.querySelectorAll('.data-table-scrollable tbody tr');
-            const rightRows = document.querySelectorAll('.data-table-frozen-right tbody tr');
-            
-            if (leftRows.length === middleRows.length && middleRows.length === rightRows.length) {
-                for (let i = 0; i < leftRows.length; i++) {
-                    const maxHeight = Math.max(
-                        leftRows[i].offsetHeight,
-                        middleRows[i].offsetHeight,
-                        rightRows[i].offsetHeight
-                    );
-                    
-                    leftRows[i].style.height = maxHeight + 'px';
-                    middleRows[i].style.height = maxHeight + 'px';
-                    rightRows[i].style.height = maxHeight + 'px';
-                }
-            }
-        }
-
-        // 同步表格垂直滚动
-        function syncTableScroll() {
-            const leftTable = document.querySelector('.frozen-left-columns');
-            const middleTable = document.querySelector('.scrollable-middle-columns');
-            const rightTable = document.querySelector('.frozen-right-columns');
-            
-            if (!leftTable || !middleTable || !rightTable) return;
-            
-            let isScrolling = false;
-            
-            function syncScroll(source, targets) {
-                if (isScrolling) return;
-                isScrolling = true;
-                
-                targets.forEach(target => {
-                    target.scrollTop = source.scrollTop;
-                });
-                
-                setTimeout(() => {
-                    isScrolling = false;
-                }, 10);
-            }
-            
-            leftTable.addEventListener('scroll', () => {
-                syncScroll(leftTable, [middleTable, rightTable]);
-            });
-            
-            middleTable.addEventListener('scroll', () => {
-                syncScroll(middleTable, [leftTable, rightTable]);
-            });
-            
-            rightTable.addEventListener('scroll', () => {
-                syncScroll(rightTable, [leftTable, middleTable]);
-            });
-        }
-
         // 显示最近分析记录
         function loadDataRecentAnalysis(recentData) {
             // 已移除最近分析记录功能
-        }
-
-        // 查看学校详情
-        function viewDataSchoolDetails(schoolId) {
-            const school = allDataSchoolsData.find(s => s.id === schoolId);
-            if (!school) {
-                alert('找不到学校详情');
-                return;
-            }
-            
-            // 解析计算结果JSON
-            let calculationResults = {};
-            if (school.calculation_results) {
-                try {
-                    calculationResults = JSON.parse(school.calculation_results);
-                } catch (e) {
-                    console.error('解析计算结果失败:', e);
-                }
-            }
-            
-            // 解析特殊补助数据
-            let specialSubsidies = [];
-            if (school.special_subsidies) {
-                try {
-                    specialSubsidies = JSON.parse(school.special_subsidies);
-                } catch (e) {
-                    console.error('解析特殊补助数据失败:', e);
-                }
-            }
-            
-            // 计算不含补助的缺口
-            const gapWithoutSubsidy = school.total_area_gap_without_subsidy ? parseFloat(school.total_area_gap_without_subsidy) : ((school.total_area_gap_with_subsidy || 0) - (school.special_subsidy_total || 0));
-            
-            // 创建与Excel第一个sheet完全一致的表格
-            let detailsHtml = `
-                <div style="max-width: 900px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="color: #2c3e50; margin: 0;">学校详情</h2>
-                        <button onclick="closeDetailsModal()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">关闭</button>
-                    </div>
-                    
-                    <!-- Excel表格样式 -->
-                    <div style="border: 1px solid #000; background: white;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                            <tr>
-                                <td colspan="4" style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #f0f0f0;">高校测算</td>
-                            </tr>
-                            <tr>
-                                <td colspan="4" style="border: 1px solid #000; padding: 6px; background: #f8f8f8;">基本办学条件缺口（"－"表示超额，"+"表示缺额）</td>
-                            </tr>
-                            <tr>
-                                <td colspan="3" style="border: 1px solid #000; padding: 6px;"></td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">测算时间：${new Date(school.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-')}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">测算年份</td>
-                                <td colspan="3" style="border: 1px solid #000; padding: 6px;">${school.year}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生统计年份</td>
-                                <td style="border: 1px solid #000; padding: 6px;">${school.student_stat_year || school.year}</td>
-                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">建筑面积统计年份</td>
-                                <td style="border: 1px solid #000; padding: 6px;">${school.building_stat_year || school.year}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">单位/学校(机构)名称(章)</td>
-                                <td style="border: 1px solid #000; padding: 6px;">${school.school_name}</td>
-                                <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">院校类型</td>
-                                <td style="border: 1px solid #000; padding: 6px;">${school.school_type ? school.school_type.substring(5) : ''}</td>
-                            </tr>
-                            <tr>
-                                <td colspan="4" style="border: 1px solid #000; padding: 6px;"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="4" style="border: 1px solid #000; padding: 6px; font-weight: bold; background: #f8f8f8;">规划学生数</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">专科全日制学生数(人)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.full_time_specialist || 0}</td>
-                                <td style="border: 1px solid #000; padding: 6px;">本科全日制学生数(人)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.full_time_undergraduate || 0}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">硕士全日制学生数(人)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.full_time_master || 0}</td>
-                                <td style="border: 1px solid #000; padding: 6px;">博士全日制学生数(人)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.full_time_doctor || 0}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">本科留学生数(人)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.international_undergraduate || 0}</td>
-                                <td style="border: 1px solid #000; padding: 6px;">硕士留学生数(人)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.international_master || 0}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">博士留学生(人)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${school.international_doctor || 0}</td>
-                                <td style="border: 1px solid #000; padding: 6px;"></td>
-                                <td style="border: 1px solid #000; padding: 6px;"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="4" style="border: 1px solid #000; padding: 6px;"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="4" style="border: 1px solid #000; padding: 6px; font-weight: bold; background: #f8f8f8;">测算结果</td>
-                            </tr>
-                            <tr style="font-weight: bold; background: #f0f0f0;">
-                                <td style="border: 1px solid #000; padding: 6px;">用房类型</td>
-                                <td style="border: 1px solid #000; padding: 6px;">现状建筑面积(m²)</td>
-                                <td style="border: 1px solid #000; padding: 6px;">学生规模测算建筑面积(m²)</td>
-                                <td style="border: 1px solid #000; padding: 6px;">学生规模测算建筑面积缺额(m²)</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">教学及辅助用房</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.teaching_area || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配教学及辅助用房(A)'] || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.teaching_area_gap || 0).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">办公用房</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.office_area || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配办公用房(B)'] || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.office_area_gap || 0).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">生活配套用房</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.total_living_area || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${(parseFloat(calculationResults['总应配学生宿舍(C1)'] || 0) + parseFloat(calculationResults['总应配其他生活用房(C2)'] || 0)).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${(parseFloat(school.dormitory_area_gap || 0) + parseFloat(school.other_living_area_gap || 0)).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">其中:学生宿舍</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.dormitory_area || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配学生宿舍(C1)'] || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.dormitory_area_gap || 0).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">其中:其他生活用房</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat((school.total_living_area || 0) - (school.dormitory_area || 0)).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配其他生活用房(C2)'] || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.other_living_area_gap || 0).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td style="border: 1px solid #000; padding: 6px;">后勤补助用房</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.logistics_area || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(calculationResults['总应配后勤辅助用房(D)'] || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.logistics_area_gap || 0).toFixed(2)}</td>
-                            </tr>
-                            <tr style="font-weight: bold; background: #f0f0f0;">
-                                <td style="border: 1px solid #000; padding: 6px;">小计</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.current_building_area || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(school.required_building_area || 0).toFixed(2)}</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(gapWithoutSubsidy || 0).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生规模测算建筑面积总缺额（不含补助）(m²)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(gapWithoutSubsidy || 0).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">补助建筑总面积(m²)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(school.special_subsidy_total || 0).toFixed(2)}</td>
-                            </tr>
-                            <tr>
-                                <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生规模测算建筑面积总缺额（含补助）(m²)</td>
-                                <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(school.total_area_gap_with_subsidy || 0).toFixed(2)}</td>
-                            </tr>
-                        </table>
-                    </div>
-            `;
-            
-            // 如果有特殊补助，显示补助明细
-            if (specialSubsidies && specialSubsidies.length > 0) {
-                detailsHtml += `
-                    <div style="margin-top: 20px; border: 1px solid #000;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                            <tr>
-                                <td colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #f0f0f0;">特殊补助明细</td>
-                            </tr>
-                            <tr style="font-weight: bold; background: #f8f8f8;">
-                                <td style="border: 1px solid #000; padding: 6px;">补助名称</td>
-                                <td style="border: 1px solid #000; padding: 6px;">补助面积(㎡)</td>
-                            </tr>
-                `;
-                
-                specialSubsidies.forEach(subsidy => {
-                    detailsHtml += `
-                        <tr>
-                            <td style="border: 1px solid #000; padding: 6px;">${subsidy['特殊用房补助名称'] || subsidy.name || '未命名项目'}</td>
-                            <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(subsidy['补助面积（m²）'] || subsidy.area || 0).toFixed(2)}</td>
-                        </tr>
-                    `;
-                });
-                
-                detailsHtml += `
-                        </table>
-                    </div>
-                `;
-            }
-            
-            detailsHtml += `
-                </div>
-            `;
-            
-            // 创建模态框显示详情
-            const modal = document.createElement('div');
-            modal.id = 'detailsModal';
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.5);
-                z-index: 1000;
-                overflow-y: auto;
-                padding: 20px 0;
-            `;
-            modal.innerHTML = detailsHtml;
-            document.body.appendChild(modal);
-            
-            // 点击背景关闭模态框
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    closeDetailsModal();
-                }
-            });
-        }
-        
-        // 关闭详情模态框
-        function closeDetailsModal() {
-            const modal = document.getElementById('detailsModal');
-            if (modal) {
-                modal.remove();
-            }
-        }
-
-        // 编辑记录 - 将数据回填到数据填报界面
-        function editDataRecord(recordId) {
-            const school = allDataSchoolsData.find(s => s.id === recordId);
-            if (!school) {
-                alert('找不到记录数据');
-                return;
-            }
-            
-            // 直接切换到数据填报页面
-            showPage('data-entry');
-            
-            // 等待页面切换完成后填充数据
-            setTimeout(() => {
-                fillFormWithData(school);
-            }, 100);
-        }
-
-        // 将历史数据填充到表单中
-        function fillFormWithData(school) {
-            try {
-                // 先确保表单已经完全初始化
-                console.log('开始填充表单数据，学校:', school.school_name);
-                
-                // 等待表单完全加载
-                setTimeout(() => {
-                    // 确保表单初始化完成
-                    if (typeof initializeOnlineForm === 'function') {
-                        console.log('重新初始化表单');
-                        initializeOnlineForm();
-                    }
-                    
-                    // 基本信息
-                    const schoolNameEl = document.getElementById('schoolName');
-                    if (schoolNameEl) schoolNameEl.value = school.school_name || '';
-                    
-                    const yearEl = document.getElementById('year');
-                    if (yearEl) yearEl.value = school.year || 2025;
-                    
-                    // 新增字段：学生统计年份和建筑面积统计年份
-                    const studentStatYearEl = document.getElementById('student_stat_year');
-                    if (studentStatYearEl) studentStatYearEl.value = school.student_stat_year || school.year || 2025;
-                    
-                    const buildingStatYearEl = document.getElementById('building_stat_year');
-                    if (buildingStatYearEl) buildingStatYearEl.value = school.building_stat_year || school.year || 2025;
-                    
-                    // 学生人数信息
-                    // 对于历史数据的本专科生，优先放到本科生字段，专科生字段为0
-                    const fullTimeUndergraduateEl = document.getElementById('fullTimeUndergraduate');
-                    if (fullTimeUndergraduateEl) fullTimeUndergraduateEl.value = school.full_time_undergraduate || 0;
-                    
-                    const fullTimeSpecialistEl = document.getElementById('fullTimeSpecialist');
-                    if (fullTimeSpecialistEl) fullTimeSpecialistEl.value = 0; // 历史数据没有单独的专科生字段
-                    
-                    const fullTimeMasterEl = document.getElementById('fullTimeMaster');
-                    if (fullTimeMasterEl) fullTimeMasterEl.value = school.full_time_master || 0;
-                    
-                    const fullTimeDoctorEl = document.getElementById('fullTimeDoctor');
-                    if (fullTimeDoctorEl) fullTimeDoctorEl.value = school.full_time_doctor || 0;
-                    
-                    const internationalUndergraduateEl = document.getElementById('internationalUndergraduate');
-                    if (internationalUndergraduateEl) internationalUndergraduateEl.value = school.international_undergraduate || 0;
-                    
-                    const internationalMasterEl = document.getElementById('internationalMaster');
-                    if (internationalMasterEl) internationalMasterEl.value = school.international_master || 0;
-                    
-                    const internationalDoctorEl = document.getElementById('internationalDoctor');
-                    if (internationalDoctorEl) internationalDoctorEl.value = school.international_doctor || 0;
-                    
-                    // 建筑面积信息
-                    const teachingAreaEl = document.getElementById('teachingArea');
-                    if (teachingAreaEl) teachingAreaEl.value = school.teaching_area || 0;
-                    
-                    const officeAreaEl = document.getElementById('officeArea');
-                    if (officeAreaEl) officeAreaEl.value = school.office_area || 0;
-                    
-                    const totalLivingAreaEl = document.getElementById('totalLivingArea');
-                    if (totalLivingAreaEl) totalLivingAreaEl.value = school.total_living_area || 0;
-                    
-                    const dormitoryAreaEl = document.getElementById('dormitoryArea');
-                    if (dormitoryAreaEl) dormitoryAreaEl.value = school.dormitory_area || 0;
-                    
-                    const logisticsAreaEl = document.getElementById('logisticsArea');
-                    if (logisticsAreaEl) logisticsAreaEl.value = school.logistics_area || 0;
-                    
-                    // 备注
-                    const remarksEl = document.getElementById('remarks');
-                    if (remarksEl) remarksEl.value = school.remarks || '';
-                    
-                    // 触发学校名称变化事件（更新院校类别显示）
-                    if (schoolNameEl) {
-                        updateSchoolType();
-                    }
-                    
-                    // 触发学生人数和面积计算
-                    calculateTotalStudents();
-                    calculateOtherLivingArea();
-                    calculateTotalBuildingArea();
-                    
-                    // 延迟一点再处理特殊补助，确保基本表单已经完全填充
-                    setTimeout(() => {
-                        fillSpecialSubsidies(school);
-                    }, 300);
-                    
-                    // 滚动到页面顶部
-                    window.scrollTo(0, 0);
-                    
-                }, 200);
-                
-            } catch (error) {
-                console.error('填充表单数据失败:', error);
-                // 静默处理错误，不显示弹窗
-            }
-        }
-
-        // 填充特殊补助信息 - 独立函数
-        function fillSpecialSubsidies(school) {
-            // 填充特殊补助信息
-            console.log('开始填充特殊补助，原始数据:', school.special_subsidies);
-            
-            if (school.special_subsidies) {
-                let subsidiesData = [];
-                
-                // 尝试解析特殊补助数据
-                try {
-                    if (typeof school.special_subsidies === 'string') {
-                        subsidiesData = JSON.parse(school.special_subsidies);
-                    } else if (Array.isArray(school.special_subsidies)) {
-                        subsidiesData = school.special_subsidies;
-                    }
-                    
-                    console.log('解析后的特殊补助数据:', subsidiesData);
-                    
-                    if (subsidiesData && subsidiesData.length > 0) {
-                        // 先清空现有的特殊补助
-                        const subsidiesContainer = document.getElementById('specialSubsidies');
-                        if (subsidiesContainer) {
-                            console.log('清空现有特殊补助容器');
-                            subsidiesContainer.innerHTML = '';
-                        }
-                        
-                        // 添加历史的特殊补助项 - 使用递归确保时序正确
-                        function addSubsidyRecursively(index) {
-                            if (index >= subsidiesData.length) {
-                                // 所有补助项都处理完成，更新汇总
-                                console.log('所有特殊补助项处理完成，更新汇总');
-                                if (typeof updateSubsidySummary === 'function') {
-                                    updateSubsidySummary();
-                                }
-                                return;
-                            }
-                            
-                            const subsidy = subsidiesData[index];
-                            console.log(`处理第${index + 1}个特殊补助项:`, subsidy);
-                            
-                            if (typeof addSubsidy === 'function') {
-                                addSubsidy();
-                                
-                                    // 使用更长的延迟确保DOM更新完成
-                                    setTimeout(() => {
-                                        // 查找所有补助项，排除汇总行
-                                        const subsidyItems = document.querySelectorAll('.subsidy-item:not(.subsidy-summary)');
-                                        console.log(`当前页面上的补助项数量（排除汇总）: ${subsidyItems.length}`);
-                                        console.log('所有补助项元素（排除汇总）:', subsidyItems);
-                                        
-                                        if (subsidyItems.length > 0) {
-                                            const lastItem = subsidyItems[subsidyItems.length - 1];
-                                            console.log('最后一个补助项元素（排除汇总）:', lastItem);
-                                            console.log('最后一个补助项的HTML:', lastItem.outerHTML);
-                                            
-                                            // 尝试多种选择器
-                                            const nameInput1 = lastItem.querySelector('input[name="subsidyName[]"]');
-                                            const nameInput2 = lastItem.querySelector('input[placeholder*="重点实验室"]');
-                                            const nameInput3 = lastItem.querySelector('input[type="text"]:not([readonly])');
-                                            const allInputs = lastItem.querySelectorAll('input:not([readonly])');
-                                            
-                                            console.log('查找名称输入框的多种尝试:');
-                                            console.log('  by name属性:', nameInput1);
-                                            console.log('  by placeholder:', nameInput2);
-                                            console.log('  by type=text非readonly:', nameInput3);
-                                            console.log('  所有非readonly input元素:', allInputs);
-                                            
-                                            const areaInput1 = lastItem.querySelector('input[name="subsidyArea[]"]');
-                                            const areaInput2 = lastItem.querySelector('input[type="number"]:not([readonly])');
-                                            
-                                            console.log('查找面积输入框的多种尝试:');
-                                            console.log('  by name属性:', areaInput1);
-                                            console.log('  by type=number非readonly:', areaInput2);
-                                            
-                                            // 使用找到的元素 - 优先使用name属性
-                                            const nameInput = nameInput1 || nameInput3 || nameInput2 || (allInputs.length > 0 ? allInputs[0] : null);
-                                            const areaInput = areaInput1 || areaInput2 || (allInputs.length > 1 ? allInputs[1] : null);
-                                            
-                                            console.log('最终选择的输入元素:', { nameInput, areaInput });                                        // 尝试不同的字段名，使用多种访问方式
-                                        console.log('补助项的所有字段:', Object.keys(subsidy));
-                                        console.log('补助项完整内容:', JSON.stringify(subsidy, null, 2));
-                                        
-                                        // 尝试多种方式获取名称
-                                        let name = '';
-                                        const nameFields = ['特殊用房补助名称', 'subsidy_name', 'name', '补助名称', '名称'];
-                                        for (const field of nameFields) {
-                                            if (subsidy[field] !== undefined && subsidy[field] !== null && subsidy[field] !== '') {
-                                                name = subsidy[field];
-                                                console.log(`名称匹配字段: ${field} = "${name}"`);
-                                                break;
-                                            }
-                                        }
-                                        
-                                        // 尝试多种方式获取面积
-                                        let area = 0;
-                                        const areaFields = ['补助面积（m²）', 'subsidy_area', 'area', '补助面积', '面积'];
-                                        for (const field of areaFields) {
-                                            if (subsidy[field] !== undefined && subsidy[field] !== null) {
-                                                area = subsidy[field];
-                                                console.log(`面积匹配字段: ${field} = "${area}"`);
-                                                break;
-                                            }
-                                        }
-                                        
-                                        console.log(`最终匹配结果 - 名称: "${name}", 面积: "${area}"`);
-                                        
-                                        if (nameInput) {
-                                            console.log(`设置前名称输入框值: "${nameInput.value}"`);
-                                            console.log(`名称输入框placeholder: "${nameInput.placeholder}"`);
-                                            console.log(`名称输入框类型: ${nameInput.type}`);
-                                            
-                                            nameInput.value = String(name || '');
-                                            console.log(`设置后名称输入框值: "${nameInput.value}"`);
-                                            
-                                            // 强制刷新显示 - 多种方式
-                                            nameInput.setAttribute('value', String(name || ''));
-                                            
-                                            // 触发多种事件
-                                            nameInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                            nameInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                            nameInput.dispatchEvent(new Event('keyup', { bubbles: true }));
-                                            
-                                            // 强制触发重绘
-                                            nameInput.style.display = 'none';
-                                            nameInput.offsetHeight; // 触发重排
-                                            nameInput.style.display = '';
-                                            
-                                            console.log(`最终检查名称输入框值: "${nameInput.value}"`);
-                                        } else {
-                                            console.error('所有尝试都未找到名称输入框！');
-                                            console.error('补助项HTML结构:', lastItem ? lastItem.outerHTML : '无lastItem');
-                                        }
-                                        
-                                        if (areaInput) {
-                                            console.log(`设置前面积输入框值: "${areaInput.value}"`);
-                                            console.log(`面积输入框类型: ${areaInput.type}`);
-                                            
-                                            // 格式化面积值为两位小数
-                                            const formattedArea = parseFloat(area || 0).toFixed(2);
-                                            areaInput.value = formattedArea;
-                                            console.log(`设置后面积输入框值: "${areaInput.value}"`);
-                                            
-                                            // 强制刷新显示 - 多种方式
-                                            areaInput.setAttribute('value', formattedArea);
-                                            
-                                            // 触发多种事件
-                                            areaInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                            areaInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                            areaInput.dispatchEvent(new Event('keyup', { bubbles: true }));
-                                            
-                                            // 强制触发重绘
-                                            areaInput.style.display = 'none';
-                                            areaInput.offsetHeight; // 触发重排
-                                            areaInput.style.display = '';
-                                            
-                                            console.log(`最终检查面积输入框值: "${areaInput.value}"`);
-                                        } else {
-                                            console.error('所有尝试都未找到面积输入框！');
-                                            console.error('补助项HTML结构:', lastItem ? lastItem.outerHTML : '无lastItem');
-                                        }
-                                    } else {
-                                        console.error('未找到任何补助项元素');
-                                    }
-                                    
-                                    // 处理下一个补助项
-                                    addSubsidyRecursively(index + 1);
-                                }, 500); // 增加延迟时间确保DOM完全更新
-                            } else {
-                                console.error('addSubsidy 函数不存在');
-                                addSubsidyRecursively(index + 1);
-                            }
-                        }
-                        
-                        // 开始递归处理
-                        addSubsidyRecursively(0);
-                    }
-                } catch (error) {
-                    console.error('解析特殊补助数据失败:', error);
-                    console.log('原始数据类型:', typeof school.special_subsidies);
-                    console.log('原始数据内容:', school.special_subsidies);
-                }
-            }
-        }
-
-        // 删除学校组合记录
-        async function deleteSchoolCombination(schoolName, year, submitterUsername) {
-            const confirmMessage = `确定要删除"${schoolName} - ${year}年测算 - 测算用户:${submitterUsername}"的所有记录吗？\n\n此操作将删除该组合的所有历史记录，不可恢复。`;
-            
-            if (!confirm(confirmMessage)) {
-                return;
-            }
-            
-            console.log('开始删除学校组合记录:', { schoolName, year, submitterUsername });
-            
-            // 显示删除进度
-            const progressDiv = document.createElement('div');
-            progressDiv.innerHTML = `
-                <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                            background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); 
-                            z-index: 2000; text-align: center;">
-                    <h4>正在删除记录...</h4>
-                    <p>请稍候，正在删除该组合的所有记录</p>
-                </div>
-            `;
-            document.body.appendChild(progressDiv);
-            
-            try {
-                const response = await fetch('/api/school-combination', {
-                    method: 'DELETE',
-                    cache: 'no-cache',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                    },
-                    body: JSON.stringify({
-                        schoolName: schoolName,
-                        year: year,
-                        submitterUsername: submitterUsername
-                    })
-                });
-                
-                const result = await response.json();
-                console.log('删除API响应:', result);
-                
-                // 移除进度提示
-                progressDiv.remove();
-                
-                if (result.success) {
-                    console.log(`删除成功！共删除了 ${result.deletedCount} 条记录`);
-                    console.log('删除成功，开始刷新数据列表...');
-                    
-                    // 清空当前显示的数据
-                    allDataSchoolsData = [];
-                    
-                    // 立即显示加载状态
-                    const resultsContainer = document.getElementById('dataHistoryResults');
-                    if (resultsContainer) {
-                        resultsContainer.innerHTML = '<div class="loading">正在刷新数据列表...</div>';
-                    }
-                    
-                    // 延迟一点时间再刷新，确保数据库操作完成
-                    setTimeout(() => {
-                        console.log('执行数据刷新...');
-                        searchDataRecords().then(() => {
-                            console.log('数据刷新完成');
-                        }).catch(err => {
-                            console.error('刷新数据失败:', err);
-                            alert('刷新数据失败，请手动点击"查找"按钮重新加载。');
-                        });
-                    }, 1000);
-                } else {
-                    console.error('删除失败:', result.error);
-                    showDataError('删除失败: ' + result.error);
-                }
-            } catch (error) {
-                // 移除进度提示
-                progressDiv.remove();
-                console.error('删除失败:', error);
-                showDataError('删除失败: ' + error.message);
-            }
-        }
-
-        // 删除记录（保留原功能用于其他地方）
-        async function deleteDataRecord(recordId) {
-            if (!confirm('确定要删除这条记录吗？此操作不可恢复。')) {
-                return;
-            }
-            
-            console.log('开始删除记录ID:', recordId);
-            
-            // 显示删除进度
-            const progressDiv = document.createElement('div');
-            progressDiv.innerHTML = `
-                <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                            background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); 
-                            z-index: 2000; text-align: center;">
-                    <h4>正在删除记录...</h4>
-                    <p>请稍候，正在处理删除请求</p>
-                </div>
-            `;
-            document.body.appendChild(progressDiv);
-            
-            try {
-                const response = await fetch(`/api/school-record/${recordId}`, {
-                    method: 'DELETE',
-                    cache: 'no-cache',  // 禁用缓存
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                    }
-                });
-                
-                const result = await response.json();
-                console.log('删除API响应:', result);
-                
-                // 移除进度提示
-                progressDiv.remove();
-                
-                if (result.success) {
-                    console.log('记录删除成功！');
-                    console.log('删除成功，开始刷新数据列表...');
-                    
-                    // 清空当前显示的数据
-                    allDataSchoolsData = [];
-                    
-                    // 立即显示加载状态
-                    const resultsContainer = document.getElementById('dataHistoryResults');
-                    if (resultsContainer) {
-                        resultsContainer.innerHTML = '<div class="loading">正在刷新数据列表...</div>';
-                    }
-                    
-                    // 延迟一点时间再刷新，确保数据库操作完成
-                    setTimeout(() => {
-                        console.log('执行数据刷新...');
-                        searchDataRecords().then(() => {
-                            console.log('数据刷新完成');
-                        }).catch(err => {
-                            console.error('刷新数据失败:', err);
-                            alert('刷新数据失败，请手动点击"查找"按钮重新加载。');
-                        });
-                    }, 1000);
-                } else {
-                    console.error('删除失败:', result.error);
-                    showDataError('删除失败: ' + result.error);
-                }
-            } catch (error) {
-                // 移除进度提示
-                progressDiv.remove();
-                console.error('删除失败:', error);
-                showDataError('删除失败: ' + error.message);
-            }
-        }
-
-        // 下载记录
-        async function downloadRecord(recordId) {
-            try {
-                const response = await fetch(`/api/download-record/${recordId}`);
-                
-                if (!response.ok) {
-                    throw new Error('下载失败');
-                }
-                
-                // 解析JSON响应
-                const result = await response.json();
-                
-                if (!result.success) {
-                    throw new Error(result.error || '下载失败');
-                }
-                
-                // 将base64数据转换为二进制
-                const binaryString = atob(result.fileData);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                
-                // 创建Blob并下载，完美支持中文文件名
-                const blob = new Blob([bytes], { type: result.mimeType });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = result.fileName; // 直接使用返回的中文文件名
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                
-                console.log('文件下载成功:', result.fileName);
-                
-            } catch (error) {
-                console.error('下载失败:', error);
-                alert('下载失败: ' + error.message);
-            }
         }
 
         // 显示错误信息
@@ -2524,7 +865,13 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             // 检查数据库状态
-            checkDatabaseStatus();
+            CommonAPI.checkDatabaseStatus().then(result => {
+                if (!result.success) {
+                    console.warn('数据库连接状态检查失败:', result.error);
+                }
+            }).catch(error => {
+                console.warn('数据库状态检查出错:', error);
+            });
             
             // 移动端点击外部关闭菜单
             document.addEventListener('click', function(e) {
@@ -2982,17 +1329,26 @@
             emptyState.style.display = 'none';
             
             try {
-                const response = await fetch('/api/auth/users');
-                const result = await response.json();
+                const result = await UserManagementAPI.getUsers();
+                console.log('获取用户列表结果:', result);
                 
                 if (result.success) {
-                    users = result.users;
+                    // 处理不同的返回格式
+                    users = result.users || result.data || [];
+                    console.log('解析的用户列表:', users);
                     displayUsers(users);
                 } else {
+                    console.warn('用户列表为空或获取失败:', result);
+                    // 设置空数组确保displayUsers不会出错
+                    users = [];
+                    displayUsers(users);
                     showUserManagementAlert(result.message || '获取用户列表失败', 'error');
                 }
             } catch (error) {
                 console.error('获取用户列表失败:', error);
+                // 设置空数组确保displayUsers不会出错
+                users = [];
+                displayUsers(users);
                 showUserManagementAlert('网络错误，请稍后重试', 'error');
             } finally {
                 loading.style.display = 'none';
@@ -3005,14 +1361,25 @@
             const emptyState = document.getElementById('userEmptyState');
             const tableBody = document.getElementById('userTableBody');
             
+            // 防护性检查
+            if (!userList || !Array.isArray(userList)) {
+                console.warn('用户列表无效:', userList);
+                userList = [];
+            }
+            
             if (userList.length === 0) {
-                tableContainer.style.display = 'none';
-                emptyState.style.display = 'block';
+                if (tableContainer) tableContainer.style.display = 'none';
+                if (emptyState) emptyState.style.display = 'block';
                 return;
             }
             
-            emptyState.style.display = 'none';
-            tableContainer.style.display = 'block';
+            if (emptyState) emptyState.style.display = 'none';
+            if (tableContainer) tableContainer.style.display = 'block';
+            
+            if (!tableBody) {
+                console.error('用户表格元素未找到');
+                return;
+            }
             
             tableBody.innerHTML = '';
             
@@ -3035,11 +1402,11 @@
                                     `<button style="padding: 6px 12px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="toggleUserStatus(${user.id}, 'inactive')">禁用</button>` :
                                     `<button style="padding: 6px 12px; font-size: 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="toggleUserStatus(${user.id}, 'active')">启用</button>`
                                 ) : 
-                                '<span style="padding: 6px 12px; font-size: 12px; color: #6c757d;">系统账户</span>'
+                                '<span style="padding: 0px 0px; font-size: 12px; color: #6c757d;">系统账户</span>'
                             }
                             ${user.username !== 'admin' && user.role !== 'admin' ? 
                                 `<button style="padding: 6px 12px; font-size: 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="deleteUserConfirm(${user.id}, '${user.username}')">删除</button>` :
-                                '<span style="padding: 6px 12px; font-size: 12px; color: #6c757d;">不可删除</span>'
+                                '<span style="padding: 0px 0px; font-size: 12px; color: #6c757d;">不可删除</span>'
                             }
                         </div>
                     </td>
@@ -3143,20 +1510,15 @@
             }
             
             try {
-                const response = await fetch('/api/auth/create-user', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(userData)
-                });
-                
-                const result = await response.json();
+                const result = await UserManagementAPI.createUser(userData);
                 
                 if (result.success) {
                     showUserManagementAlert('用户创建成功', 'success');
                     hideCreateUserModal();
-                    loadUserList(); // 重新加载用户列表
+                    
+                    // 立即刷新用户列表以显示新创建的用户
+                    console.log('用户创建成功，正在刷新用户列表...');
+                    await loadUserList();
                 } else {
                     showUserManagementAlert(result.message || '创建用户失败', 'error');
                 }
@@ -3169,19 +1531,14 @@
         // 切换用户状态
         async function toggleUserStatus(userId, newStatus) {
             try {
-                const response = await fetch(`/api/auth/user/${userId}/status`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ status: newStatus })
-                });
-                
-                const result = await response.json();
+                const result = await UserManagementAPI.toggleUserStatus(userId, newStatus);
                 
                 if (result.success) {
                     showUserManagementAlert(result.message, 'success');
-                    loadUserList(); // 重新加载用户列表
+                    
+                    // 立即刷新用户列表以显示状态变更
+                    console.log('用户状态更新成功，正在刷新用户列表...');
+                    await loadUserList();
                 } else {
                     showUserManagementAlert(result.message || '更新用户状态失败', 'error');
                 }
@@ -3201,15 +1558,14 @@
         // 删除用户
         async function deleteUser(userId) {
             try {
-                const response = await fetch(`/api/auth/user/${userId}`, {
-                    method: 'DELETE'
-                });
-                
-                const result = await response.json();
+                const result = await UserManagementAPI.deleteUser(userId);
                 
                 if (result.success) {
                     showUserManagementAlert(result.message, 'success');
-                    loadUserList(); // 重新加载用户列表
+                    
+                    // 立即刷新用户列表以移除已删除的用户
+                    console.log('用户删除成功，正在刷新用户列表...');
+                    await loadUserList();
                 } else {
                     showUserManagementAlert(result.message || '删除用户失败', 'error');
                 }

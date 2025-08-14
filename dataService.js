@@ -656,7 +656,7 @@ async function getStatistics(year = null) {
                 SUM(total_students) as total_students,
                 SUM(current_building_area) as total_current_area,
                 SUM(required_building_area) as total_required_area,
-                SUM(total_area_gap) as total_gap,
+                SUM(total_area_gap_with_subsidy) as total_gap,
                 SUM(CASE WHEN overall_compliance = 1 THEN 1 ELSE 0 END) as compliant_schools,
                 AVG(total_students) as avg_students,
                 AVG(current_building_area) as avg_current_area,
@@ -682,7 +682,7 @@ async function getStatistics(year = null) {
                 SUM(total_students) as students,
                 SUM(current_building_area) as current_area,
                 SUM(required_building_area) as required_area,
-                SUM(total_area_gap) as gap
+                SUM(total_area_gap_with_subsidy) as gap
             FROM school_info
         `;
         
@@ -881,6 +881,23 @@ async function executeQuery(query, params = []) {
     }
 }
 
+// 测试数据库连接
+async function testConnection() {
+    try {
+        const pool = await getPool();
+        const connection = await pool.getConnection();
+        
+        // 执行一个简单的查询来测试连接
+        const [result] = await connection.execute('SELECT 1 as test');
+        connection.release();
+        
+        return { success: true, message: '数据库连接正常' };
+    } catch (error) {
+        console.error('数据库连接测试失败:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     saveSchoolInfo,
     getSchoolHistory,
@@ -898,5 +915,6 @@ module.exports = {
     deleteSchoolCombination,
     clearAllData,
     getSchoolRecordById,
-    executeQuery
+    executeQuery,
+    testConnection
 };

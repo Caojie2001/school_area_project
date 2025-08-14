@@ -71,15 +71,6 @@
     display: inline-block;
 }
 
-/* === 受限菜单项样式 === */
-.menu-item.menu-restricted {
-    display: none; /* 默认隐藏受权限限制的菜单项 */
-}
-
-.menu-item.menu-restricted.visible {
-    display: block; /* 有权限时显示 */
-}
-
 /* === 主内容区域 === */
 .main-content {
     flex: 1;

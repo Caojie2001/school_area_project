@@ -7,9 +7,9 @@ const session = require('express-session');
 
 // 引入数据库相关模块
 require('dotenv').config();
-const { testConnection, initializeTables, getPool } = require('./database');
-const dataService = require('./dataService');
-const AuthService = require('./authService');
+const { testConnection, initializeTables, getPool } = require('./config/database');
+const dataService = require('./config/dataService');
+const AuthService = require('./config/authService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -196,9 +196,28 @@ app.get('/', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 用户管理页面 - 需要管理员权限
+// 功能页面路由重定向到主页面的相应部分
+app.get('/html/data-entry.html', requireAuth, (req, res) => {
+    res.redirect('/#data-entry');
+});
+
+app.get('/html/data-management.html', requireAuth, (req, res) => {
+    res.redirect('/#data-management');
+});
+
+// 统计页面 - 需要基建中心或管理员权限
+app.get('/html/statistics.html', requireAuth, requireConstructionCenterOrAdmin, (req, res) => {
+    res.redirect('/#statistics');
+});
+
+// 用户管理页面 - 保持独立页面
+app.get('/html/user-management.html', requireAuth, requireAdmin, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'html', 'user-management.html'));
+});
+
+// 兼容旧的用户管理路由
 app.get('/user-management.html', requireAuth, requireAdmin, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'user-management.html'));
+    res.redirect('/html/user-management.html');
 });
 
 // 保护其他需要认证的路由

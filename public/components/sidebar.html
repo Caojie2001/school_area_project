@@ -1,0 +1,24 @@
+<!-- 左侧菜单组件 -->
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <h1>高校测算工具</h1>
+        <p>Higher Education Measurement Tool</p>
+    </div>
+    
+    <div class="sidebar-menu">
+        <a class="menu-item" onclick="showPage('data-entry')" id="menu-data-entry">
+            测算数据填报
+        </a>
+        <a class="menu-item" onclick="showPage('data-management')" id="menu-data-management">
+            测算数据管理
+        </a>
+        <!-- 测算数据统计菜单项（仅基建中心和管理员可见） -->
+        <a class="menu-item menu-restricted" onclick="showPage('statistics')" id="menu-statistics">
+            测算数据统计
+        </a>
+        <!-- 用户管理菜单项（仅管理员可见） -->
+        <a class="menu-item menu-restricted" href="/html/user-management.html" id="menu-user-management">
+            系统用户管理
+        </a>
+    </div>
+</nav>

@@ -667,6 +667,15 @@ const CommonAPI = {
             console.warn('数据库状态检查失败:', error);
             return { success: false, error: error.message };
         }
+    },
+
+    /**
+     * 下载记录
+     * @param {string|number} recordId 记录ID
+     * @returns {Promise} 下载结果
+     */
+    async downloadRecord(recordId) {
+        return DataManagementAPI.downloadRecord(recordId);
     }
 };
 

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>统计分析 - 高校测算工具</title>
+    <!-- 引入模块化CSS样式 -->
+    <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏容器 -->
+        <div id="sidebarContainer"></div>
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+            <div class="page-content active">
+                <!-- 页面头部容器 -->
+                <div id="pageHeaderContainer"></div>
+                
+                <!-- 页面内容容器 -->
+                <div class="content-body" id="pageContentContainer">
+                    <!-- 数据统计卡片 -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h4>现状建筑总面积</h4>
+                            <div class="stat-value" id="overviewCurrentArea">0.00</div>
+                            <div class="stat-unit">(m²)</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>学生规模测算建筑总面积</h4>
+                            <div class="stat-value" id="overviewRequiredArea">0.00</div>
+                            <div class="stat-unit">(m²)</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>学生规模测算建筑面积总缺额(不含补助)</h4>
+                            <div class="stat-value" id="overviewGapWithoutSubsidy">0.00</div>
+                            <div class="stat-unit">(m²)</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>学生规模测算建筑面积总缺额(含补助)</h4>
+                            <div class="stat-value" id="overviewGapWithSubsidy">0.00</div>
+                            <div class="stat-unit">(m²)</div>
+                        </div>
+                    </div>
+
+                    <!-- 筛选区域 -->
+                    <div class="card">
+                        <div class="search-bar">
+                            <select id="overviewYearFilter" class="search-input" style="width: 20%; min-width: 120px;">
+                                <!-- 年份选项将通过JavaScript动态加载 -->
+                            </select>
+                            <select id="overviewUserTypeFilter" class="search-input" style="width: 25%; min-width: 150px;">
+                                <option value="school">所有学校用户</option>
+                                <option value="construction_center" selected>所有基建中心用户</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="searchOverviewRecords()" style="width: 10%; min-width: 70px; margin-left: 8px;">查找</button>
+                        </div>
+                        
+                        <!-- 记录总数显示 -->
+                        <div id="overviewRecordCount" class="record-count" style="display: none; margin-top: 15px; padding: 8px 12px; background: #e8f4fd; border-radius: 6px; border-left: 4px solid #3498db; font-size: 14px; color: #333;">
+                            共找到 <span id="overviewTotalCount">0</span> 条记录
+                        </div>
+                        
+                        <!-- 数据表格 -->
+                        <div id="overviewDataResults" style="margin-top: 20px;">
+                            <div class="alert alert-info">请选择筛选条件并点击查找按钮</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 引入外部脚本 -->
+    <script src="../js/utils.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/main.js"></script>
+    <script src="../js/componentManager.js"></script>
+    <script src="../js/statistics.js"></script>
+    
+    <script>
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                console.log('统计分析页面加载完成，开始初始化...');
+                
+                // 初始化页面结构
+                await ComponentManager.initPageStructure({
+                    title: '统计分析',
+                    description: '查看各学校数据填报情况的总体概览',
+                    activeMenu: 'menu-statistics'
+                });
+                
+                // 初始化认证模块
+                await AuthManager.initialize();
+                console.log('认证模块初始化完成');
+
+                // 立即更新用户信息显示
+                const user = AuthManager.getCurrentUser();
+                if (user) {
+                    AuthManager.updateUserInfo(user);
+                    const userName = document.getElementById('userName');
+                    if (userName && userName.textContent === '加载中...') {
+                        userName.textContent = user.real_name || user.username || '未知用户';
+                    }
+                    
+                    // 根据用户角色显示/隐藏菜单项
+                    AuthManager.updateMenuVisibility(user.role);
+                    
+                    // 检查用户权限（统计分析页面仅基建中心和管理员可访问）
+                    if (user.role !== 'construction_center' && user.role !== 'admin') {
+                        alert('您没有权限访问此页面');
+                        window.location.href = 'data-entry.html';
+                        return;
+                    }
+                }
+
+                // 初始化统计分析模块
+                if (typeof StatisticsManager !== 'undefined') {
+                    await StatisticsManager.initialize();
+                    console.log('统计分析模块初始化完成');
+                }
+
+            } catch (error) {
+                console.error('页面初始化失败:', error);
+                if (error.message.includes('unauthorized') || error.message.includes('login')) {
+                    window.location.href = '../login.html';
+                }
+            }
+
+            // 检查数据库状态
+            if (typeof CommonAPI !== 'undefined') {
+                CommonAPI.checkDatabaseStatus().then(result => {
+                    if (!result.success) {
+                        console.warn('数据库连接状态检查失败:', result.error);
+                    }
+                }).catch(error => {
+                    console.warn('数据库状态检查出错:', error);
+                });
+            }
+        });
+
+        // 退出登录函数
+        function logout() {
+            if (typeof AuthManager !== 'undefined') {
+                AuthManager.logout();
+            }
+        }
+
+        // 统计分析相关函数
+        async function searchOverviewRecords() {
+            if (typeof StatisticsManager !== 'undefined' && StatisticsManager.searchOverviewRecords) {
+                await StatisticsManager.searchOverviewRecords();
+            } else {
+                console.error('统计分析功能未正确加载');
+            }
+        }
+    </script>
+</body>
+</html>

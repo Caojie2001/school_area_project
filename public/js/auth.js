@@ -310,16 +310,26 @@ const AuthManager = {
         if (user.school_name) {
             const schoolNameSelect = document.getElementById('schoolName');
             if (schoolNameSelect) {
-                schoolNameSelect.value = user.school_name;
-                // 设置为只读状态
-                schoolNameSelect.style.backgroundColor = '#f5f5f5';
-                schoolNameSelect.style.cursor = 'not-allowed';
-                schoolNameSelect.style.pointerEvents = 'none';
-                schoolNameSelect.setAttribute('data-locked', 'true');
-                
-                // 更新学校类型显示
-                if (typeof updateSchoolType === 'function') {
-                    updateSchoolType();
+                // 检查学校选项是否已经加载（有多个选项）
+                if (schoolNameSelect.options.length > 1) {
+                    schoolNameSelect.value = user.school_name;
+                    // 设置为只读状态
+                    schoolNameSelect.style.backgroundColor = '#f5f5f5';
+                    schoolNameSelect.style.cursor = 'not-allowed';
+                    schoolNameSelect.style.pointerEvents = 'none';
+                    schoolNameSelect.setAttribute('data-locked', 'true');
+                    
+                    // 更新学校类型显示
+                    if (typeof updateSchoolType === 'function') {
+                        updateSchoolType();
+                    }
+                } else {
+                    // 学校选项还没有加载，只设置样式，值的设置留给数据填报模块
+                    schoolNameSelect.style.backgroundColor = '#f5f5f5';
+                    schoolNameSelect.style.cursor = 'not-allowed';
+                    schoolNameSelect.style.pointerEvents = 'none';
+                    schoolNameSelect.setAttribute('data-locked', 'true');
+                    console.log('学校选项还没有加载，将由数据填报模块自动设置学校名称');
                 }
             }
         }
@@ -605,16 +615,26 @@ function adjustSchoolUserInterface(user) {
     if (user.school_name) {
         const schoolNameSelect = document.getElementById('schoolName');
         if (schoolNameSelect) {
-            schoolNameSelect.value = user.school_name;
-            // 设置为只读状态
-            schoolNameSelect.style.backgroundColor = '#f5f5f5';
-            schoolNameSelect.style.cursor = 'not-allowed';
-            schoolNameSelect.style.pointerEvents = 'none';
-            schoolNameSelect.setAttribute('data-locked', 'true');
-            
-            // 更新学校类型显示
-            if (typeof updateSchoolType === 'function') {
-                updateSchoolType();
+            // 检查学校选项是否已经加载（有多个选项）
+            if (schoolNameSelect.options.length > 1) {
+                schoolNameSelect.value = user.school_name;
+                // 设置为只读状态
+                schoolNameSelect.style.backgroundColor = '#f5f5f5';
+                schoolNameSelect.style.cursor = 'not-allowed';
+                schoolNameSelect.style.pointerEvents = 'none';
+                schoolNameSelect.setAttribute('data-locked', 'true');
+                
+                // 更新学校类型显示
+                if (typeof updateSchoolType === 'function') {
+                    updateSchoolType();
+                }
+            } else {
+                // 学校选项还没有加载，只设置样式，值的设置留给数据填报模块
+                schoolNameSelect.style.backgroundColor = '#f5f5f5';
+                schoolNameSelect.style.cursor = 'not-allowed';
+                schoolNameSelect.style.pointerEvents = 'none';
+                schoolNameSelect.setAttribute('data-locked', 'true');
+                console.log('学校选项还没有加载，将由数据填报模块自动设置学校名称');
             }
         }
     }

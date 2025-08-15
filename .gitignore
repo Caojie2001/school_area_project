@@ -12,6 +12,9 @@ logs/
 *.tmp
 *.temp
 
+# Cookie 文件（可能包含认证信息）
+cookies.txt
+
 # Excel输出文件（根据需要可以选择是否忽略）
 output/*.xlsx
 output/*.xls
@@ -27,6 +30,7 @@ Thumbs.db
 *.swo
 
 # 备份文件
+backups/
 *.bak
 *.backup
 

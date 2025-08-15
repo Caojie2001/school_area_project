@@ -48,6 +48,20 @@
  *    - groupBy() 数组分组
  * 
  * 6. 字符串工具
+ *    - capitalizeFirst() 首字母大写
+ *    - truncateString() 字符串截断
+ *    - escapeHtml() HTML转义
+ * 
+ * 7. 消息提示工具
+ *    - showMessage() 显示消息提示
+ *    - showSuccessMessage() 显示成功消息
+ *    - showErrorMessage() 显示错误消息
+ *    - showWarningMessage() 显示警告消息
+ * 
+ * 8. 表单工具
+ *    - setDefaultValues() 设置表单默认值
+ *    - formatToTwoDecimals() 格式化为两位小数
+ *    - validateFormData() 验证表单数据
  *    - capitalize() 首字母大写
  *    - truncateText() 文本截断
  *    - removeSpaces() 移除空格
@@ -668,6 +682,40 @@ function generateUniqueId(prefix = '', length = 8) {
     return result + Date.now().toString(36);
 }
 
+/**
+ * 转换为驼峰命名
+ * @param {string} str 字符串
+ * @returns {string} 驼峰命名字符串
+ */
+function toCamelCase(str) {
+    if (!str || typeof str !== 'string') return '';
+    return str.replace(/[-_\s]+(.)?/g, (_, char) => char ? char.toUpperCase() : '');
+}
+
+/**
+ * 转换为短横线命名
+ * @param {string} str 字符串
+ * @returns {string} 短横线命名字符串
+ */
+function toKebabCase(str) {
+    if (!str || typeof str !== 'string') return '';
+    return str.replace(/([a-z])([A-Z])/g, '$1-$2')
+              .replace(/[\s_]+/g, '-')
+              .toLowerCase();
+}
+
+/**
+ * 移除特殊字符
+ * @param {string} str 字符串
+ * @param {string} keep 保留的字符，默认为空字符串
+ * @returns {string} 处理后的字符串
+ */
+function removeSpecialChars(str, keep = '') {
+    if (!str || typeof str !== 'string') return '';
+    const pattern = new RegExp(`[^a-zA-Z0-9${keep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]`, 'g');
+    return str.replace(pattern, '');
+}
+
 // ========================================
 // 7. 数学计算工具
 // ========================================
@@ -752,6 +800,29 @@ function findMinMax(array, key, type = 'max') {
     });
     
     return type === 'min' ? Math.min(...values) : Math.max(...values);
+}
+
+/**
+ * 生成随机数
+ * @param {number} min 最小值
+ * @param {number} max 最大值
+ * @param {number} decimals 小数位数，默认0（整数）
+ * @returns {number} 随机数
+ */
+function getRandomNumber(min = 0, max = 100, decimals = 0) {
+    const random = Math.random() * (max - min) + min;
+    return decimals > 0 ? roundToDecimals(random, decimals) : Math.floor(random);
+}
+
+/**
+ * 限制数值范围
+ * @param {number} value 值
+ * @param {number} min 最小值
+ * @param {number} max 最大值
+ * @returns {number} 限制后的值
+ */
+function clampNumber(value, min, max) {
+    return Math.min(Math.max(parseFloat(value) || 0, min), max);
 }
 
 // ========================================
@@ -891,6 +962,104 @@ function setSessionStorage(key, value) {
 }
 
 // ========================================
+// 浏览器工具
+// ========================================
+
+/**
+ * 获取URL查询参数
+ * @param {string} name 参数名
+ * @param {string} url 可选的URL，默认为当前页面
+ * @returns {string|null} 参数值
+ */
+function getQueryParam(name, url = window.location.href) {
+    const urlObj = new URL(url);
+    return urlObj.searchParams.get(name);
+}
+
+/**
+ * 设置URL查询参数
+ * @param {string} name 参数名
+ * @param {string} value 参数值
+ * @param {boolean} updateHistory 是否更新历史记录，默认true
+ */
+function setQueryParam(name, value, updateHistory = true) {
+    const url = new URL(window.location.href);
+    url.searchParams.set(name, value);
+    
+    if (updateHistory) {
+        window.history.pushState({}, '', url);
+    } else {
+        window.history.replaceState({}, '', url);
+    }
+}
+
+/**
+ * 获取Cookie
+ * @param {string} name Cookie名称
+ * @returns {string|null} Cookie值
+ */
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+/**
+ * 设置Cookie
+ * @param {string} name Cookie名称
+ * @param {string} value Cookie值
+ * @param {number} days 过期天数，默认7天
+ * @param {string} path 路径，默认'/'
+ */
+function setCookie(name, value, days = 7, path = '/') {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=${path}`;
+}
+
+/**
+ * 删除Cookie
+ * @param {string} name Cookie名称
+ * @param {string} path 路径，默认'/'
+ */
+function deleteCookie(name, path = '/') {
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=${path}`;
+}
+
+/**
+ * 检测设备类型
+ * @returns {object} 设备信息
+ */
+function detectDevice() {
+    const ua = navigator.userAgent;
+    
+    return {
+        isMobile: /Mobi|Android/i.test(ua),
+        isTablet: /Tablet|iPad/i.test(ua),
+        isDesktop: !/Mobi|Android|Tablet|iPad/i.test(ua),
+        isIOS: /iPhone|iPad|iPod/i.test(ua),
+        isAndroid: /Android/i.test(ua),
+        browser: getBrowserInfo()
+    };
+}
+
+/**
+ * 获取浏览器信息
+ * @returns {object} 浏览器信息
+ */
+function getBrowserInfo() {
+    const ua = navigator.userAgent;
+    
+    if (ua.includes('Firefox')) return { name: 'Firefox', version: ua.match(/Firefox\/(\d+)/)?.[1] };
+    if (ua.includes('Chrome')) return { name: 'Chrome', version: ua.match(/Chrome\/(\d+)/)?.[1] };
+    if (ua.includes('Safari')) return { name: 'Safari', version: ua.match(/Version\/(\d+)/)?.[1] };
+    if (ua.includes('Edge')) return { name: 'Edge', version: ua.match(/Edge\/(\d+)/)?.[1] };
+    
+    return { name: 'Unknown', version: 'Unknown' };
+}
+
+// ========================================
 // 10. 网络请求工具
 // ========================================
 
@@ -981,3 +1150,359 @@ async function uploadFile(url, file, options = {}) {
     
     return makeRequest(url, uploadOptions);
 }
+
+// ========================================
+// UI工具函数
+// ========================================
+
+/**
+ * 显示消息提示
+ * @param {string} message 消息内容
+ * @param {string} type 消息类型 ('info', 'success', 'error', 'warning')
+ * @param {number} duration 显示时长(毫秒)，默认3000ms
+ */
+function showMessage(message, type = 'info', duration = 3000) {
+    // 创建消息提示元素
+    const messageDiv = document.createElement('div');
+    messageDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 5px;
+        color: white;
+        z-index: 9999;
+        font-weight: 500;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: opacity 0.3s ease;
+        max-width: 300px;
+        word-wrap: break-word;
+        font-size: 14px;
+        line-height: 1.4;
+    `;
+    
+    // 根据类型设置颜色
+    switch (type) {
+        case 'success':
+            messageDiv.style.background = '#28a745';
+            break;
+        case 'error':
+            messageDiv.style.background = '#dc3545';
+            break;
+        case 'warning':
+            messageDiv.style.background = '#ffc107';
+            messageDiv.style.color = '#212529';
+            break;
+        default:
+            messageDiv.style.background = '#17a2b8';
+    }
+    
+    messageDiv.textContent = message;
+    document.body.appendChild(messageDiv);
+    
+    // 动画显示
+    requestAnimationFrame(() => {
+        messageDiv.style.opacity = '1';
+        messageDiv.style.transform = 'translateX(0)';
+    });
+    
+    // 定时消失
+    setTimeout(() => {
+        messageDiv.style.opacity = '0';
+        messageDiv.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.parentNode.removeChild(messageDiv);
+            }
+        }, 300);
+    }, duration);
+}
+
+/**
+ * 显示确认对话框
+ * @param {string} message 确认消息
+ * @param {string} title 对话框标题
+ * @returns {Promise<boolean>} 用户选择结果
+ */
+function showConfirm(message, title = '确认') {
+    return new Promise((resolve) => {
+        const result = confirm(`${title}\n\n${message}`);
+        resolve(result);
+    });
+}
+
+/**
+ * 显示加载状态
+ * @param {string} message 加载消息
+ * @returns {function} 关闭加载的函数
+ */
+function showLoading(message = '加载中...') {
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'global-loading';
+    loadingDiv.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+    `;
+    
+    loadingDiv.innerHTML = `
+        <div style="text-align: center;">
+            <div style="margin-bottom: 10px;">⏳</div>
+            <div>${message}</div>
+        </div>
+    `;
+    
+    document.body.appendChild(loadingDiv);
+    
+    // 返回关闭函数
+    return function hideLoading() {
+        const loading = document.getElementById('global-loading');
+        if (loading && loading.parentNode) {
+            loading.parentNode.removeChild(loading);
+        }
+    };
+}
+
+// ========================================
+// 表单工具函数 (从 script.js 迁移)
+// ========================================
+
+/**
+ * 格式化为两位小数（不带千分符）
+ * @param {number|string} num 要格式化的数字
+ * @returns {string} 格式化后的数字字符串
+ */
+function formatToTwoDecimals(num) {
+    if (num === null || num === undefined || num === '') return '0.00';
+    const parsed = parseFloat(num);
+    if (isNaN(parsed)) return '0.00';
+    return parsed.toFixed(2);
+}
+
+/**
+ * 设置表单默认值的辅助函数
+ * @param {Array<string>} elementIds 元素ID数组
+ * @param {string} defaultValue 默认值，默认为'0'
+ */
+function setDefaultValues(elementIds = [], defaultValue = '0') {
+    const defaultElements = elementIds.length > 0 ? elementIds : [
+        'fullTimeTotal', 'internationalTotal', 'totalStudents',
+        'otherLivingArea', 'totalBuildingArea'
+    ];
+    
+    defaultElements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element && !element.value) {
+            element.value = defaultValue;
+        }
+    });
+}
+
+/**
+ * 显示成功消息的便捷方法
+ * @param {string} message 消息内容
+ * @param {number} duration 显示时长
+ */
+function showSuccessMessage(message, duration = 3000) {
+    showMessage(message, 'success', duration);
+}
+
+/**
+ * 显示错误消息的便捷方法
+ * @param {string} message 消息内容
+ * @param {number} duration 显示时长
+ */
+function showErrorMessage(message, duration = 5000) {
+    showMessage(message, 'error', duration);
+}
+
+/**
+ * 显示警告消息的便捷方法
+ * @param {string} message 消息内容
+ * @param {number} duration 显示时长
+ */
+function showWarningMessage(message, duration = 4000) {
+    showMessage(message, 'warning', duration);
+}
+
+/**
+ * 显示信息消息的便捷方法
+ * @param {string} message 消息内容
+ * @param {number} duration 显示时长
+ */
+function showInfoMessage(message, duration = 3000) {
+    showMessage(message, 'info', duration);
+}
+
+// ========================================
+// 全局导出
+// ========================================
+
+// 将所有工具函数添加到全局作用域
+if (typeof window !== 'undefined') {
+    // 创建 Utils 命名空间
+    window.Utils = {
+        // 数据格式化
+        formatNumber,
+        formatCurrency,
+        formatPercentage,
+        formatFileSize,
+        formatPhoneNumber,
+        
+        // 时间日期
+        formatDate,
+        formatDateTime,
+        parseDate,
+        calculateDateDiff,
+        isValidDate,
+        
+        // DOM操作
+        getElementById: safeGetElement,
+        addClass,
+        removeClass,
+        toggleClass,
+        setElementValue,
+        getElementValue,
+        
+        // 数据验证
+        validateEmail,
+        validatePhone,
+        validateNumber,
+        validateRequired,
+        validateLength,
+        
+        // 数组和对象
+        deepClone,
+        mergeObjects,
+        sortArray,
+        filterArray,
+        groupBy,
+        
+        // 字符串工具
+        capitalizeFirstLetter: capitalize,
+        toCamelCase,
+        toKebabCase,
+        truncateString: truncateText,
+        removeSpecialChars,
+        
+        // 数学计算
+        roundToDecimal: roundToDecimals,
+        calculatePercentage,
+        getRandomNumber,
+        clampNumber,
+        
+        // 浏览器工具
+        getQueryParam,
+        setQueryParam,
+        getCookie,
+        setCookie,
+        deleteCookie,
+        detectDevice,
+        
+        // 网络请求
+        makeRequest,
+        handleApiError: handleError,
+        uploadFile,
+        
+        // UI工具
+        showMessage,
+        showConfirm,
+        showLoading,
+        
+        // 表单工具 (从 script.js 迁移)
+        formatToTwoDecimals,
+        setDefaultValues,
+        showSuccessMessage,
+        showErrorMessage,
+        showWarningMessage,
+        showInfoMessage
+    };
+    
+    // 为了向后兼容，也将一些常用函数直接添加到 window 对象
+    window.showMessage = showMessage;
+    window.showConfirm = showConfirm;
+    window.showLoading = showLoading;
+    window.formatDate = formatDate;
+    window.formatNumber = formatNumber;
+    window.validateEmail = validateEmail;
+    window.deepClone = deepClone;
+    
+    // 新增的表单工具函数也添加到全局
+    window.formatToTwoDecimals = formatToTwoDecimals;
+    window.setDefaultValues = setDefaultValues;
+    window.showSuccessMessage = showSuccessMessage;
+    window.showErrorMessage = showErrorMessage;
+    window.showWarningMessage = showWarningMessage;
+    window.showInfoMessage = showInfoMessage;
+}
+
+// 支持模块导出
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        // 导出所有工具函数...
+        formatNumber,
+        formatCurrency,
+        formatPercentage,
+        formatFileSize,
+        formatPhoneNumber,
+        formatDate,
+        formatDateTime,
+        parseDate,
+        calculateDateDiff,
+        isValidDate,
+        getElementById: safeGetElement,
+        addClass,
+        removeClass,
+        toggleClass,
+        setElementValue,
+        getElementValue,
+        validateEmail,
+        validatePhone,
+        validateNumber,
+        validateRequired,
+        validateLength,
+        deepClone,
+        mergeObjects,
+        sortArray,
+        filterArray,
+        groupBy,
+        capitalizeFirstLetter: capitalize,
+        toCamelCase,
+        toKebabCase,
+        truncateString: truncateText,
+        removeSpecialChars,
+        roundToDecimal: roundToDecimals,
+        calculatePercentage,
+        getRandomNumber,
+        clampNumber,
+        getQueryParam,
+        setQueryParam,
+        getCookie,
+        setCookie,
+        deleteCookie,
+        detectDevice,
+        makeRequest,
+        handleApiError: handleError,
+        uploadFile,
+        showMessage,
+        showConfirm,
+        showLoading
+    };
+}
+
+// ========================================
+// 模块信息
+// ========================================
+
+console.log('✅ 工具函数模块 (utils.js) 已加载');
+console.log('📦 提供功能: 数据格式化、时间处理、DOM操作、数据验证、UI工具等');
+console.log('🔗 全局访问: window.Utils 或直接使用函数名');

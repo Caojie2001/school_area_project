@@ -1,5 +1,81 @@
 /* ==================== 组件样式 ==================== */
 
+/**
+ * 公共组件样式优化
+ * 为使用组件化架构的页面提供额外的样式支持
+ */
+
+/* 组件容器样式 */
+#sidebarContainer,
+#pageHeaderContainer,
+#pageContentContainer {
+    transition: opacity 0.3s ease;
+}
+
+/* 加载状态样式 */
+.component-loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.component-loaded {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* 动态加载的菜单项样式增强 */
+.sidebar-menu .menu-item {
+    transition: all 0.3s ease;
+}
+
+.sidebar-menu .menu-item:hover {
+    background: rgba(52, 152, 219, 0.1);
+    transform: translateX(5px);
+}
+
+.sidebar-menu .menu-item.active {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    transform: translateX(0);
+}
+
+/* 页面加载动画 */
+@keyframes componentFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.component-fade-in {
+    animation: componentFadeIn 0.3s ease-out;
+}
+
+/* 公共错误提示样式 */
+.component-error {
+    background: #fee;
+    color: #d63384;
+    padding: 12px 15px;
+    border-radius: 6px;
+    border-left: 4px solid #d63384;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+.component-success {
+    background: #d4edda;
+    color: #155724;
+    padding: 12px 15px;
+    border-radius: 6px;
+    border-left: 4px solid #28a745;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
 /* === 卡片样式 === */
 .card {
     background: white;

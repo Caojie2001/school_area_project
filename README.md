@@ -94,25 +94,41 @@ school_area_project/
 │       ├── login.html               用户登录页面
 │       │
 │       ├── html/                    页面组件
+│       │   ├── data-entry.html      数据录入页面组件
+│       │   ├── data-management.html 数据管理页面组件
+│       │   ├── statistics.html      统计分析页面组件
 │       │   └── user-management.html 用户管理页面
 │       │
-│       ├── css/                     样式文件
-│       │   ├── main.css             主样式文件
-│       │   ├── components.css       组件样式
-│       │   ├── forms.css            表单样式
-│       │   ├── tables.css           表格样式
-│       │   └── responsive.css       响应式样式
+│       ├── css/                     模块化样式文件
+│       │   ├── main.css             主样式文件（导入所有模块）
+│       │   ├── base.css             基础样式（重置、字体、颜色）
+│       │   ├── layout.css           布局样式（侧边栏、页面结构）
+│       │   ├── components.css       组件样式（按钮、卡片、提示）
+│       │   ├── forms.css            表单样式（输入框、选择器）
+│       │   ├── student-fields.css   学生字段专用样式
+│       │   ├── tables.css           表格样式（数据表格、冻结列）
+│       │   ├── results.css          结果显示样式（分析图表）
+│       │   └── responsive.css       响应式样式（移动端适配）
 │       │
 │       ├── js/                      JavaScript模块
-│       │   └── main.js              主交互脚本
+│       │   ├── main.js              主交互脚本
+│       │   ├── api.js               API接口封装
+│       │   ├── auth.js              认证相关功能
+│       │   ├── componentManager.js  组件管理器
+│       │   ├── dataEntry.js         数据录入功能
+│       │   ├── dataManagement.js    数据管理功能
+│       │   ├── statistics.js        统计分析功能
+│       │   ├── userManagement.js    用户管理功能
+│       │   ├── progressManager.js   进度管理器
+│       │   └── utils.js             工具函数
 │       │
-│       ├── components/              可复用组件
+│       ├── components/              可复用组件（预留）
 │       │
 │       └── assets/                  静态资源
 │           └── login_background.jpg 登录背景图片
 │
 ├── 数据文件
-│   ├── data/                        基础数据
+│   ├── data/                        基础数据文件
 │   ├── uploads/                     文件上传目录
 │   ├── output/                      Excel报告输出目录
 │   └── backups/                     备份文件目录

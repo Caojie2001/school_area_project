@@ -138,6 +138,8 @@ school_area_project/
 │   ├── package-lock.json            依赖版本锁定文件
 │   ├── .env                         环境变量配置文件
 │   ├── .gitignore                   Git版本控制忽略规则
+│   ├── Dockerfile                   Docker容器化配置
+│   ├── .dockerignore               Docker构建忽略文件
 │   └── README.md                    项目说明文档
 │
 └── node_modules/                    依赖包目录

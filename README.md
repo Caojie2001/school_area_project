@@ -77,6 +77,7 @@ users                    用户信息与权限表
 school_area_project/
 ├── 核心服务文件
 │   ├── server.js                    Express服务器主文件
+│   ├── db.sql                       数据库初始化脚本
 │   └── install.sh                   自动安装配置脚本
 │
 ├── 配置模块
@@ -152,37 +153,46 @@ school_area_project/
 
 ### 安装步骤
 
+### 安装步骤
+
 #### 方式一：自动安装（推荐）
 ```bash
 # 1. 克隆或下载项目
 git clone <repository-url>
 cd school_area_project
 
-# 2. 运行自动安装脚本
+# 2. 初始化数据库（必须先执行）
+# 方式2a：使用MySQL命令行
+mysql -u root -p < db.sql
+
+# 方式2b：使用MySQL客户端工具
+# 直接导入 db.sql 文件到MySQL
+
+# 3. 运行自动安装脚本
 chmod +x install.sh
 ./install.sh
 ```
 
 #### 方式二：手动安装
 ```bash
-# 1. 安装项目依赖
+# 1. 初始化数据库（必须先执行）
+mysql -u root -p < db.sql
+
+# 2. 安装项目依赖
 npm install
 
-# 2. 复制环境配置文件
+# 3. 复制环境配置文件
 cp config/.env.example .env
 
-# 3. 编辑数据库配置
+# 4. 编辑数据库配置
 nano .env
 ```
 
 ### 数据库配置
 
-1. **创建数据库**
-```sql
-CREATE DATABASE school_area_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+**重要提示：** 必须先执行 `db.sql` 文件来创建数据库和表结构，然后再配置环境变量。
 
-2. **配置环境变量** (.env)
+**配置环境变量** (.env)
 ```env
 # 数据库配置
 DB_HOST=localhost

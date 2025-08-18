@@ -7,7 +7,7 @@ const session = require('express-session');
 
 // 引入数据库相关模块
 require('dotenv').config();
-const { testConnection, initializeTables, getPool } = require('./config/database');
+const { testConnection, getPool } = require('./config/database');
 const dataService = require('./config/dataService');
 const AuthService = require('./config/authService');
 
@@ -2456,10 +2456,9 @@ async function startServer() {
         const isConnected = await testConnection();
         if (!isConnected) {
             console.log('数据库连接失败，服务器将在无数据库模式下运行');
+            console.log('提示：请确保已执行 db.sql 文件来创建数据库和表结构');
         } else {
-            // 初始化数据库表
-            await initializeTables();
-            console.log('数据库初始化完成');
+            console.log('数据库连接成功，应用已就绪');
         }
         
         // 启动HTTP服务器

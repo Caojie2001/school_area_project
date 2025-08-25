@@ -55,27 +55,37 @@ async function apiDelete(endpoint, data = null, options = {}) {
  *    - DataEntryAPI.getStandards() 获取计算标准
  *    - DataEntryAPI.validateData() 验证数据
  * 
- * 4. 数据管理相关API
+ * 4. 学校数据相关API（优化版本）
+ *    - SchoolsAPI.getRegistry() 获取学校注册表
+ *    - SchoolsAPI.getNames() 获取学校名称列表
+ *    - SchoolsAPI.getTypes() 获取院校类型列表
+ *    - SchoolsAPI.getTypeMapping() 获取类型映射关系
+ *    - SchoolsAPI.getByType() 按类型获取学校
+ *    - SchoolsAPI.getDetail() 获取学校详细信息
+ *    - SchoolsAPI.search() 搜索学校
+ *    - SchoolsAPI.getStatistics() 获取学校统计
+ * 
+ * 5. 数据管理相关API
  *    - DataManagementAPI.getHistory() 获取历史数据
  *    - DataManagementAPI.getDetails() 获取数据详情
  *    - DataManagementAPI.updateData() 更新数据
  *    - DataManagementAPI.deleteData() 删除数据
  *    - DataManagementAPI.exportData() 导出数据
  * 
- * 5. 统计分析相关API
+ * 6. 统计分析相关API
  *    - StatisticsAPI.getOverview() 获取概览统计
  *    - StatisticsAPI.getSchoolStats() 获取学校统计
  *    - StatisticsAPI.getTrends() 获取趋势数据
  *    - StatisticsAPI.exportStats() 导出统计数据
  * 
- * 6. 用户管理相关API
+ * 7. 用户管理相关API
  *    - UserManagementAPI.getUsers() 获取用户列表
  *    - UserManagementAPI.createUser() 创建用户
  *    - UserManagementAPI.updateUser() 更新用户
  *    - UserManagementAPI.deleteUser() 删除用户
  *    - UserManagementAPI.resetPassword() 重置密码
  * 
- * 7. 文件上传相关API
+ * 8. 文件上传相关API
  *    - FileAPI.uploadExcel() 上传Excel文件
  *    - FileAPI.downloadTemplate() 下载模板
  *    - FileAPI.exportReport() 导出报告
@@ -145,6 +155,17 @@ const API_ENDPOINTS = {
         SCHOOL_TYPE: '/school-type'
     },
     
+    // 学校数据相关 - 优化版本
+    SCHOOLS: {
+        REGISTRY: '/schools/registry',        // 获取学校注册表
+        NAMES: '/schools/names',              // 获取学校名称列表
+        TYPES: '/schools/types',              // 获取院校类型列表
+        TYPE_MAPPING: '/schools/type-mapping', // 获取类型映射关系
+        BY_TYPE: '/schools/by-type',          // 按类型获取学校（需要加上/:type）
+        DETAIL: '/schools/detail',            // 获取学校详情（需要加上/:schoolName）
+        OPTIONS: '/school-options'            // 向后兼容的学校选项接口
+    },
+    
     // 数据管理相关
     DATA_MANAGEMENT: {
         HISTORY: '/data/history',
@@ -172,6 +193,14 @@ const API_ENDPOINTS = {
         UPDATE: '/auth/user',  // 需要加上/:id/status
         DELETE: '/auth/user',  // 需要加上/:id
         RESET_PASSWORD: '/auth/users/reset-password'
+    },
+    
+    // 计算标准相关
+    CALCULATION_STANDARDS: {
+        GET: '/calculation-standards',
+        UPDATE: '/calculation-standards',
+        SCHOOL_MAPPINGS: '/school-mappings',
+        RELOAD_MAPPINGS: '/reload-school-type-mapping'
     },
     
     // 其他API
@@ -379,6 +408,129 @@ const DataEntryAPI = {
      */
     async getStandards() {
         return apiGet(API_ENDPOINTS.DATA_ENTRY.STANDARDS);
+    }
+};
+
+// ========================================
+// 学校数据相关API - 优化版本
+// ========================================
+
+const SchoolsAPI = {
+    /**
+     * 获取学校注册表（所有学校基础信息）
+     * @returns {Promise} 学校注册表数据
+     */
+    async getRegistry() {
+        return apiGet(API_ENDPOINTS.SCHOOLS.REGISTRY);
+    },
+    
+    /**
+     * 获取学校名称列表（用于下拉框）
+     * @returns {Promise} 学校名称列表
+     */
+    async getNames() {
+        return apiGet(API_ENDPOINTS.SCHOOLS.NAMES);
+    },
+    
+    /**
+     * 获取院校类型列表和统计
+     * @returns {Promise} 院校类型数据
+     */
+    async getTypes() {
+        return apiGet(API_ENDPOINTS.SCHOOLS.TYPES);
+    },
+    
+    /**
+     * 获取学校类型映射关系
+     * @returns {Promise} 映射关系数据
+     */
+    async getTypeMapping() {
+        return apiGet(API_ENDPOINTS.SCHOOLS.TYPE_MAPPING);
+    },
+    
+    /**
+     * 按类型获取学校列表
+     * @param {string} schoolType 院校类型
+     * @returns {Promise} 该类型的学校列表
+     */
+    async getByType(schoolType) {
+        const endpoint = `${API_ENDPOINTS.SCHOOLS.BY_TYPE}/${encodeURIComponent(schoolType)}`;
+        return apiGet(endpoint);
+    },
+    
+    /**
+     * 获取单个学校详细信息
+     * @param {string} schoolName 学校名称
+     * @returns {Promise} 学校详细信息
+     */
+    async getDetail(schoolName) {
+        const endpoint = `${API_ENDPOINTS.SCHOOLS.DETAIL}/${encodeURIComponent(schoolName)}`;
+        return apiGet(endpoint);
+    },
+    
+    /**
+     * 获取学校选项（向后兼容）
+     * @returns {Promise} 学校选项数据
+     */
+    async getOptions() {
+        return apiGet(API_ENDPOINTS.SCHOOLS.OPTIONS);
+    },
+    
+    /**
+     * 搜索学校（按名称或类型）
+     * @param {string} query 搜索关键词
+     * @returns {Promise} 搜索结果
+     */
+    async search(query) {
+        const registry = await this.getRegistry();
+        if (!registry.success) {
+            return registry;
+        }
+        
+        const searchTerm = query.toLowerCase();
+        const filteredSchools = registry.data.filter(school => 
+            school.school_name.toLowerCase().includes(searchTerm) ||
+            school.school_type.toLowerCase().includes(searchTerm)
+        );
+        
+        return {
+            success: true,
+            data: filteredSchools,
+            count: filteredSchools.length,
+            query: query
+        };
+    },
+    
+    /**
+     * 获取学校统计信息
+     * @returns {Promise} 统计信息
+     */
+    async getStatistics() {
+        const registry = await this.getRegistry();
+        if (!registry.success) {
+            return registry;
+        }
+        
+        const stats = {
+            totalSchools: registry.data.length,
+            typeDistribution: {},
+            schoolsByType: {}
+        };
+        
+        registry.data.forEach(school => {
+            const type = school.school_type;
+            stats.typeDistribution[type] = (stats.typeDistribution[type] || 0) + 1;
+            
+            if (!stats.schoolsByType[type]) {
+                stats.schoolsByType[type] = [];
+            }
+            stats.schoolsByType[type].push(school.school_name);
+        });
+        
+        return {
+            success: true,
+            data: stats
+        };
     }
 };
 
@@ -623,6 +775,14 @@ const UserManagementAPI = {
      */
     async toggleUserStatus(id, status) {
         return apiPut(`/auth/user/${id}/status`, { status });
+    },
+
+    /**
+     * 获取学校列表
+     * @returns {Promise} 学校列表数据
+     */
+    async getSchools() {
+        return apiGet('/school-options');
     }
 };
 
@@ -758,6 +918,111 @@ function handleApiError(error, context = '') {
     return apiError;
 }
 
+// ========================================
+// 计算标准相关API
+// ========================================
+
+/**
+ * 计算标准API对象
+ */
+const CalculationStandardsAPI = {
+    /**
+     * 获取计算标准数据
+     * @returns {Promise} 计算标准数据
+     */
+    async getStandards() {
+        return apiGet(API_ENDPOINTS.CALCULATION_STANDARDS.GET);
+    },
+
+    /**
+     * 更新计算标准数据
+     * @param {object} data 标准数据
+     * @returns {Promise} 更新结果
+     */
+    async updateStandards(data) {
+        return apiPost(API_ENDPOINTS.CALCULATION_STANDARDS.UPDATE, data);
+    },
+
+    /**
+     * 获取院校类型映射
+     * @returns {Promise} 院校类型映射数据
+     */
+    async getSchoolTypeMappings() {
+        return apiGet(API_ENDPOINTS.CALCULATION_STANDARDS.SCHOOL_MAPPINGS);
+    },
+
+    /**
+     * 更新院校类型映射
+     * @param {object} mappings 映射数据
+     * @returns {Promise} 更新结果
+     */
+    async updateSchoolTypeMappings(mappings) {
+        return apiPost(API_ENDPOINTS.CALCULATION_STANDARDS.SCHOOL_MAPPINGS, { mappings });
+    },
+
+    /**
+     * 重新加载院校类型映射缓存
+     * @returns {Promise} 操作结果
+     */
+    async reloadMappings() {
+        return apiPost(API_ENDPOINTS.CALCULATION_STANDARDS.RELOAD_MAPPINGS);
+    },
+
+    /**
+     * 标准化院校类型名称（客户端辅助方法）
+     * @param {string} inputType 输入的院校类型
+     * @returns {string} 标准化后的院校类型
+     */
+    normalizeSchoolType(inputType) {
+        if (!inputType) return '综合院校';
+        
+        const trimmedType = inputType.trim();
+        
+        // 标准名称映射
+        const standardTypes = [
+            '综合院校', '师范院校', '理工院校', '医药院校', '农业院校',
+            '政法院校', '财经院校', '体育院校', '艺术院校', '外语院校'
+        ];
+        
+        // 检查是否是标准名称
+        if (standardTypes.includes(trimmedType)) {
+            return trimmedType;
+        }
+        
+        // 别名映射
+        const aliasMapping = {
+            '综合': '综合院校',
+            '综合类': '综合院校',
+            '师范': '师范院校',
+            '师范类': '师范院校',
+            '理工': '理工院校',
+            '工科': '理工院校',
+            '工科院校': '理工院校',
+            '工科类': '理工院校',
+            '医药': '医药院校',
+            '医学': '医药院校',
+            '医学院校': '医药院校',
+            '医学类': '医药院校',
+            '农业': '农业院校',
+            '农林': '农业院校',
+            '农林院校': '农业院校',
+            '农林类': '农业院校',
+            '政法': '政法院校',
+            '政法类': '政法院校',
+            '财经': '财经院校',
+            '财经类': '财经院校',
+            '外语': '外语院校',
+            '外语类': '外语院校',
+            '艺术': '艺术院校',
+            '艺术类': '艺术院校',
+            '体育': '体育院校',
+            '体育类': '体育院校'
+        };
+        
+        return aliasMapping[trimmedType] || '综合院校';
+    }
+};
+
 /**
  * 清除API缓存
  * @param {string} pattern 缓存键模式（可选）
@@ -783,8 +1048,10 @@ function clearApiCache(pattern = '') {
 if (typeof window !== 'undefined') {
     window.AuthAPI = AuthAPI;
     window.DataEntryAPI = DataEntryAPI;
+    window.SchoolsAPI = SchoolsAPI;  // 新增的学校API
     window.DataManagementAPI = DataManagementAPI;
     window.StatisticsAPI = StatisticsAPI;
+    window.CalculationStandardsAPI = CalculationStandardsAPI;
     window.UserManagementAPI = UserManagementAPI;
     window.CommonAPI = CommonAPI;
     window.clearApiCache = clearApiCache;

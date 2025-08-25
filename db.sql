@@ -100,17 +100,6 @@ CREATE TABLE IF NOT EXISTS `subsidized_area_standards` (
     UNIQUE KEY `unique_school_room_subsidy` (`school_type`, `room_type`, `subsidy_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 创建院校类型映射表
-CREATE TABLE IF NOT EXISTS `school_type_mapping` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `type_code` VARCHAR(50) NOT NULL UNIQUE COMMENT '院校类型名称',
-    `type_name` VARCHAR(50) NOT NULL COMMENT '类型名称',
-    `sort_order` INT DEFAULT 0 COMMENT '排序顺序',
-    `is_active` BOOLEAN DEFAULT TRUE COMMENT '是否启用',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- 创建索引以提高查询性能
 CREATE INDEX `idx_school_info_name_year` ON `school_info`(`school_name`, `year`);
 CREATE INDEX `idx_school_info_year` ON `school_info`(`year`);
@@ -121,25 +110,11 @@ CREATE INDEX `idx_basic_area_standards_room_type` ON `basic_area_standards`(`roo
 CREATE INDEX `idx_subsidized_area_standards_school_type` ON `subsidized_area_standards`(`school_type`);
 CREATE INDEX `idx_subsidized_area_standards_room_type` ON `subsidized_area_standards`(`room_type`);
 CREATE INDEX `idx_subsidized_area_standards_subsidy_type` ON `subsidized_area_standards`(`subsidy_type`);
-CREATE INDEX `idx_school_type_mapping_code` ON `school_type_mapping`(`type_code`);
 
 -- 创建默认管理员账户
 -- 密码: admin123 (请在生产环境中修改)
 INSERT IGNORE INTO `users` (`username`, `password`, `real_name`, `role`) 
 VALUES ('admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '系统管理员', 'admin');
-
--- 插入院校类型映射数据
-INSERT IGNORE INTO `school_type_mapping` (`type_code`, `type_name`, `sort_order`) VALUES
-('综合院校', '综合院校', 1),
-('师范院校', '师范院校', 2),
-('理工院校', '理工院校', 3),
-('医药院校', '医药院校', 4),
-('农业院校', '农业院校', 5),
-('政法院校', '政法院校', 6),
-('财经院校', '财经院校', 7),
-('体育院校', '体育院校', 8),
-('艺术院校', '艺术院校', 9),
-('外语院校', '外语院校', 10);
 
 -- 插入基础面积标准数据（按院校类型分类）
 INSERT IGNORE INTO `basic_area_standards` (`school_type`, `room_type`, `standard_value`, `description`) VALUES

@@ -13,7 +13,7 @@
 const AppConfig = {
     // 应用信息
     app: {
-        name: '高校建筑面积缺口测算系统',
+        name: '高校建筑面积缺口测算计算器',
         version: '2.0.0',
         description: '用于计算高校建筑面积缺口的现代化Web应用',
         author: 'School Area Calculator Team'

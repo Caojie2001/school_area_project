@@ -52,6 +52,7 @@ const DataManagementManager = {
             
             await this.loadDataAvailableYears();
             await this.loadDataAvailableUsers();
+            await this.loadSchoolOptions();
             
             // 如果是学校用户，自动锁定学校筛选器和用户筛选器
             if (currentUser && currentUser.role === 'school') {
@@ -197,6 +198,32 @@ const DataManagementManager = {
             }
         } catch (error) {
             console.error('加载年份失败:', error);
+        }
+    },
+    
+    /**
+     * 加载学校选项
+     */
+    async loadSchoolOptions() {
+        try {
+            const result = await DataEntryAPI.getSchools();
+            
+            if (result.success && result.schools) {
+                const schoolSelect = document.getElementById('dataSchoolNameFilter');
+                if (schoolSelect) {
+                    // 保留第一个"所有学校"选项
+                    schoolSelect.innerHTML = '<option value="all">所有学校</option>';
+                    
+                    result.schools.forEach(school => {
+                        const option = document.createElement('option');
+                        option.value = school.school_name;
+                        option.textContent = school.school_name;
+                        schoolSelect.appendChild(option);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('加载学校选项失败:', error);
         }
     },
     
@@ -1335,12 +1362,11 @@ const AnalysisResultsManager = {
         
         // 获取学校数据（现在只有一个学校）
         const school = analysisData[0];
-        const isCompliant = school['整体达标情况'] === '达标';
         const totalCurrentArea = school['现有建筑总面积'] || 0;
         const totalRequiredArea = school['应配建筑总面积'] || 0;
         const totalGap = school['建筑面积总缺口（含特殊补助）'] || school['建筑面积总缺口'] || 0;
         
-        console.log('学校分析数据:', { isCompliant, totalCurrentArea, totalRequiredArea, totalGap });
+        console.log('学校分析数据:', { totalCurrentArea, totalRequiredArea, totalGap });
         
         // 显示学校概况统计，使用相同底色的四个数据卡片
         const gapWithoutSubsidy = school['建筑面积总缺口（不含特殊补助）'] || 0;
@@ -1438,48 +1464,42 @@ const AnalysisResultsManager = {
                     name: '教学及辅助用房', 
                     current: school['现有教学及辅助用房面积'], 
                     required: school['总应配教学及辅助用房(A)'], 
-                    gap: school['教学及辅助用房缺口(A)'], 
-                    status: school['教学及辅助用房达标情况']
+                    gap: school['教学及辅助用房缺口(A)']
                 },
                 { 
                     key: 'B', 
                     name: '办公用房', 
                     current: school['现有办公用房面积'], 
                     required: school['总应配办公用房(B)'], 
-                    gap: school['办公用房缺口(B)'], 
-                    status: school['办公用房达标情况']
+                    gap: school['办公用房缺口(B)']
                 },
                 { 
                     key: 'D', 
                     name: '后勤辅助用房', 
                     current: school['现有后勤辅助用房面积'], 
                     required: school['总应配后勤辅助用房(D)'], 
-                    gap: school['后勤辅助用房缺口(D)'], 
-                    status: school['后勤辅助用房达标情况']
+                    gap: school['后勤辅助用房缺口(D)']
                 },
                 { 
                     key: 'C', 
                     name: '生活配套用房', 
                     current: school['现有生活用房总面积'], 
                     required: (school['总应配学生宿舍(C1)'] || 0) + (school['总应配其他生活用房(C2)'] || 0), 
-                    gap: (school['学生宿舍缺口(C1)'] || 0) + (school['其他生活用房缺口(C2)'] || 0), 
-                    status: ((school['学生宿舍缺口(C1)'] || 0) + (school['其他生活用房缺口(C2)'] || 0)) <= 0 ? '达标' : '不达标'
+                    gap: (school['学生宿舍缺口(C1)'] || 0) + (school['其他生活用房缺口(C2)'] || 0)
                 },
                 { 
                     key: 'C1', 
                     name: '其中:学生宿舍', 
                     current: school['现有学生宿舍面积'], 
                     required: school['总应配学生宿舍(C1)'], 
-                    gap: school['学生宿舍缺口(C1)'], 
-                    status: school['学生宿舍达标情况']
+                    gap: school['学生宿舍缺口(C1)']
                 },
                 { 
                     key: 'C2', 
                     name: '其中:其他生活用房', 
                     current: school['现有其他生活用房面积（计算）'] || school['现有其他生活用房面积'], 
                     required: school['总应配其他生活用房(C2)'], 
-                    gap: school['其他生活用房缺口(C2)'], 
-                    status: school['其他生活用房达标情况']
+                    gap: school['其他生活用房缺口(C2)']
                 },
             ];
             

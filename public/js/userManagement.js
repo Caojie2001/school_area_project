@@ -360,7 +360,7 @@ const UserManagementManager = {
     /**
      * 显示创建用户模态框
      */
-    showCreateUserModal() {
+    async showCreateUserModal() {
         const modal = document.getElementById('createUserModal');
         const form = document.getElementById('createUserForm');
         const schoolNameGroup = document.getElementById('schoolNameGroup');
@@ -368,6 +368,40 @@ const UserManagementManager = {
         if (modal) modal.style.display = 'block';
         if (form) form.reset();
         if (schoolNameGroup) schoolNameGroup.style.display = 'none';
+        
+        // 加载学校选项
+        await this.loadSchoolOptions();
+    },
+    
+    /**
+     * 加载学校选项
+     */
+    async loadSchoolOptions() {
+        const schoolSelect = document.getElementById('school_name');
+        if (!schoolSelect) return;
+        
+        try {
+            const response = await UserManagementAPI.getSchools();
+            
+            if (response.success && response.schools) {
+                // 清空现有选项（保留第一个"请选择学校"选项）
+                schoolSelect.innerHTML = '<option value="">请选择学校</option>';
+                
+                // 添加学校选项
+                response.schools.forEach(school => {
+                    const option = document.createElement('option');
+                    option.value = school.school_name;
+                    option.textContent = school.school_name;
+                    schoolSelect.appendChild(option);
+                });
+                
+                console.log(`加载了 ${response.schools.length} 个学校选项`);
+            } else {
+                console.error('加载学校选项失败:', response.message);
+            }
+        } catch (error) {
+            console.error('加载学校选项时出错:', error);
+        }
     },
     
     /**

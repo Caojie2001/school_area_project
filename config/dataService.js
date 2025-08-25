@@ -18,8 +18,9 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
         // 获取要删除的记录ID（用于删除关联的特殊补助记录）
         // 严格按照 学校名称+测算年份+测算用户 作为唯一标识
         const [existingRecords] = await connection.execute(`
-            SELECT id FROM school_info 
-            WHERE school_name = ? AND year = ? AND submitter_username = ?
+            SELECT ch.id FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
+            WHERE sr.school_name = ? AND ch.year = ? AND ch.submitter_username = ?
         `, [schoolName, year, submitter]);
         
         // 删除关联的特殊补助记录
@@ -36,8 +37,9 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
         
         // 删除主记录
         const [deleteResult] = await connection.execute(`
-            DELETE FROM school_info 
-            WHERE school_name = ? AND year = ? AND submitter_username = ?
+            DELETE ch FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
+            WHERE sr.school_name = ? AND ch.year = ? AND ch.submitter_username = ?
         `, [schoolName, year, submitter]);
         
         console.log(`删除了 ${deleteResult.affectedRows} 条学校主记录`);
@@ -54,7 +56,6 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
             total_area_gap_with_subsidy: 0,
             total_area_gap_without_subsidy: 0,
             special_subsidy_total: 0,
-            overall_compliance: 0,
             calculation_results: null
         };
         
@@ -69,7 +70,6 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
             calcData.total_area_gap_with_subsidy = calculationResults['建筑面积总缺口（含特殊补助）'] || 0;
             calcData.total_area_gap_without_subsidy = calculationResults['建筑面积总缺口（不含特殊补助）'] || 0;
             calcData.special_subsidy_total = calculationResults['特殊补助总面积'] || 0;
-            calcData.overall_compliance = calculationResults['整体达标情况'] === '达标' ? 1 : 0;
             calcData.calculation_results = JSON.stringify(calculationResults);
         }
         
@@ -79,19 +79,51 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
             calcData: calcData
         });
         
-        // 构建参数数组
-        const params = [
-            schoolData['学校名称'],
-            schoolData['学校类型'] || null,
+        // 调试：检查关键字段
+        console.log('关键字段检查:', {
+            schoolName: schoolData['学校名称'],
+            schoolType: schoolData['学校类型'],
+            year: schoolData['年份'],
+            submitterUsername: submitterUsername
+        });
+        
+        // 获取或创建学校注册信息
+        let schoolRegistryId;
+        const [existingSchool] = await connection.execute(`
+            SELECT id FROM school_registry WHERE school_name = ?
+        `, [schoolData['学校名称']]);
+        
+        if (existingSchool.length > 0) {
+            schoolRegistryId = existingSchool[0].id;
+            // 更新学校类型（可能有变化）
+            await connection.execute(`
+                UPDATE school_registry SET school_type = ? WHERE id = ?
+            `, [schoolData['学校类型'] || '综合院校', schoolRegistryId]);
+        } else {
+            // 创建新的学校注册记录
+            const [schoolRegResult] = await connection.execute(`
+                INSERT INTO school_registry (school_name, school_type) VALUES (?, ?)
+            `, [schoolData['学校名称'], schoolData['学校类型'] || '综合院校']);
+            schoolRegistryId = schoolRegResult.insertId;
+        }
+        
+        console.log('schoolRegistryId:', schoolRegistryId);
+        console.log('即将插入的参数数量检查...');
+        
+        // 构建参数数组并检查undefined值
+        const insertParams = [
+            schoolRegistryId,
             schoolData['年份'],
             schoolData['学生统计年份'] || schoolData['年份'],
             schoolData['建筑面积统计年份'] || schoolData['年份'],
+            submitterUsername || 'system',
+            schoolData['年份'], // base_year 使用同样的年份
             schoolData['全日制本科生人数'] || 0,
             schoolData['全日制专科生人数'] || 0,
             schoolData['全日制硕士生人数'] || 0,
             schoolData['全日制博士生人数'] || 0,
             schoolData['留学生本科生人数'] || 0,
-            schoolData['留学生专科生人数'] || 0,
+            0, // international_specialist 固定为0，因为通常没有留学生专科生
             schoolData['留学生硕士生人数'] || 0,
             schoolData['留学生博士生人数'] || 0,
             schoolData['学生总人数'] || 0,
@@ -100,8 +132,6 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
             schoolData['现有生活用房总面积'] || 0,
             schoolData['现有学生宿舍面积'] || 0,
             schoolData['现有后勤辅助用房面积'] || 0,
-            schoolData['备注'] || null,
-            // 计算结果
             calcData.current_building_area || 0,
             calcData.required_building_area || 0,
             calcData.teaching_area_gap || 0,
@@ -112,38 +142,32 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
             calcData.total_area_gap_with_subsidy || 0,
             calcData.total_area_gap_without_subsidy || 0,
             calcData.special_subsidy_total || 0,
-            calcData.overall_compliance || 0,
-            calcData.calculation_results || null
+            calcData.calculation_results || null,
+            schoolData['备注'] || null
         ];
         
         // 检查是否有undefined值
-        const undefinedIndex = params.findIndex(param => param === undefined);
+        const undefinedIndex = insertParams.findIndex(param => param === undefined);
         if (undefinedIndex !== -1) {
-            console.log(`参数数组中第${undefinedIndex}个参数是undefined:`, params[undefinedIndex]);
-            console.log('完整参数数组:', params);
+            console.log(`参数数组中第${undefinedIndex}个参数是undefined:`, insertParams[undefinedIndex]);
+            console.log('完整参数数组:', insertParams);
             throw new Error(`参数数组中第${undefinedIndex}个参数是undefined`);
         }
         
-        // 插入新记录
+        console.log(`参数数组长度: ${insertParams.length}, 都不是undefined`);
+        
+        // 插入新的计算历史记录
         const [schoolResult] = await connection.execute(`
-            INSERT INTO school_info (
-                school_name, school_type, year, student_stat_year, building_stat_year, submitter_username, full_time_undergraduate, full_time_specialist, 
+            INSERT INTO calculation_history (
+                school_registry_id, year, student_stat_year, building_stat_year, submitter_username, base_year, full_time_undergraduate, full_time_specialist, 
                 full_time_master, full_time_doctor, international_undergraduate, international_specialist,
                 international_master, international_doctor, total_students, teaching_area, 
-                office_area, total_living_area, dormitory_area, logistics_area, remarks,
+                office_area, total_living_area, dormitory_area, logistics_area,
                 current_building_area, required_building_area, teaching_area_gap, office_area_gap,
                 dormitory_area_gap, other_living_area_gap, logistics_area_gap, total_area_gap_with_subsidy,
-                total_area_gap_without_subsidy, special_subsidy_total, overall_compliance, calculation_results
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-            schoolData['学校名称'],
-            schoolData['学校类型'],
-            schoolData['年份'],
-            schoolData['学生统计年份'] || schoolData['年份'],
-            schoolData['建筑面积统计年份'] || schoolData['年份'],
-            submitterUsername, // 添加填报单位
-            ...params.slice(5) // 其余参数保持不变
-        ]);
+                total_area_gap_without_subsidy, special_subsidy_total, calculation_results, remarks
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, insertParams);
         
         const schoolInfoId = schoolResult.insertId;
         
@@ -179,42 +203,42 @@ async function getSchoolHistoryByUser(userRole, userSchoolName = null, username 
     try {
         let query = `
             SELECT 
-                si.id,
-                si.school_name,
-                si.school_type,
-                si.year,
-                si.student_stat_year,
-                si.building_stat_year,
-                si.submitter_username,
-                si.full_time_undergraduate,
-                si.full_time_specialist,
-                si.full_time_master,
-                si.full_time_doctor,
-                si.international_undergraduate,
-                si.international_specialist,
-                si.international_master,
-                si.international_doctor,
-                si.total_students,
-                si.teaching_area,
-                si.office_area,
-                si.total_living_area,
-                si.dormitory_area,
-                si.logistics_area,
-                si.current_building_area,
-                si.required_building_area,
-                si.teaching_area_gap,
-                si.office_area_gap,
-                si.dormitory_area_gap,
-                si.other_living_area_gap,
-                si.logistics_area_gap,
-                si.total_area_gap_with_subsidy,
-                si.total_area_gap_without_subsidy,
-                si.special_subsidy_total,
-                si.overall_compliance,
-                si.calculation_results,
-                si.remarks,
-                si.created_at
-            FROM school_info si
+                ch.id,
+                sr.school_name,
+                sr.school_type,
+                ch.year,
+                ch.student_stat_year,
+                ch.building_stat_year,
+                ch.submitter_username,
+                ch.full_time_undergraduate,
+                ch.full_time_specialist,
+                ch.full_time_master,
+                ch.full_time_doctor,
+                ch.international_undergraduate,
+                ch.international_specialist,
+                ch.international_master,
+                ch.international_doctor,
+                ch.total_students,
+                ch.teaching_area,
+                ch.office_area,
+                ch.total_living_area,
+                ch.dormitory_area,
+                ch.logistics_area,
+                ch.current_building_area,
+                ch.required_building_area,
+                ch.teaching_area_gap,
+                ch.office_area_gap,
+                ch.dormitory_area_gap,
+                ch.other_living_area_gap,
+                ch.logistics_area_gap,
+                ch.total_area_gap_with_subsidy,
+                ch.total_area_gap_without_subsidy,
+                ch.special_subsidy_total,
+                ch.calculation_results,
+                ch.remarks,
+                ch.created_at
+            FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
         `;
         
         let whereConditions = [];
@@ -223,7 +247,7 @@ async function getSchoolHistoryByUser(userRole, userSchoolName = null, username 
         // 根据用户角色添加过滤条件
         if (userRole === 'school') {
             // 学校用户只能看到自己填报的记录
-            whereConditions.push('(si.school_name = ? AND si.submitter_username = ?)');
+            whereConditions.push('(sr.school_name = ? AND ch.submitter_username = ?)');
             params.push(userSchoolName, username);
         } else if (userRole === 'construction_center') {
             // 基建中心可以看到所有记录
@@ -235,7 +259,7 @@ async function getSchoolHistoryByUser(userRole, userSchoolName = null, username 
         
         // 按年份过滤
         if (year) {
-            whereConditions.push('si.year = ?');
+            whereConditions.push('ch.year = ?');
             params.push(year);
         }
         
@@ -243,7 +267,7 @@ async function getSchoolHistoryByUser(userRole, userSchoolName = null, username 
             query += ' WHERE ' + whereConditions.join(' AND ');
         }
         
-        query += ' ORDER BY si.created_at DESC, si.school_name ASC';
+        query += ' ORDER BY ch.created_at DESC, sr.school_name ASC';
         
         const [rows] = await pool.execute(query, params);
         return rows;
@@ -261,57 +285,57 @@ async function getSchoolHistory(year = null) {
     try {
         let query = `
             SELECT 
-                si.id,
-                si.school_name,
-                si.school_type,
-                si.year,
-                si.student_stat_year,
-                si.building_stat_year,
-                si.full_time_undergraduate,
-                si.full_time_specialist,
-                si.full_time_master,
-                si.full_time_doctor,
-                si.international_undergraduate,
-                si.international_specialist,
-                si.international_master,
-                si.international_doctor,
-                si.total_students,
-                si.teaching_area,
-                si.office_area,
-                si.total_living_area,
-                si.dormitory_area,
-                si.logistics_area,
-                si.current_building_area,
-                si.required_building_area,
-                si.teaching_area_gap,
-                si.office_area_gap,
-                si.dormitory_area_gap,
-                si.other_living_area_gap,
-                si.logistics_area_gap,
-                si.total_area_gap_with_subsidy,
-                si.total_area_gap_without_subsidy,
-                si.special_subsidy_total,
-                si.overall_compliance,
-                si.calculation_results,
-                si.remarks,
-                si.created_at,
+                ch.id,
+                sr.school_name,
+                sr.school_type,
+                ch.year,
+                ch.student_stat_year,
+                ch.building_stat_year,
+                ch.full_time_undergraduate,
+                ch.full_time_specialist,
+                ch.full_time_master,
+                ch.full_time_doctor,
+                ch.international_undergraduate,
+                ch.international_specialist,
+                ch.international_master,
+                ch.international_doctor,
+                ch.total_students,
+                ch.teaching_area,
+                ch.office_area,
+                ch.total_living_area,
+                ch.dormitory_area,
+                ch.logistics_area,
+                ch.current_building_area,
+                ch.required_building_area,
+                ch.teaching_area_gap,
+                ch.office_area_gap,
+                ch.dormitory_area_gap,
+                ch.other_living_area_gap,
+                ch.logistics_area_gap,
+                ch.total_area_gap_with_subsidy,
+                ch.total_area_gap_without_subsidy,
+                ch.special_subsidy_total,
+                ch.calculation_results,
+                ch.remarks,
+                ch.created_at,
                 GROUP_CONCAT(
                     CONCAT('{"特殊用房补助名称":"', ss.subsidy_name, '","补助面积（m²）":', ss.subsidy_area, '}')
                     SEPARATOR ','
                 ) as special_subsidies_json
-            FROM school_info si
-            LEFT JOIN special_subsidies ss ON si.id = ss.school_info_id
+            FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
+            LEFT JOIN special_subsidies ss ON ch.id = ss.school_info_id
         `;
         
         let params = [];
         if (year) {
-            query += ' WHERE si.year = ?';
+            query += ' WHERE ch.year = ?';
             params.push(year);
         }
         
         query += `
-            GROUP BY si.id
-            ORDER BY si.created_at DESC, si.school_name ASC
+            GROUP BY ch.id
+            ORDER BY ch.created_at DESC, sr.school_name ASC
         `;
         
         const [rows] = await pool.execute(query, params);
@@ -350,19 +374,23 @@ async function getLatestSchoolRecords(year = null, schoolName = null, baseYear =
         // 原有的"最新记录"逻辑（保留以防需要）
         let query = `
             SELECT 
-                si.*,
+                ch.*,
+                sr.school_name,
+                sr.school_type,
                 u.real_name as submitter_real_name,
                 GROUP_CONCAT(
                     CONCAT('{"特殊用房补助名称":"', ss.subsidy_name, '","补助面积（m²）":', ss.subsidy_area, '}')
                     SEPARATOR ','
                 ) as special_subsidies_json
-            FROM school_info si
-            LEFT JOIN special_subsidies ss ON si.id = ss.school_info_id
-            LEFT JOIN users u ON si.submitter_username = u.username
+            FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
+            LEFT JOIN special_subsidies ss ON ch.id = ss.school_info_id
+            LEFT JOIN users u ON ch.submitter_username = u.username
             INNER JOIN (
-                SELECT school_name, year, submitter_username, MAX(created_at) as max_created_at
-                FROM school_info si2
-                LEFT JOIN users u2 ON si2.submitter_username = u2.username
+                SELECT sr2.school_name, ch2.year, ch2.submitter_username, MAX(ch2.created_at) as max_created_at
+                FROM calculation_history ch2
+                JOIN school_registry sr2 ON ch2.school_registry_id = sr2.id
+                LEFT JOIN users u2 ON ch2.submitter_username = u2.username
         `;
         
         let params = [];
@@ -371,22 +399,22 @@ async function getLatestSchoolRecords(year = null, schoolName = null, baseYear =
         // 用户权限过滤（在子查询中）
         if (userRole === 'school') {
             // 学校用户只能查看自己学校自己填报的数据
-            whereConditions.push('si2.school_name = ? AND si2.submitter_username = ?');
+            whereConditions.push('sr2.school_name = ? AND ch2.submitter_username = ?');
             params.push(userSchoolName, username);
         }
         
         if (year) {
-            whereConditions.push('si2.year = ?');
+            whereConditions.push('ch2.year = ?');
             params.push(year);
         }
         
         if (schoolName) {
-            whereConditions.push('si2.school_name = ?');
+            whereConditions.push('sr2.school_name = ?');
             params.push(schoolName);
         }
         
         if (userFilter) {
-            whereConditions.push('(u2.real_name = ? OR (u2.real_name IS NULL AND si2.submitter_username = ?))');
+            whereConditions.push('(u2.real_name = ? OR (u2.real_name IS NULL AND ch2.submitter_username = ?))');
             params.push(userFilter, userFilter);
         }
         
@@ -396,10 +424,10 @@ async function getLatestSchoolRecords(year = null, schoolName = null, baseYear =
         
         query += `
                 GROUP BY school_name, year, submitter_username
-            ) latest ON si.school_name = latest.school_name 
-                     AND si.year = latest.year
-                     AND si.submitter_username = latest.submitter_username
-                     AND si.created_at = latest.max_created_at
+            ) latest ON sr.school_name = latest.school_name 
+                     AND ch.year = latest.year
+                     AND ch.submitter_username = latest.submitter_username
+                     AND ch.created_at = latest.max_created_at
         `;
         
         // 再次添加筛选条件到主查询
@@ -409,22 +437,22 @@ async function getLatestSchoolRecords(year = null, schoolName = null, baseYear =
         // 用户权限过滤（在主查询中）
         if (userRole === 'school') {
             // 学校用户只能查看自己学校自己填报的数据
-            mainWhereConditions.push('si.school_name = ? AND si.submitter_username = ?');
+            mainWhereConditions.push('sr.school_name = ? AND ch.submitter_username = ?');
             mainParams.push(userSchoolName, username);
         }
         
         if (year) {
-            mainWhereConditions.push('si.year = ?');
+            mainWhereConditions.push('ch.year = ?');
             mainParams.push(year);
         }
         
         if (schoolName) {
-            mainWhereConditions.push('si.school_name = ?');
+            mainWhereConditions.push('sr.school_name = ?');
             mainParams.push(schoolName);
         }
         
         if (userFilter) {
-            mainWhereConditions.push('(u.real_name = ? OR (u.real_name IS NULL AND si.submitter_username = ?))');
+            mainWhereConditions.push('(u.real_name = ? OR (u.real_name IS NULL AND ch.submitter_username = ?))');
             mainParams.push(userFilter, userFilter);
         }
         
@@ -434,8 +462,8 @@ async function getLatestSchoolRecords(year = null, schoolName = null, baseYear =
         }
         
         query += `
-            GROUP BY si.id
-            ORDER BY si.year DESC, si.school_name ASC, si.submitter_username ASC
+            GROUP BY ch.id
+            ORDER BY ch.year DESC, sr.school_name ASC, ch.submitter_username ASC
         `;
         
         const [rows] = await pool.execute(query, params);
@@ -462,15 +490,18 @@ async function getAllSchoolRecords(year = null, schoolName = null, userRole = nu
     try {
         let query = `
             SELECT 
-                si.*,
+                ch.*,
+                sr.school_name,
+                sr.school_type,
                 u.real_name as submitter_real_name,
                 GROUP_CONCAT(
                     CONCAT('{"特殊用房补助名称":"', ss.subsidy_name, '","补助面积（m²）":', ss.subsidy_area, '}')
                     SEPARATOR ','
                 ) as special_subsidies_json
-            FROM school_info si
-            LEFT JOIN special_subsidies ss ON si.id = ss.school_info_id
-            LEFT JOIN users u ON si.submitter_username = u.username
+            FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
+            LEFT JOIN special_subsidies ss ON ch.id = ss.school_info_id
+            LEFT JOIN users u ON ch.submitter_username = u.username
         `;
         
         let params = [];
@@ -479,22 +510,22 @@ async function getAllSchoolRecords(year = null, schoolName = null, userRole = nu
         // 用户权限过滤
         if (userRole === 'school') {
             // 学校用户只能查看自己学校自己填报的数据
-            whereConditions.push('si.school_name = ? AND si.submitter_username = ?');
+            whereConditions.push('sr.school_name = ? AND ch.submitter_username = ?');
             params.push(userSchoolName, username);
         }
         
         if (year) {
-            whereConditions.push('si.year = ?');
+            whereConditions.push('ch.year = ?');
             params.push(year);
         }
         
         if (schoolName) {
-            whereConditions.push('si.school_name = ?');
+            whereConditions.push('sr.school_name = ?');
             params.push(schoolName);
         }
         
         if (userFilter) {
-            whereConditions.push('(u.real_name = ? OR (u.real_name IS NULL AND si.submitter_username = ?))');
+            whereConditions.push('(u.real_name = ? OR (u.real_name IS NULL AND ch.submitter_username = ?))');
             params.push(userFilter, userFilter);
         }
         
@@ -503,8 +534,8 @@ async function getAllSchoolRecords(year = null, schoolName = null, userRole = nu
         }
         
         query += `
-            GROUP BY si.id
-            ORDER BY si.school_name ASC, si.year DESC, si.submitter_username ASC, si.created_at DESC
+            GROUP BY ch.id
+            ORDER BY sr.school_name ASC, ch.year DESC, ch.submitter_username ASC, ch.created_at DESC
         `;
         
         const [rows] = await pool.execute(query, params);
@@ -531,7 +562,7 @@ async function getAvailableYears() {
     try {
         const [rows] = await pool.execute(`
             SELECT DISTINCT year 
-            FROM school_info 
+            FROM calculation_history 
             WHERE year IS NOT NULL 
             ORDER BY year DESC
         `);
@@ -549,11 +580,11 @@ async function getAvailableSubmitterUsers() {
     
     try {
         const [rows] = await pool.execute(`
-            SELECT DISTINCT si.submitter_username, u.real_name
-            FROM school_info si
-            LEFT JOIN users u ON si.submitter_username = u.username
-            WHERE si.submitter_username IS NOT NULL 
-            ORDER BY si.submitter_username ASC
+            SELECT DISTINCT ch.submitter_username, u.real_name
+            FROM calculation_history ch
+            LEFT JOIN users u ON ch.submitter_username = u.username
+            WHERE ch.submitter_username IS NOT NULL 
+            ORDER BY ch.submitter_username ASC
         `);
         
         return rows.map(row => ({
@@ -573,10 +604,11 @@ async function getAvailableSubmitterUsersBySchool(schoolName) {
     
     try {
         const [rows] = await pool.execute(`
-            SELECT DISTINCT submitter_username 
-            FROM school_info 
-            WHERE submitter_username IS NOT NULL AND school_name = ?
-            ORDER BY submitter_username ASC
+            SELECT DISTINCT ch.submitter_username 
+            FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
+            WHERE ch.submitter_username IS NOT NULL AND sr.school_name = ?
+            ORDER BY ch.submitter_username ASC
         `, [schoolName]);
         
         return rows.map(row => row.submitter_username);
@@ -593,7 +625,7 @@ async function getAvailableStudentStatYears() {
     try {
         const [rows] = await pool.execute(`
             SELECT DISTINCT student_stat_year 
-            FROM school_info 
+            FROM calculation_history 
             WHERE student_stat_year IS NOT NULL 
             ORDER BY student_stat_year DESC
         `);
@@ -612,7 +644,7 @@ async function getAvailableBuildingStatYears() {
     try {
         const [rows] = await pool.execute(`
             SELECT DISTINCT building_stat_year 
-            FROM school_info 
+            FROM calculation_history 
             WHERE building_stat_year IS NOT NULL 
             ORDER BY building_stat_year DESC
         `);
@@ -625,7 +657,7 @@ async function getAvailableBuildingStatYears() {
 }
 
 // 获取特殊补助信息
-async function getSpecialSubsidies(schoolInfoId) {
+async function getSpecialSubsidies(calculationHistoryId) {
     const pool = await getPool();
     
     try {
@@ -636,7 +668,7 @@ async function getSpecialSubsidies(schoolInfoId) {
             FROM special_subsidies
             WHERE school_info_id = ?
             ORDER BY id
-        `, [schoolInfoId]);
+        `, [calculationHistoryId]);
         
         return rows;
     } catch (error) {
@@ -653,21 +685,21 @@ async function getStatistics(year = null) {
         let query = `
             SELECT 
                 COUNT(*) as total_schools,
-                SUM(total_students) as total_students,
-                SUM(current_building_area) as total_current_area,
-                SUM(required_building_area) as total_required_area,
-                SUM(total_area_gap_with_subsidy) as total_gap,
-                SUM(CASE WHEN overall_compliance = 1 THEN 1 ELSE 0 END) as compliant_schools,
-                AVG(total_students) as avg_students,
-                AVG(current_building_area) as avg_current_area,
-                MIN(year) as earliest_year,
-                MAX(year) as latest_year
-            FROM school_info
+                SUM(ch.total_students) as total_students,
+                SUM(ch.current_building_area) as total_current_area,
+                SUM(ch.required_building_area) as total_required_area,
+                SUM(ch.total_area_gap_with_subsidy) as total_gap,
+                AVG(ch.total_students) as avg_students,
+                AVG(ch.current_building_area) as avg_current_area,
+                MIN(ch.year) as earliest_year,
+                MAX(ch.year) as latest_year
+            FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
         `;
         
         let params = [];
         if (year) {
-            query += ' WHERE year = ?';
+            query += ' WHERE ch.year = ?';
             params.push(year);
         }
         
@@ -677,20 +709,21 @@ async function getStatistics(year = null) {
         // 获取学校类型统计
         let typeQuery = `
             SELECT 
-                school_type,
+                sr.school_type,
                 COUNT(*) as count,
-                SUM(total_students) as students,
-                SUM(current_building_area) as current_area,
-                SUM(required_building_area) as required_area,
-                SUM(total_area_gap_with_subsidy) as gap
-            FROM school_info
+                SUM(ch.total_students) as students,
+                SUM(ch.current_building_area) as current_area,
+                SUM(ch.required_building_area) as required_area,
+                SUM(ch.total_area_gap_with_subsidy) as gap
+            FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
         `;
         
         if (year) {
-            typeQuery += ' WHERE year = ?';
+            typeQuery += ' WHERE ch.year = ?';
         }
         
-        typeQuery += ' GROUP BY school_type ORDER BY count DESC';
+        typeQuery += ' GROUP BY sr.school_type ORDER BY count DESC';
         
         const [typeRows] = await pool.execute(typeQuery, params);
         
@@ -717,7 +750,7 @@ async function deleteSchoolRecord(id) {
         await connection.execute('DELETE FROM special_subsidies WHERE school_info_id = ?', [id]);
         
         // 删除学校信息记录
-        const [result] = await connection.execute('DELETE FROM school_info WHERE id = ?', [id]);
+        const [result] = await connection.execute('DELETE FROM calculation_history WHERE id = ?', [id]);
         
         await connection.commit();
         
@@ -744,12 +777,12 @@ async function deleteSchoolCombination(schoolName, baseYear, year, submitterUser
         await connection.beginTransaction();
         
         // 构建WHERE条件
-        const whereConditions = ['school_name = ?', 'year = ?'];
+        const whereConditions = ['sr.school_name = ?', 'ch.year = ?'];
         const params = [schoolName, year];
         
         // 如果指定了用户，添加用户筛选条件
         if (submitterUsername) {
-            whereConditions.push('submitter_username = ?');
+            whereConditions.push('ch.submitter_username = ?');
             params.push(submitterUsername);
         }
         
@@ -757,7 +790,7 @@ async function deleteSchoolCombination(schoolName, baseYear, year, submitterUser
         
         // 首先获取要删除的记录ID，用于删除特殊补助
         const [recordsToDelete] = await connection.execute(
-            `SELECT id FROM school_info WHERE ${whereClause}`,
+            `SELECT ch.id FROM calculation_history ch JOIN school_registry sr ON ch.school_registry_id = sr.id WHERE ${whereClause}`,
             params
         );
         
@@ -778,7 +811,7 @@ async function deleteSchoolCombination(schoolName, baseYear, year, submitterUser
         
         // 删除学校信息记录
         const [result] = await connection.execute(
-            `DELETE FROM school_info WHERE ${whereClause}`,
+            `DELETE ch FROM calculation_history ch JOIN school_registry sr ON ch.school_registry_id = sr.id WHERE ${whereClause}`,
             params
         );
         
@@ -812,11 +845,11 @@ async function clearAllData() {
         await connection.execute('DELETE FROM special_subsidies');
         
         // 再删除学校信息表的数据
-        await connection.execute('DELETE FROM school_info');
+        await connection.execute('DELETE FROM calculation_history');
         
         // 重置自增ID
         await connection.execute('ALTER TABLE special_subsidies AUTO_INCREMENT = 1');
-        await connection.execute('ALTER TABLE school_info AUTO_INCREMENT = 1');
+        await connection.execute('ALTER TABLE calculation_history AUTO_INCREMENT = 1');
         
         await connection.commit();
         
@@ -837,17 +870,20 @@ async function getSchoolRecordById(id) {
     try {
         const [rows] = await pool.execute(`
             SELECT 
-                si.*,
+                ch.*,
+                sr.school_name,
+                sr.school_type,
                 u.real_name as submitter_real_name,
                 GROUP_CONCAT(
                     CONCAT('{"特殊用房补助名称":"', ss.subsidy_name, '","补助面积（m²）":', ss.subsidy_area, '}')
                     SEPARATOR ','
                 ) as special_subsidies_json
-            FROM school_info si
-            LEFT JOIN special_subsidies ss ON si.id = ss.school_info_id
-            LEFT JOIN users u ON si.submitter_username = u.username
-            WHERE si.id = ?
-            GROUP BY si.id
+            FROM calculation_history ch
+            JOIN school_registry sr ON ch.school_registry_id = sr.id
+            LEFT JOIN special_subsidies ss ON ch.id = ss.school_info_id
+            LEFT JOIN users u ON ch.submitter_username = u.username
+            WHERE ch.id = ?
+            GROUP BY ch.id
         `, [id]);
         
         if (rows.length === 0) {
@@ -898,6 +934,24 @@ async function testConnection() {
     }
 }
 
+// 获取学校注册表中的所有学校
+async function getSchoolRegistry() {
+    const pool = await getPool();
+    
+    try {
+        const [rows] = await pool.execute(`
+            SELECT school_name, school_type 
+            FROM school_registry 
+            ORDER BY school_name ASC
+        `);
+        
+        return rows;
+    } catch (error) {
+        console.error('获取学校注册表失败:', error);
+        return [];
+    }
+}
+
 module.exports = {
     saveSchoolInfo,
     getSchoolHistory,
@@ -915,6 +969,7 @@ module.exports = {
     deleteSchoolCombination,
     clearAllData,
     getSchoolRecordById,
+    getSchoolRegistry,
     executeQuery,
     testConnection
 };

@@ -144,16 +144,10 @@ const CalculationStandardsManager = {
      */
     async loadStandards() {
         try {
-            const response = await fetch('/api/calculation-standards', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+            // 使用新的API方法
+            const data = await CalculationStandardsAPI.getStandards();
             
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
+            if (data.success) {
                     console.log('收到服务器数据:', data);
                     
                     // 处理基础标准数据 - API现在返回按院校类型组织的结构
@@ -205,10 +199,6 @@ const CalculationStandardsManager = {
                     // 使用默认配置
                     this.useDefaultStandards();
                 }
-            } else {
-                console.warn('服务器响应错误:', response.status);
-                this.useDefaultStandards();
-            }
         } catch (error) {
             console.error('加载标准配置失败:', error);
             this.useDefaultStandards();
@@ -754,20 +744,12 @@ const CalculationStandardsManager = {
      */
     async loadSchoolMappings() {
         try {
-            const response = await fetch('/api/school-mappings', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+            const data = await CalculationStandardsAPI.getSchoolTypeMappings();
             
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    this.currentStandards.schoolMapping = data.mappings || {};
-                } else {
-                    console.warn('获取学校映射失败:', data.message);
-                }
+            if (data.success) {
+                this.currentStandards.schoolMapping = data.mappings || {};
+            } else {
+                console.warn('获取学校映射失败:', data.message);
             }
         } catch (error) {
             console.error('加载学校映射失败:', error);
@@ -850,68 +832,30 @@ const CalculationStandardsManager = {
      * 保存所有标准配置
      */
     async saveAllStandards() {
-        if (this.pendingChanges.length === 0) {
-            showMessage('没有需要保存的更改', 'info');
-            return;
-        }
-
         try {
             // 显示保存状态
             const saveButton = document.querySelector('button[onclick="saveAllStandards()"]');
-            const originalText = saveButton.textContent;
-            saveButton.textContent = '保存中...';
-            saveButton.disabled = true;
-            
-            let successCount = 0;
-            let errorCount = 0;
-            const errors = [];
-            
-            // 批量保存所有待保存的更改
-            for (const change of this.pendingChanges) {
-                try {
-                    const requestBody = {
-                        type: change.type,
-                        schoolType: change.schoolType,
-                        roomType: change.roomType,
-                        value: change.value
-                    };
-                    
-                    // 如果是补贴标准，添加补贴类型参数
-                    if (change.type === 'subsidized') {
-                        requestBody.subsidyType = change.subsidyType;
-                    }
-                    
-                    const response = await fetch('/api/calculation-standards/single', {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(requestBody)
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success) {
-                            successCount++;
-                        } else {
-                            errorCount++;
-                            errors.push(`保存失败: ${change.key} - ${data.message || '未知错误'}`);
-                        }
-                    } else {
-                        errorCount++;
-                        errors.push(`保存失败: ${change.key} - HTTP ${response.status}`);
-                    }
-                } catch (error) {
-                    errorCount++;
-                    errors.push(`保存失败: ${change.key} - ${error.message}`);
-                }
+            const originalText = saveButton ? saveButton.textContent : '保存配置';
+            if (saveButton) {
+                saveButton.textContent = '保存中...';
+                saveButton.disabled = true;
             }
             
-            // 恢复按钮状态
-            saveButton.disabled = false;
+            // 收集所有标准数据
+            const allStandards = this.collectAllStandards();
             
-            if (errorCount === 0) {
-                // 全部保存成功
+            // 验证数据
+            const validation = this.validateStandards(allStandards);
+            if (!validation.isValid) {
+                showMessage('数据验证失败: ' + validation.errors.join(', '), 'error');
+                return;
+            }
+            
+            // 使用新的API保存
+            const result = await CalculationStandardsAPI.updateStandards(allStandards);
+            
+            if (result.success) {
+                // 保存成功
                 this.pendingChanges = [];
                 this.updateSaveButtonState();
                 
@@ -920,34 +864,24 @@ const CalculationStandardsManager = {
                     input.classList.remove('modified');
                 });
                 
-                showMessage(`成功保存 ${successCount} 项配置！`, 'success');
+                showMessage('配置保存成功！', 'success');
                 
                 // 重新加载标准数据以确保同步
                 await this.loadStandards();
             } else {
-                // 部分或全部保存失败
-                if (successCount > 0) {
-                    showMessage(`部分保存成功：${successCount} 项成功，${errorCount} 项失败`, 'warning');
-                    // 移除成功保存的更改
-                    this.pendingChanges = this.pendingChanges.filter(change => 
-                        errors.some(error => error.includes(change.key))
-                    );
-                } else {
-                    showMessage(`保存失败：${errorCount} 项全部失败`, 'error');
-                }
-                
-                console.error('保存错误详情:', errors);
-                this.updateSaveButtonState();
+                throw new Error(result.message || '保存失败');
             }
             
         } catch (error) {
-            console.error('批量保存失败:', error);
-            showMessage('批量保存失败: ' + error.message, 'error');
-            
+            console.error('保存标准配置失败:', error);
+            showMessage('保存失败: ' + error.message, 'error');
+        } finally {
             // 恢复按钮状态
             const saveButton = document.querySelector('button[onclick="saveAllStandards()"]');
-            saveButton.disabled = false;
-            this.updateSaveButtonState();
+            if (saveButton) {
+                saveButton.textContent = '保存配置';
+                saveButton.disabled = false;
+            }
         }
     }
 };
@@ -960,7 +894,32 @@ const CalculationStandardsManager = {
  * 保存所有标准
  */
 async function saveAllStandards() {
-    await CalculationStandardsManager.saveAllStandards();
+    try {
+        await CalculationStandardsAPI.updateStandards(CalculationStandardsManager.pendingChanges);
+        showMessage('所有标准保存成功！', 'success');
+        // 清空待保存的更改
+        CalculationStandardsManager.pendingChanges = [];
+        CalculationStandardsManager.updateSaveButtonState();
+        // 重新加载数据
+        await loadAllStandards();
+    } catch (error) {
+        console.error('保存所有标准失败:', error);
+        showMessage('保存失败: ' + error.message, 'error');
+    }
+}
+
+/**
+ * 加载所有标准数据
+ */
+async function loadAllStandards() {
+    try {
+        await CalculationStandardsManager.loadStandards();
+        await CalculationStandardsManager.loadSchoolMappings();
+        showMessage('标准数据加载完成', 'success');
+    } catch (error) {
+        console.error('加载标准数据失败:', error);
+        showMessage('加载失败: ' + error.message, 'error');
+    }
 }
 
 /**

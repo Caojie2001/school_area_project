@@ -14,6 +14,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
+# 添加构建时间戳，用于使缓存失效
+ARG BUILD_DATE
+ENV BUILD_DATE=$BUILD_DATE
+
 # 复制应用程序代码
 COPY --chown=nodejs:nodejs . .
 

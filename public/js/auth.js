@@ -87,7 +87,8 @@ const ROLE_DISPLAY_NAMES = {
 const MENU_PERMISSIONS = {
     'menu-data-management': [UserRoles.ADMIN, UserRoles.CONSTRUCTION_CENTER, UserRoles.SCHOOL],
     'menu-user-management': [UserRoles.ADMIN],
-    'menu-statistics': [UserRoles.ADMIN, UserRoles.CONSTRUCTION_CENTER]
+    'menu-statistics': [UserRoles.ADMIN, UserRoles.CONSTRUCTION_CENTER],
+    'menu-calculation-standards': [UserRoles.ADMIN]
 };
 
 // ========================================
@@ -242,8 +243,9 @@ const AuthManager = {
                 const displayName = user.real_name || user.username || '未知用户';
                 nameEl.textContent = displayName;
                 console.log(`更新用户名 ${elements.name}: ${displayName}`);
-            } else {
-                console.warn(`用户名元素 ${elements.name} 未找到`);
+            } else if (elements.name === 'userName') {
+                // 只对主要的用户名元素发出警告
+                console.warn(`主要用户名元素 ${elements.name} 未找到`);
             }
             
             // 更新角色显示
@@ -270,7 +272,7 @@ const AuthManager = {
                 // 使用CSS类来控制显示/隐藏，避免JavaScript延迟
                 if (hasPermission) {
                     menuElement.classList.add('visible');
-                    menuElement.classList.remove('menu-restricted');
+                    // 保留menu-restricted类，因为CSS规则要求同时有这两个类
                 } else {
                     menuElement.classList.remove('visible');
                     menuElement.classList.add('menu-restricted');
@@ -423,6 +425,45 @@ const AuthManager = {
      */
     getRoleDisplayName(role) {
         return ROLE_DISPLAY_NAMES[role] || '未知角色';
+    },
+    
+    /**
+     * 检查用户认证状态和权限
+     * @param {string} requiredRole 可选的必需角色
+     * @returns {Promise<boolean>} 认证是否成功
+     */
+    async checkAuth(requiredRole = null) {
+        try {
+            // 如果还没有用户信息，先检查登录状态
+            if (!currentUser) {
+                const isLoggedIn = await this.checkUserStatus();
+                if (!isLoggedIn) {
+                    return false;
+                }
+            }
+            
+            // 如果指定了必需角色，检查角色权限
+            if (requiredRole) {
+                if (!this.hasRole(requiredRole)) {
+                    console.warn(`用户角色 ${currentUser.role} 没有权限访问需要 ${requiredRole} 角色的功能`);
+                    return false;
+                }
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('权限检查失败:', error);
+            return false;
+        }
+    },
+    
+    /**
+     * 检查用户是否有指定角色
+     * @param {string} requiredRole 需要的角色
+     * @returns {boolean} 是否有该角色
+     */
+    hasRole(requiredRole) {
+        return currentUser && currentUser.role === requiredRole;
     }
 };
 
@@ -573,7 +614,7 @@ function updateMenuVisibility(user) {
             // 使用CSS类来控制显示/隐藏，与AuthManager保持一致
             if (allowedRoles.includes(user.role)) {
                 menuElement.classList.add('visible');
-                menuElement.classList.remove('menu-restricted');
+                // 保留menu-restricted类，因为CSS规则要求同时有这两个类
             } else {
                 menuElement.classList.remove('visible');
                 menuElement.classList.add('menu-restricted');

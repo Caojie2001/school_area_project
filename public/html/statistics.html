@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>统计分析 - 高校测算工具</title>
+    <title>统计分析 - 高校测算系统</title>
     <!-- 引入模块化CSS样式 -->
     <link rel="stylesheet" href="../css/main.css">
 </head>
@@ -51,8 +51,8 @@
                                 <!-- 年份选项将通过JavaScript动态加载 -->
                             </select>
                             <select id="overviewUserTypeFilter" class="search-input" style="width: 25%; min-width: 150px;">
-                                <option value="school">所有学校用户</option>
-                                <option value="construction_center" selected>所有基建中心用户</option>
+                                <option value="school">所有高校用户</option>
+                                <option value="construction_center" selected>基建中心</option>
                             </select>
                             <button class="btn btn-primary" onclick="searchOverviewRecords()" style="width: 10%; min-width: 70px; margin-left: 8px;">查找</button>
                         </div>
@@ -107,7 +107,7 @@
                     }
                     
                     // 根据用户角色显示/隐藏菜单项
-                    AuthManager.updateMenuVisibility(user.role);
+                    AuthManager.updateMenuVisibility(user);
                     
                     // 检查用户权限（统计分析页面仅基建中心和管理员可访问）
                     if (user.role !== 'construction_center' && user.role !== 'admin') {
@@ -118,9 +118,14 @@
                 }
 
                 // 初始化统计分析模块
-                if (typeof StatisticsManager !== 'undefined') {
+                if (typeof StatisticsManager !== 'undefined' && StatisticsManager.initialize) {
                     await StatisticsManager.initialize();
                     console.log('统计分析模块初始化完成');
+                } else if (typeof statisticsManager !== 'undefined' && statisticsManager.initialize) {
+                    await statisticsManager.initialize();
+                    console.log('统计分析模块初始化完成');
+                } else {
+                    console.warn('统计管理器未找到或初始化方法不存在');
                 }
 
             } catch (error) {
@@ -148,6 +153,39 @@
                 AuthManager.logout();
             }
         }
+
+        // 页面跳转函数（覆盖main.js中的版本）
+        function showPage(pageId) {
+            console.log('统计页面中的showPage被调用:', pageId);
+            try {
+                switch(pageId) {
+                    case 'data-entry':
+                        window.location.href = '/index.html';
+                        break;
+                    case 'data-management':
+                        window.location.href = '/html/data-management.html';
+                        break;
+                    case 'statistics':
+                        // 已经在统计页面，不需要跳转
+                        break;
+                    case 'calculation-standards':
+                        window.location.href = '/html/calculation-standards.html';
+                        break;
+                    case 'user-management':
+                        window.location.href = '/html/user-management.html';
+                        break;
+                    default:
+                        console.warn('未知的页面ID:', pageId);
+                        window.location.href = '/index.html';
+                }
+            } catch (error) {
+                console.error('页面跳转失败:', error);
+                window.location.href = '/index.html';
+            }
+        }
+
+        // 全局暴露函数，覆盖main.js中的版本
+        window.showPage = showPage;
 
         // 统计分析相关函数
         async function searchOverviewRecords() {

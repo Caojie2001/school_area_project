@@ -436,7 +436,7 @@ const DataEntryManager = {
             
             if (response.success && response.schools) {
                 // 清空现有选项
-                schoolSelect.innerHTML = '<option value="">请选择学校</option>';
+                schoolSelect.innerHTML = '<option value="">请选择高校</option>';
                 
                 // 添加学校选项
                 response.schools.forEach(school => {
@@ -610,7 +610,7 @@ const DataEntryManager = {
         const dormitoryArea = parseFloat(dormitoryAreaEl ? dormitoryAreaEl.value : 0) || 0;
         
         // 计算总建筑面积
-        const totalBuildingArea = teachingArea + officeArea + logisticsArea + totalLivingArea + dormitoryArea;
+        const totalBuildingArea = teachingArea + officeArea + logisticsArea + totalLivingArea;
         
         // 更新总面积显示
         const totalBuildingAreaEl = document.getElementById('totalBuildingArea');
@@ -884,14 +884,30 @@ const DataEntryManager = {
         const schoolTypeText = schoolTypeDisplay ? schoolTypeDisplay.textContent : '';
         const schoolType = schoolTypeText ? schoolTypeText.replace('学校类型: ', '') : null;
         
+        // 兼容历史字段：优先用本科字段，无则用本专科字段
+        let fullTimeUndergraduate = formData.get('fullTimeUndergraduate');
+        let fullTimeSpecialist = formData.get('fullTimeSpecialist');
+        let fullTimeBachelorAndSpecialist = formData.get('fullTimeBachelorAndSpecialist');
+
+        let undergraduateVal = null;
+        if (fullTimeUndergraduate !== null && fullTimeUndergraduate !== undefined && fullTimeUndergraduate !== "") {
+            undergraduateVal = parseInt(fullTimeUndergraduate) || 0;
+        } else if (fullTimeBachelorAndSpecialist !== null && fullTimeBachelorAndSpecialist !== undefined && fullTimeBachelorAndSpecialist !== "") {
+            undergraduateVal = parseInt(fullTimeBachelorAndSpecialist) || 0;
+        } else {
+            undergraduateVal = 0;
+        }
+
+        let specialistVal = parseInt(fullTimeSpecialist) || 0;
+
         const schoolData = {
             '学校名称': finalSchoolName,
             '学校类型': schoolType,
             '年份': parseInt(formData.get('year')),
             '学生统计年份': parseInt(formData.get('student_stat_year')),
             '建筑面积统计年份': parseInt(formData.get('building_stat_year')),
-            '全日制本科生人数': parseInt(formData.get('fullTimeUndergraduate')),
-            '全日制专科生人数': parseInt(formData.get('fullTimeSpecialist')) || 0,
+            '全日制本科生人数': undergraduateVal,
+            '全日制专科生人数': specialistVal,
             '全日制硕士生人数': parseInt(formData.get('fullTimeMaster')) || 0,
             '全日制博士生人数': parseInt(formData.get('fullTimeDoctor')) || 0,
             '留学生本科生人数': parseInt(formData.get('internationalUndergraduate')) || 0,
@@ -906,10 +922,6 @@ const DataEntryManager = {
             '现有后勤辅助用房面积': parseFloat(formData.get('logisticsArea')),
             '备注': formData.get('remarks') || ''
         };
-        
-        // 向后兼容：计算本专科生总数（用于后端计算逻辑）
-        schoolData['全日制本专科生人数'] = schoolData['全日制本科生人数'] + schoolData['全日制专科生人数'];
-        
         return schoolData;
     },
     
@@ -944,35 +956,35 @@ const DataEntryManager = {
         const schoolTypeDisplay = document.getElementById('schoolTypeDisplay');
         
         const schoolTypes = {
-            '上海大学': '综合类',
-            '上海交通大学医学院': '医学类',
-            '上海理工大学': '工科类',
-            '上海师范大学': '师范类',
-            '上海科技大学': '工科类',
-            '华东政法大学': '政法类',
-            '上海海事大学': '工科类',
-            '上海海洋大学': '农林类',
-            '上海中医药大学': '医学类',
-            '上海体育大学': '体育类',
-            '上海音乐学院': '艺术类',
-            '上海戏剧学院': '艺术类',
-            '上海电力大学': '工科类',
-            '上海对外经贸大学': '财经类',
-            '上海应用技术大学': '工科类',
-            '上海立信会计金融学院': '财经类',
-            '上海工程技术大学': '工科类',
-            '上海第二工业大学': '工科类',
-            '上海商学院': '财经类',
-            '上海电机学院': '工科类',
-            '上海政法学院': '政法类',
-            '上海健康医学院': '医学类',
-            '上海出版印刷高等专科学校': '工科类',
+            '上海大学': '综合院校',
+            '上海交通大学医学院': '医药院校',
+            '上海理工大学': '理工院校',
+            '上海师范大学': '师范院校',
+            '上海科技大学': '理工院校',
+            '华东政法大学': '政法院校',
+            '上海海事大学': '理工院校',
+            '上海海洋大学': '农业院校',
+            '上海中医药大学': '医药院校',
+            '上海体育大学': '体育院校',
+            '上海音乐学院': '艺术院校',
+            '上海戏剧学院': '艺术院校',
+            '上海电力大学': '理工院校',
+            '上海对外经贸大学': '财经院校',
+            '上海应用技术大学': '理工院校',
+            '上海立信会计金融学院': '财经院校',
+            '上海工程技术大学': '理工院校',
+            '上海第二工业大学': '理工院校',
+            '上海商学院': '财经院校',
+            '上海电机学院': '理工院校',
+            '上海政法学院': '政法院校',
+            '上海健康医学院': '医药院校',
+            '上海出版印刷高等专科学校': '理工院校',
             '上海旅游高等专科学校': '其他',
-            '上海城建职业学院': '工科类',
-            '上海电子信息职业技术学院': '工科类',
-            '上海工艺美术职业学院': '工科类',
-            '上海农林职业技术学院': '农林类',
-            '上海健康医学院附属卫生学校(上海健康护理职业学院(筹))': '医学类'
+            '上海城建职业学院': '理工院校',
+            '上海电子信息职业技术学院': '理工院校',
+            '上海工艺美术职业学院': '理工院校',
+            '上海农林职业技术学院': '农业院校',
+            '上海健康医学院附属卫生学校(上海健康护理职业学院(筹))': '医药院校'
         };
         
         if (schoolSelect && schoolTypeDisplay) {

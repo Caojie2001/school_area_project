@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高校测算工具</title>
+    <title>高校测算系统</title>
     <!-- 引入模块化CSS样式 -->
     <link rel="stylesheet" href="css/main.css">
 </head>
@@ -15,8 +15,8 @@
         <!-- 左侧菜单 -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h1>高校测算工具</h1>
-                <p>Higher Education Measurement Tool</p>
+                <h1>高校测算系统</h1>
+                <p>Higher Education Measurement System</p>
             </div>
             
             <div class="sidebar-menu">
@@ -29,6 +29,10 @@
                 <!-- 测算数据统计菜单项（仅基建中心和管理员可见） -->
                 <a class="menu-item menu-restricted" onclick="showPage('statistics')" id="menu-statistics">
                     测算数据统计
+                </a>
+                <!-- 测算标准管理菜单项（仅管理员可见） -->
+                <a class="menu-item menu-restricted" href="/html/calculation-standards.html" id="menu-calculation-standards">
+                    测算标准管理
                 </a>
                 <!-- 用户管理菜单项（仅管理员可见） -->
                 <a class="menu-item menu-restricted" href="/html/user-management.html" id="menu-user-management">
@@ -64,9 +68,9 @@
                         <form id="onlineDataForm" class="data-form" onsubmit="handleOnlineFormSubmit(event)">
                             <div class="form-row">
                                 <div class="form-group form-group-school-name">
-                                    <label for="schoolName">学校名称 *</label>
+                                    <label for="schoolName">高校名称 *</label>
                                     <select id="schoolName" name="schoolName" required class="form-control" style="background: white;" onchange="updateSchoolType()">
-                                        <option value="">请选择学校</option>
+                                        <option value="">请选择高校</option>
                                         <option value="上海大学">上海大学</option>
                                         <option value="上海交通大学医学院">上海交通大学医学院</option>
                                         <option value="上海理工大学">上海理工大学</option>
@@ -198,7 +202,7 @@
                             </div>
                             
                             <div class="card">
-                                <h3>现状建筑面积信息</h3>
+                                <h3>建筑面积信息</h3>
                                 <div class="form-row" style="margin-bottom: 20px;">
                                     <div class="form-group form-group-building-year">
                                         <label for="building_stat_year">建筑面积统计年份 *</label>
@@ -334,7 +338,7 @@
                                 <option value="all">所有测算年份</option>
                             </select>
                             <select id="dataSchoolNameFilter" class="search-input" style="width: 28%; min-width: 150px;">
-                                <option value="all">所有学校</option>
+                                <option value="all">所有高校</option>
                                 <option value="上海大学">上海大学</option>
                                 <option value="上海交通大学医学院">上海交通大学医学院</option>
                                 <option value="上海理工大学">上海理工大学</option>
@@ -430,8 +434,8 @@
                                 <!-- 年份选项将通过JavaScript动态加载 -->
                             </select>
                             <select id="overviewUserTypeFilter" class="search-input" style="width: 25%; min-width: 150px;">
-                                <option value="school">所有学校用户</option>
-                                <option value="construction_center" selected>所有基建中心用户</option>
+                                <option value="school">所有高校用户</option>
+                                <option value="construction_center" selected>基建中心</option>
                             </select>
                             <button class="btn btn-primary" onclick="searchOverviewRecords()" style="width: 10%; min-width: 70px; margin-left: 8px;">查找</button>
                         </div>

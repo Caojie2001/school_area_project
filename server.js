@@ -191,6 +191,303 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     }
 });
 
+// ========================================
+// 测算标准管理API（仅管理员可访问）
+// ========================================
+
+// 获取当前测算标准配置
+app.get('/api/calculation-standards', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const pool = await getPool();
+        
+        // 获取基础面积标准（按院校类型和用房类型组织）
+        const [basicRows] = await pool.execute(
+            'SELECT school_type, room_type, standard_value FROM basic_area_standards WHERE is_active = 1'
+        );
+        
+        // 获取补贴面积标准（三重索引结构）
+        const [subsidizedRows] = await pool.execute(
+            'SELECT school_type, room_type, subsidy_type, standard_value FROM subsidized_area_standards WHERE is_active = 1'
+        );
+        
+        // 获取院校类型映射
+        const [schoolTypeRows] = await pool.execute(
+            'SELECT type_code, type_name FROM school_type_mapping WHERE is_active = 1 ORDER BY sort_order'
+        );
+        
+        // 组织基础标准数据（按院校类型和用房类型组织）
+        const basicStandards = {};
+        basicRows.forEach(row => {
+            if (!basicStandards[row.school_type]) {
+                basicStandards[row.school_type] = {};
+            }
+            basicStandards[row.school_type][row.room_type] = parseFloat(row.standard_value);
+        });
+        
+        // 组织补贴标准数据（三重索引结构）
+        const subsidizedStandards = {};
+        subsidizedRows.forEach(row => {
+            if (!subsidizedStandards[row.school_type]) {
+                subsidizedStandards[row.school_type] = {};
+            }
+            if (!subsidizedStandards[row.school_type][row.room_type]) {
+                subsidizedStandards[row.school_type][row.room_type] = {};
+            }
+            subsidizedStandards[row.school_type][row.room_type][row.subsidy_type] = parseFloat(row.standard_value);
+        });
+        
+        // 组织院校类型映射数据
+        const schoolMapping = {};
+        schoolTypeRows.forEach(row => {
+            schoolMapping[row.type_code] = row.type_name;
+        });
+        
+        res.json({
+            success: true,
+            basicStandards,
+            subsidizedStandards,
+            schoolMapping
+        });
+    } catch (error) {
+        console.error('获取测算标准失败:', error);
+        res.status(500).json({ success: false, message: '获取测算标准失败' });
+    }
+});
+
+// 测试端点 - 不需要认证
+app.get('/api/test-standards', async (req, res) => {
+    try {
+        const pool = await getPool();
+        
+        // 获取基础面积标准
+        const [basicRows] = await pool.execute(
+            'SELECT school_type, room_type, standard_value FROM basic_area_standards WHERE is_active = 1 LIMIT 10'
+        );
+        
+        res.json({
+            success: true,
+            sampleData: basicRows,
+            message: 'Test endpoint working'
+        });
+    } catch (error) {
+        console.error('测试端点失败:', error);
+        res.status(500).json({ success: false, message: '测试失败' });
+    }
+});
+
+// 保存测算标准配置
+app.post('/api/calculation-standards', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { basicStandards, subsidizedStandards, schoolMapping } = req.body;
+        
+        // 验证数据格式
+        if (!basicStandards || !subsidizedStandards) {
+            return res.status(400).json({ success: false, message: '标准配置数据不完整' });
+        }
+        
+        const pool = await getPool();
+        const connection = await pool.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // 更新基础面积标准
+            if (basicStandards) {
+                for (const [roomType, value] of Object.entries(basicStandards)) {
+                    await connection.execute(
+                        `UPDATE basic_area_standards 
+                         SET standard_value = ?, updated_at = CURRENT_TIMESTAMP 
+                         WHERE room_type = ?`,
+                        [value, roomType]
+                    );
+                }
+            }
+            
+            // 更新补贴面积标准（三重索引结构）
+            if (subsidizedStandards) {
+                for (const [schoolType, roomTypes] of Object.entries(subsidizedStandards)) {
+                    for (const [roomType, subsidyTypes] of Object.entries(roomTypes)) {
+                        for (const [subsidyType, value] of Object.entries(subsidyTypes)) {
+                            await connection.execute(
+                                `UPDATE subsidized_area_standards 
+                                 SET standard_value = ?, updated_at = CURRENT_TIMESTAMP 
+                                 WHERE school_type = ? AND room_type = ? AND subsidy_type = ?`,
+                                [value, schoolType, roomType, subsidyType]
+                            );
+                        }
+                    }
+                }
+            }
+            
+            await connection.commit();
+            
+            // 同时更新内存中的常量以保持兼容性
+            Object.assign(BASIC_AREA_STANDARDS, basicStandards);
+            Object.assign(SUBSIDIZED_AREA_STANDARDS, subsidizedStandards);
+            
+            res.json({
+                success: true,
+                message: '测算标准配置保存成功'
+            });
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        console.error('保存测算标准失败:', error);
+        res.status(500).json({ success: false, message: '保存测算标准失败' });
+    }
+});
+
+// 更新单个标准值
+app.put('/api/calculation-standards/single', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { type, schoolType, roomType, subsidyType, value } = req.body;
+        
+        if (!type || !roomType || value === undefined) {
+            return res.status(400).json({ success: false, message: '参数不完整' });
+        }
+        
+        const pool = await getPool();
+        
+        if (type === 'basic') {
+            // 更新基础面积标准 - 确保只更新指定学校类型的标准
+            if (!schoolType) {
+                return res.status(400).json({ success: false, message: '学校类型不能为空' });
+            }
+            
+            await pool.execute(
+                `UPDATE basic_area_standards 
+                 SET standard_value = ?, updated_at = CURRENT_TIMESTAMP 
+                 WHERE school_type = ? AND room_type = ?`,
+                [value, schoolType, roomType]
+            );
+            
+            // 同时更新内存常量（注意：BASIC_AREA_STANDARDS使用的是代码映射）
+            const schoolTypeCodeMapping = {
+                '综合院校': 'A',
+                '师范院校': 'B', 
+                '理工院校': 'C',
+                '医药院校': 'D',
+                '农业院校': 'E',
+                '政法院校': 'F',
+                '财经院校': 'G',
+                '外语院校': 'H',
+                '艺术院校': 'I',
+                '体育院校': 'J'
+            };
+            
+            const roomTypeCodeMapping = {
+                '教学及辅助用房': 'A',
+                '办公用房': 'B',
+                '学生宿舍': 'C1',
+                '其他生活用房': 'C2',
+                '后勤辅助用房': 'D'
+            };
+            
+            const schoolCode = schoolTypeCodeMapping[schoolType];
+            const roomCode = roomTypeCodeMapping[roomType];
+            
+            if (schoolCode && roomCode && BASIC_AREA_STANDARDS[schoolCode] && 
+                BASIC_AREA_STANDARDS[schoolCode][roomCode] !== undefined) {
+                BASIC_AREA_STANDARDS[schoolCode][roomCode] = parseFloat(value);
+            }
+        } else if (type === 'subsidized') {
+            // 更新补贴面积标准（三重索引）
+            if (!schoolType || !subsidyType) {
+                return res.status(400).json({ success: false, message: '院校类型和补贴类型不能为空' });
+            }
+            
+            await pool.execute(
+                `UPDATE subsidized_area_standards 
+                 SET standard_value = ?, updated_at = CURRENT_TIMESTAMP 
+                 WHERE school_type = ? AND room_type = ? AND subsidy_type = ?`,
+                [value, schoolType, roomType, subsidyType]
+            );
+            
+            // 同时更新内存常量
+            if (SUBSIDIZED_AREA_STANDARDS[schoolType] && 
+                SUBSIDIZED_AREA_STANDARDS[schoolType][roomType] && 
+                SUBSIDIZED_AREA_STANDARDS[schoolType][roomType][subsidyType] !== undefined) {
+                SUBSIDIZED_AREA_STANDARDS[schoolType][roomType][subsidyType] = parseFloat(value);
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: '标准值更新成功'
+        });
+    } catch (error) {
+        console.error('更新标准值失败:', error);
+        res.status(500).json({ success: false, message: '更新标准值失败' });
+    }
+});
+
+// 获取学校类型映射
+app.get('/api/school-mappings', requireAuth, requireAdmin, (req, res) => {
+    try {
+        res.json({
+            success: true,
+            mappings: SCHOOL_NAME_TO_TYPE
+        });
+    } catch (error) {
+        console.error('获取学校映射失败:', error);
+        res.status(500).json({ success: false, message: '获取学校映射失败' });
+    }
+});
+
+// 更新学校类型映射
+app.post('/api/school-mappings', requireAuth, requireAdmin, (req, res) => {
+    try {
+        const { mappings } = req.body;
+        
+        if (!mappings || typeof mappings !== 'object') {
+            return res.status(400).json({ success: false, message: '映射数据格式错误' });
+        }
+        
+        // 更新学校映射
+        Object.assign(SCHOOL_NAME_TO_TYPE, mappings);
+        
+        // 记录变更历史
+        const changeRecord = {
+            changeTime: new Date().toISOString(),
+            changeUser: req.session.user.username,
+            changeType: '学校映射更新',
+            changeDescription: '更新了学校类型映射配置',
+            changeDetails: { mappings }
+        };
+        
+        // TODO: 将变更记录保存到数据库
+        
+        res.json({
+            success: true,
+            message: '学校类型映射更新成功'
+        });
+    } catch (error) {
+        console.error('更新学校映射失败:', error);
+        res.status(500).json({ success: false, message: '更新学校映射失败' });
+    }
+});
+
+// 获取标准变更历史
+app.get('/api/standards-history', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        // TODO: 从数据库获取变更历史
+        // 目前返回空数组
+        const history = [];
+        
+        res.json({
+            success: true,
+            history: history
+        });
+    } catch (error) {
+        console.error('获取变更历史失败:', error);
+        res.status(500).json({ success: false, message: '获取变更历史失败' });
+    }
+});
+
 // 主页路由 - 需要认证
 app.get('/', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -472,7 +769,7 @@ app.post('/online-download', (req, res) => {
             [`单位/学校(机构)名称(章)`, calculationData['学校名称'] || '', '院校类型', cleanSchoolType(calculationData['院校类别'] || '')],
             ['', '', '', ''],
             ['规划学生数', '', '', ''],
-            ['专科全日制学生数(人)', calculationData['全日制专科生人数'] || 0, '本科全日制学生数(人)', calculationData['全日制本专科生人数'] || 0],
+            ['专科全日制学生数(人)', calculationData['全日制专科生人数'] || 0, '本科全日制学生数(人)', calculationData['全日制本科生人数'] || 0],
             ['硕士全日制学生数(人)', calculationData['全日制硕士生人数'] || 0, '博士全日制学生数(人)', calculationData['全日制博士生人数'] || 0],
             ['本科留学生数(人)', calculationData['留学生本科生人数'] || 0, '硕士留学生数(人)', calculationData['留学生硕士生人数'] || 0],
             ['博士留学生(人)', calculationData['留学生博士生人数'] || 0, '', ''],
@@ -1191,34 +1488,32 @@ app.get('/api/overview/records', requireAuth, async (req, res) => {
 // 批量导出功能
 app.post('/api/batch-export', requireAuth, async (req, res) => {
     try {
-        const { year, baseYear, schoolType, user, exportType = 'all' } = req.body;
+        const { year, baseYear, schoolType, user, exportType = 'all', school } = req.body;
         const userRole = req.session.user.role;
         const username = req.session.user.username;
         const userSchoolName = req.session.user.school_name;
-        
+
         let userFilter = user && user !== 'all' ? user : null;
-        
-        // 如果是学校用户，强制只能导出自己的数据
-        if (userRole === 'school') {
-            userFilter = username;
-        }
-        
+        let schoolName = school && school !== 'all' ? school : null;
+
+        // 不再强制覆盖schoolName或userFilter，直接用前端传递的参数
+
         // 根据筛选条件获取数据 - 使用最新记录函数
         let schoolsData = [];
-        
+
         if (exportType === 'filtered') {
             // 按条件筛选导出 - 只导出每个学校每个年份的最新记录
             const yearFilter = year && year !== 'all' ? parseInt(year) : null;
             const baseYearFilter = baseYear && baseYear !== 'all' ? parseInt(baseYear) : null;
-            schoolsData = await dataService.getLatestSchoolRecords(yearFilter, null, baseYearFilter, userRole, username, userSchoolName, userFilter);
-            
+            schoolsData = await dataService.getLatestSchoolRecords(yearFilter, schoolName, baseYearFilter, userRole, username, userSchoolName, userFilter);
+
             // 如果指定了学校类型，进一步筛选
             if (schoolType && schoolType !== 'all') {
                 schoolsData = schoolsData.filter(school => school.school_type === schoolType);
             }
         } else {
             // 导出所有数据 - 只导出每个学校每个年份的最新记录
-            schoolsData = await dataService.getLatestSchoolRecords(null, null, null, userRole, username, userSchoolName, userFilter);
+            schoolsData = await dataService.getLatestSchoolRecords(null, schoolName, null, userRole, username, userSchoolName, userFilter);
         }
         
         if (schoolsData.length === 0) {
@@ -1352,6 +1647,11 @@ function generateSingleRecordDetailExcel(recordData) {
     // 创建与在线下载相同格式的详细测算结果表
     const studentStatYear = recordData.student_stat_year || recordData.year || new Date().getFullYear();
     const buildingStatYear = recordData.building_stat_year || recordData.year || new Date().getFullYear();
+    
+    // 调试：打印填报单位相关信息
+    console.log('调试 - recordData.submitter_real_name:', recordData.submitter_real_name);
+    console.log('调试 - recordData.submitter_username:', recordData.submitter_username);
+    
     const submitterUser = recordData.submitter_real_name || recordData.submitter_username || '未知用户';
     
     const data = [
@@ -1619,43 +1919,77 @@ app.delete('/api/clear-all-data', async (req, res) => {
     }
 });
 
-// 院校类别映射
+// 院校类别映射 - 新的10分法
 const SCHOOL_TYPES = {
-    '综合师范': 'X',
-    '工科医学农林': 'Y', 
-    '政法财经外语': 'Z',
-    '艺术': 'M',
-    '体育': 'T'
+    '综合': 'A',
+    '师范': 'B',
+    '工科': 'C',
+    '医学': 'D', 
+    '农林': 'E',
+    '政法': 'F',
+    '财经': 'G',
+    '外语': 'H',
+    '艺术': 'I',
+    '体育': 'J'
 };
 
 const SCHOOL_TYPES_REVERSE = {
-    'X': '综合师范',
-    'Y': '工科医学农林',
-    'Z': '政法财经外语',
-    'M': '艺术',
-    'T': '体育'
+    'A': '综合',
+    'B': '师范',
+    'C': '工科',
+    'D': '医学',
+    'E': '农林',
+    'F': '政法',
+    'G': '财经',
+    'H': '外语',
+    'I': '艺术',
+    'J': '体育'
 };
 
 // 详细院校类别到计算类型的映射
 const DETAILED_SCHOOL_TYPE_MAPPING = {
-    // 综合师范类 -> X
-    '综合院校': 'X',
-    '师范院校': 'X',
+    // 综合类 -> A
+    '综合院校': 'A',
+    '综合类': 'A',
     
-    // 工科医学农林类 -> Y
-    '理工院校': 'Y',
-    '医药院校': 'Y',
-    '农业院校': 'Y',
+    // 师范类 -> B
+    '师范院校': 'B',
+    '师范类': 'B',
     
-    // 政法财经外语类 -> Z
-    '政法院校': 'Z',
-    '财经院校': 'Z',
+    // 工科类 -> C
+    '理工院校': 'C',
+    '工科院校': 'C',
+    '工科类': 'C',
     
-    // 艺术类 -> M
-    '艺术院校': 'M',
+    // 医学类 -> D
+    '医药院校': 'D',
+    '医学院校': 'D',
+    '医学类': 'D',
     
-    // 体育类 -> T
-    '体育院校': 'T'
+    // 农林类 -> E
+    '农业院校': 'E',
+    '农林院校': 'E',
+    '农林类': 'E',
+    
+    // 政法类 -> F
+    '政法院校': 'F',
+    '政法类': 'F',
+    
+    // 财经类 -> G
+    '财经院校': 'G',
+    '财经类': 'G',
+    
+    // 外语类 -> H
+    '外语院校': 'H',
+    '外语类': 'H',
+    
+    // 艺术类 -> I
+    '艺术院校': 'I',
+    '艺术类': 'I',
+    
+    // 体育类 -> J
+    '体育院校': 'J',
+    '体育类': 'J'
 };
 
 // 计算类型到详细类型的反向映射（用于模板说明）
@@ -1700,22 +2034,92 @@ const SCHOOL_NAME_TO_TYPE = {
     '上海健康医学院附属卫生学校(上海健康护理职业学院(筹))': '医药院校'
 };
 
-// 基础应配面积标准
+// 基础应配面积标准 - 新的10分法
 const BASIC_AREA_STANDARDS = {
-    'X': { A: 12.95, B: 2, C1: 10, C2: 2, D: 1.55 },
-    'Y': { A: 15.95, B: 2, C1: 10, C2: 2, D: 1.55 },
-    'Z': { A: 7.95, B: 2, C1: 10, C2: 2, D: 1.55 },
-    'M': { A: 53.5, B: 3.5, C1: 10, C2: 2.5, D: 2 },
-    'T': { A: 22, B: 2.2, C1: 10, C2: 2, D: 1.8 }
+    'A': { A: 12.95, B: 3.0, C1: 10.0, C2: 2.0, D: 1.55 },      // 综合类
+    'B': { A: 12.95, B: 2.0, C1: 10.0, C2: 2.0, D: 1.55 },      // 师范类  
+    'C': { A: 15.95, B: 2.0, C1: 10.0, C2: 2.0, D: 1.55 },      // 工科类（理工院校）
+    'D': { A: 15.95, B: 2.0, C1: 10.0, C2: 2.0, D: 1.55 },      // 医学类
+    'E': { A: 15.95, B: 2.0, C1: 10.0, C2: 2.0, D: 1.55 },      // 农林类
+    'F': { A: 7.95,  B: 2.0, C1: 10.0, C2: 2.0, D: 1.55 },      // 政法类
+    'G': { A: 7.95,  B: 2.0, C1: 10.0, C2: 2.0, D: 1.55 },      // 财经类
+    'H': { A: 0.0,   B: 0.0, C1: 0.0,  C2: 0.0, D: 0.0  },      // 外语类
+    'I': { A: 53.50, B: 3.5, C1: 10.5, C2: 2.0, D: 2.0  },      // 艺术类
+    'J': { A: 22.00, B: 2.2, C1: 10.0, C2: 2.0, D: 1.80 }       // 体育类
 };
 
-// 补贴应配面积标准
+// 补贴应配面积标准 - 新的三重索引结构（从数据库动态加载，这里保留兼容性常量）
 const SUBSIDIZED_AREA_STANDARDS = {
-    'X': { A: {Master: 3, Doctor: 3, International: 0}, B: {Master: 2, Doctor: 2, International: 0}, C1: {Master: 5, Doctor: 14, International: 0}, C2: {Master: 0, Doctor: 0, International: 19}, D: {Master: 0, Doctor: 0, International: 0} },
-    'Y': { A: {Master: 3, Doctor: 3, International: 0}, B: {Master: 2, Doctor: 2, International: 0}, C1: {Master: 5, Doctor: 14, International: 0}, C2: {Master: 0, Doctor: 0, International: 19}, D: {Master: 0, Doctor: 0, International: 0} },
-    'Z': { A: {Master: 3, Doctor: 3, International: 0}, B: {Master: 2, Doctor: 2, International: 0}, C1: {Master: 5, Doctor: 14, International: 0}, C2: {Master: 0, Doctor: 0, International: 19}, D: {Master: 0, Doctor: 0, International: 0} },
-    'M': { A: {Master: 3, Doctor: 3, International: 0}, B: {Master: 2, Doctor: 2, International: 0}, C1: {Master: 5, Doctor: 14, International: 0}, C2: {Master: 0, Doctor: 0, International: 19}, D: {Master: 0, Doctor: 0, International: 0} },
-    'T': { A: {Master: 3, Doctor: 3, International: 0}, B: {Master: 2, Doctor: 2, International: 0}, C1: {Master: 5, Doctor: 14, International: 0}, C2: {Master: 0, Doctor: 0, International: 19}, D: {Master: 0, Doctor: 0, International: 0} }
+    '综合院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '师范院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '理工院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '医药院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '农业院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '政法院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '财经院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '体育院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '艺术院校': {
+        '教学及辅助用房': { '全日制硕士': 3, '全日制博士': 3, '留学生': 0, '留学生硕士': 3, '留学生博士': 3 },
+        '办公用房': { '全日制硕士': 2, '全日制博士': 2, '留学生': 0, '留学生硕士': 2, '留学生博士': 2 },
+        '学生宿舍': { '全日制硕士': 5, '全日制博士': 14, '留学生': 0, '留学生硕士': 5, '留学生博士': 14 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 19, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    },
+    '外语院校': {
+        '教学及辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 },
+        '办公用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 },
+        '学生宿舍': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 },
+        '其他生活用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 },
+        '后勤辅助用房': { '全日制硕士': 0, '全日制博士': 0, '留学生': 0, '留学生硕士': 0, '留学生博士': 0 }
+    }
 };
 
 // 获取学校对应的院校类别
@@ -2026,6 +2430,9 @@ function generateSummarySheet(schoolsData) {
         // 计算不含补助的缺额
         const gapWithoutSubsidy = school.total_area_gap_without_subsidy || ((parseFloat(school.total_area_gap_with_subsidy) || 0) - specialSubsidyTotalArea);
 
+        // 计算学生总数（全日制+留学生）
+        const totalStudents = fullTimeTotal + internationalTotal;
+
         return {
             '学校名称': school.school_name || '',
             '院校类别': cleanSchoolType(school.school_type || ''),
@@ -2034,6 +2441,7 @@ function generateSummarySheet(schoolsData) {
             '建筑面积统计年份': parseInt(school.building_stat_year) || 0,
             '全日制学生总数(人)': fullTimeTotal,
             '留学生总数(人)': internationalTotal,
+            '学生总数(人)': totalStudents,
             '学生规模测算建筑总面积(㎡)': formatAreaToTwoDecimals(parseFloat(school.required_building_area)),
             '现状建筑总面积(㎡)': formatAreaToTwoDecimals(parseFloat(school.current_building_area)),
             '学生规模测算建筑面积总缺额(不含补助)(㎡)': formatAreaToTwoDecimals(gapWithoutSubsidy),
@@ -2230,27 +2638,31 @@ function calculateBuildingAreaGap(data, specialSubsidyData = []) {
         }
         
         const year = parseFloat(data['年份']) || new Date().getFullYear();
-        const totalStudents = parseFloat(data['学生总人数']) || 0;
         
-        // 从新的学生人数结构中提取数据
-        const fullTimeUndergraduate = parseFloat(data['全日制本专科生人数']) || 0;
+        // 只用本科生和专科生字段，兼容历史但不再输出或使用本专科生人数
+        let fullTimeUndergraduate = parseFloat(data['全日制本科生人数']);
+        if (isNaN(fullTimeUndergraduate)) fullTimeUndergraduate = 0;
+        let fullTimeSpecialist = parseFloat(data['全日制专科生人数']);
+        if (isNaN(fullTimeSpecialist)) fullTimeSpecialist = 0;
+        // 历史数据只有“全日制本专科生人数”时，自动拆分为本科生（全部计入本科）
+        if (fullTimeUndergraduate === 0 && fullTimeSpecialist === 0 && data['全日制本专科生人数'] !== undefined) {
+            fullTimeUndergraduate = parseFloat(data['全日制本专科生人数']) || 0;
+        }
         const fullTimeMaster = parseFloat(data['全日制硕士生人数']) || 0;
         const fullTimeDoctor = parseFloat(data['全日制博士生人数']) || 0;
         const internationalUndergraduate = parseFloat(data['留学生本科生人数']) || 0;
         const internationalMaster = parseFloat(data['留学生硕士生人数']) || 0;
         const internationalDoctor = parseFloat(data['留学生博士生人数']) || 0;
-        
+
         // 计算各类学生总数
         const allUndergraduate = fullTimeUndergraduate + internationalUndergraduate;
+        const allSpecialist = fullTimeSpecialist; // 专科生单独统计
         const allMaster = fullTimeMaster + internationalMaster;
         const allDoctor = fullTimeDoctor + internationalDoctor;
         const allInternational = internationalUndergraduate + internationalMaster + internationalDoctor;
-        
-        // 向后兼容：如果使用旧字段名，则转换
-        const undergraduateStudents = allUndergraduate || parseFloat(data['本专科生人数']) || 0;
-        const masterStudents = allMaster || parseFloat(data['硕士研究生人数']) || 0;
-        const doctorStudents = allDoctor || parseFloat(data['博士研究生人数']) || 0;
-        const internationalStudents = allInternational || parseFloat(data['留学生人数']) || 0;
+
+        // 重新计算总学生数确保准确性（本科+专科+硕士+博士）
+        const totalStudents = allUndergraduate + allSpecialist + allMaster + allDoctor;
         
         // 现有面积
         const currentArea = {
@@ -2268,7 +2680,24 @@ function calculateBuildingAreaGap(data, specialSubsidyData = []) {
         
         // 获取标准
         const basicStandards = BASIC_AREA_STANDARDS[schoolType];
-        const subsidizedStandards = SUBSIDIZED_AREA_STANDARDS[schoolType];
+        
+        // 将学校类型代码映射回中文名称用于补贴标准查询
+        const schoolTypeCodeToName = {
+            'A': '综合院校',
+            'B': '师范院校', 
+            'C': '理工院校',
+            'D': '医药院校',
+            'E': '农业院校',
+            'F': '政法院校',
+            'G': '财经院校',
+            'H': '外语院校',
+            'I': '艺术院校',
+            'J': '体育院校',
+            'X': '综合院校'  // 默认为综合院校
+        };
+        
+        const schoolTypeNameForSubsidy = schoolTypeCodeToName[schoolType] || '综合院校';
+        const subsidizedStandards = SUBSIDIZED_AREA_STANDARDS[schoolTypeNameForSubsidy];
         
         // 计算基础应配面积
         const basicRequiredArea = {
@@ -2279,13 +2708,33 @@ function calculateBuildingAreaGap(data, specialSubsidyData = []) {
             D: basicStandards.D * totalStudents
         };
         
-        // 计算补贴面积（按要求：基础值按全日制、留学生人数之和计算，再额外按博士生、硕士生、留学生数量计算额外值）
+        // 计算补贴面积（新三重索引结构）
         const subsidizedArea = {
-            A: subsidizedStandards.A.Master * allMaster + subsidizedStandards.A.Doctor * allDoctor + subsidizedStandards.A.International * allInternational,
-            B: subsidizedStandards.B.Master * allMaster + subsidizedStandards.B.Doctor * allDoctor + subsidizedStandards.B.International * allInternational,
-            C1: subsidizedStandards.C1.Master * allMaster + subsidizedStandards.C1.Doctor * allDoctor + subsidizedStandards.C1.International * allInternational,
-            C2: subsidizedStandards.C2.Master * allMaster + subsidizedStandards.C2.Doctor * allDoctor + subsidizedStandards.C2.International * allInternational,
-            D: subsidizedStandards.D.Master * allMaster + subsidizedStandards.D.Doctor * allDoctor + subsidizedStandards.D.International * allInternational
+            A: (subsidizedStandards['教学及辅助用房']['全日制硕士'] || 0) * fullTimeMaster + 
+               (subsidizedStandards['教学及辅助用房']['全日制博士'] || 0) * fullTimeDoctor + 
+               (subsidizedStandards['教学及辅助用房']['留学生'] || 0) * allInternational + 
+               (subsidizedStandards['教学及辅助用房']['留学生硕士'] || 0) * internationalMaster + 
+               (subsidizedStandards['教学及辅助用房']['留学生博士'] || 0) * internationalDoctor,
+            B: (subsidizedStandards['办公用房']['全日制硕士'] || 0) * fullTimeMaster + 
+               (subsidizedStandards['办公用房']['全日制博士'] || 0) * fullTimeDoctor + 
+               (subsidizedStandards['办公用房']['留学生'] || 0) * allInternational + 
+               (subsidizedStandards['办公用房']['留学生硕士'] || 0) * internationalMaster + 
+               (subsidizedStandards['办公用房']['留学生博士'] || 0) * internationalDoctor,
+            C1: (subsidizedStandards['学生宿舍']['全日制硕士'] || 0) * fullTimeMaster + 
+                (subsidizedStandards['学生宿舍']['全日制博士'] || 0) * fullTimeDoctor + 
+                (subsidizedStandards['学生宿舍']['留学生'] || 0) * allInternational + 
+                (subsidizedStandards['学生宿舍']['留学生硕士'] || 0) * internationalMaster + 
+                (subsidizedStandards['学生宿舍']['留学生博士'] || 0) * internationalDoctor,
+            C2: (subsidizedStandards['其他生活用房']['全日制硕士'] || 0) * fullTimeMaster + 
+                (subsidizedStandards['其他生活用房']['全日制博士'] || 0) * fullTimeDoctor + 
+                (subsidizedStandards['其他生活用房']['留学生'] || 0) * allInternational + 
+                (subsidizedStandards['其他生活用房']['留学生硕士'] || 0) * internationalMaster + 
+                (subsidizedStandards['其他生活用房']['留学生博士'] || 0) * internationalDoctor,
+            D: (subsidizedStandards['后勤辅助用房']['全日制硕士'] || 0) * fullTimeMaster + 
+               (subsidizedStandards['后勤辅助用房']['全日制博士'] || 0) * fullTimeDoctor + 
+               (subsidizedStandards['后勤辅助用房']['留学生'] || 0) * allInternational + 
+               (subsidizedStandards['后勤辅助用房']['留学生硕士'] || 0) * internationalMaster + 
+               (subsidizedStandards['后勤辅助用房']['留学生博士'] || 0) * internationalDoctor
         };
         
         // 计算总应配面积
@@ -2330,14 +2779,16 @@ function calculateBuildingAreaGap(data, specialSubsidyData = []) {
             '学校类型': schoolTypeText,
             '学校类型代码': schoolType,
             '计算使用类型': SCHOOL_TYPES_REVERSE[schoolType],
-            '全日制本专科生人数': fullTimeUndergraduate,
+            '全日制本科生人数': fullTimeUndergraduate,
+            '全日制专科生人数': fullTimeSpecialist,
             '全日制硕士生人数': fullTimeMaster,
             '全日制博士生人数': fullTimeDoctor,
             '留学生本科生人数': internationalUndergraduate,
             '留学生硕士生人数': internationalMaster,
             '留学生博士生人数': internationalDoctor,
             '学生总人数': totalStudents,
-            '本专科生总人数': allUndergraduate,
+            '本科生总人数': fullTimeUndergraduate,
+            '专科生总人数': fullTimeSpecialist,
             '硕士生总人数': allMaster,
             '博士生总人数': allDoctor,
             '留学生总人数': allInternational,

@@ -7,6 +7,7 @@
 @import url('./forms.css');         /* 表单元素 */
 @import url('./student-fields.css'); /* 学生字段专用样式 */
 @import url('./tables.css');        /* 表格样式 */
+@import url('./frozen-table.css');  /* 冻结表格样式 */
 @import url('./results.css');       /* 结果显示 */
 @import url('./responsive.css');    /* 响应式布局 */
 

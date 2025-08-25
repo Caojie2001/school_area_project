@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数据管理 - 高校测算工具</title>
+    <title>数据管理 - 高校测算系统</title>
     <!-- 引入模块化CSS样式 -->
     <link rel="stylesheet" href="../css/main.css">
 </head>
@@ -110,7 +110,7 @@
                     }
                     
                     // 根据用户角色显示/隐藏菜单项
-                    AuthManager.updateMenuVisibility(user.role);
+                    AuthManager.updateMenuVisibility(user);
                 }
 
                 // 初始化数据管理模块
@@ -161,6 +161,39 @@
                 console.error('批量下载功能未正确加载');
             }
         }
+
+        // 页面跳转函数（覆盖main.js中的版本）
+        function showPage(pageId) {
+            console.log('数据管理页面中的showPage被调用:', pageId);
+            try {
+                switch(pageId) {
+                    case 'data-entry':
+                        window.location.href = '/index.html';
+                        break;
+                    case 'data-management':
+                        // 已经在数据管理页面，不需要跳转
+                        break;
+                    case 'statistics':
+                        window.location.href = '/html/statistics.html';
+                        break;
+                    case 'calculation-standards':
+                        window.location.href = '/html/calculation-standards.html';
+                        break;
+                    case 'user-management':
+                        window.location.href = '/html/user-management.html';
+                        break;
+                    default:
+                        console.warn('未知的页面ID:', pageId);
+                        window.location.href = '/index.html';
+                }
+            } catch (error) {
+                console.error('页面跳转失败:', error);
+                window.location.href = '/index.html';
+            }
+        }
+
+        // 全局暴露函数，覆盖main.js中的版本
+        window.showPage = showPage;
     </script>
 </body>
 </html>

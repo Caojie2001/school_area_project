@@ -86,7 +86,7 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
             schoolData['年份'],
             schoolData['学生统计年份'] || schoolData['年份'],
             schoolData['建筑面积统计年份'] || schoolData['年份'],
-            schoolData['全日制本专科生人数'] || 0,
+            schoolData['全日制本科生人数'] || 0,
             schoolData['全日制专科生人数'] || 0,
             schoolData['全日制硕士生人数'] || 0,
             schoolData['全日制博士生人数'] || 0,

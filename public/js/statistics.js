@@ -793,35 +793,24 @@ async function loadOverviewAvailableYears() {
         yearFilter.innerHTML = '';
         
         let years = [];
-        
-        if (result.success && result.years && result.years.length > 0) {
-            years = result.years;
+        if (result.success && result.data && result.data.length > 0) {
+            years = result.data;
         } else {
             // 如果没有数据，提供当前年份作为默认选项
             const currentYear = new Date().getFullYear();
             years = [currentYear];
-            console.log('数据库中没有年份数据，使用当前年份:', currentYear);
         }
-        
         // 按降序排列
         const sortedYears = years.sort((a, b) => b - a);
-        console.log('排序后的年份:', sortedYears);
-        
         sortedYears.forEach(year => {
             const option = document.createElement('option');
             option.value = year;
             option.textContent = `${year}年`;
             yearFilter.appendChild(option);
-            console.log(`添加年份选项: ${year}年`);
         });
-        
-        console.log('添加后的选项:', yearFilter.innerHTML);
-        
         // 默认选择最新年份
         if (sortedYears.length > 0) {
             yearFilter.value = sortedYears[0];
-            console.log(`设置默认选择年份: ${sortedYears[0]}`);
-            console.log('当前选择的值:', yearFilter.value);
         }
         
     } catch (error) {

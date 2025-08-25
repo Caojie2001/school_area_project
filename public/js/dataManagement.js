@@ -799,7 +799,7 @@ const DataManagementManager = {
                 // 测算年份
                 const yearEl = document.getElementById('year');
                 if (yearEl) {
-                    const year = school.student_stat_year || school.year || 2025;
+                    const year = school.year || school.student_stat_year || 2025;
                     yearEl.value = year;
                     console.log('设置年份:', year);
                 }
@@ -851,7 +851,7 @@ const DataManagementManager = {
     fillStudentData(school) {
         // 检查所有可能的字段名
         const studentFields = [
-            { id: 'fullTimeUndergraduate', keys: ['fulltime_undergrad', 'full_time_undergraduate', 'fulltime_undergraduate'] },
+            { id: 'fullTimeUndergraduate', keys: ['fulltime_undergrad', 'full_time_undergraduate', 'fulltime_undergraduate', 'fullTimeUndergraduate'] },
             { id: 'fullTimeSpecialist', keys: ['fulltime_specialist', 'full_time_specialist', 'fulltime_specialist'] },
             { id: 'fullTimeMaster', keys: ['fulltime_master', 'full_time_master', 'fulltime_master'] },
             { id: 'fullTimeDoctor', keys: ['fulltime_doctor', 'full_time_doctor', 'fulltime_doctor'] },

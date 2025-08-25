@@ -20,22 +20,22 @@
             
             <div class="sidebar-menu">
                 <a class="menu-item active" onclick="showPage('data-entry')" id="menu-data-entry">
-                    测算数据填报
+                    高校测算
                 </a>
                 <a class="menu-item" onclick="showPage('data-management')" id="menu-data-management">
-                    测算数据管理
+                    历史测算
                 </a>
                 <!-- 测算数据统计菜单项（仅基建中心和管理员可见） -->
                 <a class="menu-item menu-restricted" onclick="showPage('statistics')" id="menu-statistics">
-                    测算数据统计
+                    测算统计
                 </a>
                 <!-- 测算标准管理菜单项（仅管理员可见） -->
                 <a class="menu-item menu-restricted" href="/html/calculation-standards.html" id="menu-calculation-standards">
-                    测算标准管理
+                    标准管理
                 </a>
                 <!-- 用户管理菜单项（仅管理员可见） -->
                 <a class="menu-item menu-restricted" href="/html/user-management.html" id="menu-user-management">
-                    系统用户管理
+                    用户管理
                 </a>
             </div>
         </nav>
@@ -46,8 +46,9 @@
             <div id="page-data-entry" class="page-content active">
                 <div class="content-header">
                     <div class="content-header-left">
-                        <h2>测算数据填报</h2>
-                        <p>填写学校基本信息和建筑面积数据，自动计算建筑面积缺口</p>
+                        <h2>高校测算</h2>
+                        <p>根据测算年份的规划学生数，结合生均面积测算标准，测算出学校规划建筑面积，并与现状</p>
+                        <p>建筑面积(含测算年份预计建成项目的建筑面积)进行差值对比，得出建筑面积的测算缺口。</p>
                     </div>
                     <div class="content-header-right">
                         <div class="user-info" id="userInfo">
@@ -315,8 +316,8 @@
             <div id="page-data-management" class="page-content">
                 <div class="content-header">
                     <div class="content-header-left">
-                        <h2>测算数据管理</h2>
-                        <p>查看、编辑和管理已提交的测算数据记录</p>
+                        <h2>历史测算</h2>
+                        <p>查看、编辑和管理已提交的测算数据记录。</p>
                     </div>
                     <div class="content-header-right">
                         <div class="user-info" id="userInfo2">
@@ -387,8 +388,8 @@
             <div id="page-statistics" class="page-content">
                 <div class="content-header">
                     <div class="content-header-left">
-                        <h2>测算统计分析</h2>
-                        <p>查看各学校数据填报情况的总体概览</p>
+                        <h2>测算统计</h2>
+                        <p>查看各学校数据填报情况的总体概览。</p>
                     </div>
                     <div class="content-header-right">
                         <div class="user-info" id="userInfo3">

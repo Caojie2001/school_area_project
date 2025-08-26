@@ -594,12 +594,6 @@ const DataManagementManager = {
                             <td style="border: 1px solid #000; padding: 6px;">${school.submitter_real_name || school.submitter_username}</td>
                         </tr>
                         <tr>
-                            <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生统计年份</td>
-                            <td style="border: 1px solid #000; padding: 6px;">${school.student_stat_year || school.year}</td>
-                            <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">建筑面积统计年份</td>
-                            <td style="border: 1px solid #000; padding: 6px;">${school.building_stat_year || school.year}</td>
-                        </tr>
-                        <tr>
                             <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">单位/学校(机构)名称(章)</td>
                             <td style="border: 1px solid #000; padding: 6px;">${school.school_name}</td>
                             <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">院校类型</td>
@@ -826,20 +820,9 @@ const DataManagementManager = {
                 // 测算年份
                 const yearEl = document.getElementById('year');
                 if (yearEl) {
-                    const year = school.year || school.student_stat_year || 2025;
+                    const year = school.year || 2025;
                     yearEl.value = year;
                     console.log('设置年份:', year);
-                }
-                
-                // 学生统计年份和建筑面积统计年份
-                const studentStatYearEl = document.getElementById('student_stat_year');
-                if (studentStatYearEl) {
-                    studentStatYearEl.value = school.student_stat_year || school.year || 2025;
-                }
-                
-                const buildingStatYearEl = document.getElementById('building_stat_year');
-                if (buildingStatYearEl) {
-                    buildingStatYearEl.value = school.building_stat_year || school.year || 2025;
                 }
                 
                 // 学生人数信息 - 检查实际字段名

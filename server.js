@@ -746,8 +746,6 @@ app.post('/online-download', (req, res) => {
         const wb = XLSX.utils.book_new();
         
         // 创建与图片格式一致的测算结果表
-        const studentStatYear = calculationData['学生统计年份'] || calculationData['年份'] || new Date().getFullYear();
-        const buildingStatYear = calculationData['建筑面积统计年份'] || calculationData['年份'] || new Date().getFullYear();
         const calcYear = calculationData['年份'] || new Date().getFullYear();
         const submitterUser = calculationData['填报单位'] || '未知用户';
         
@@ -756,7 +754,6 @@ app.post('/online-download', (req, res) => {
             ['基本办学条件缺口（"－"表示超额，"+"表示缺额）', '', '', ''],
             ['', '', '', `测算时间：${new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-')}`],
             ['测算年份', calcYear, '测算用户', submitterUser],
-            ['学生统计年份', studentStatYear, '建筑面积统计年份', buildingStatYear],
             [`单位/学校(机构)名称(章)`, calculationData['学校名称'] || '', '院校类型', cleanSchoolType(calculationData['院校类别'] || '')],
             ['', '', '', ''],
             ['规划学生数', '', '', ''],
@@ -795,13 +792,12 @@ app.post('/online-download', (req, res) => {
             { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, // 标题行
             { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, // 副标题行 - A2B2C2D2合并
             // 第4行（测算年份和测算用户）不需要合并，保持各自独立
-            // 第5行（学生统计年份和建筑面积统计年份）不需要合并，保持各自独立
-            { s: { r: 6, c: 0 }, e: { r: 6, c: 3 } }, // A7B7C7D7合并为空
-            { s: { r: 7, c: 0 }, e: { r: 7, c: 3 } }, // A8B8C8D8合并并写入"规划学生数"
-            { s: { r: 12, c: 0 }, e: { r: 12, c: 3 } }, // A13B13C13D13合并为空
-            { s: { r: 22, c: 0 }, e: { r: 22, c: 2 } }, // A23B23C23合并 - 总缺额行
-            { s: { r: 23, c: 0 }, e: { r: 23, c: 2 } }, // A24B24C24合并 - 补助面积行
-            { s: { r: 24, c: 0 }, e: { r: 24, c: 2 } }  // A25B25C25合并 - 含补助总缺额行
+            { s: { r: 5, c: 0 }, e: { r: 5, c: 3 } }, // A6B6C6D6合并为空
+            { s: { r: 6, c: 0 }, e: { r: 6, c: 3 } }, // A7B7C7D7合并并写入"规划学生数"
+            { s: { r: 11, c: 0 }, e: { r: 11, c: 3 } }, // A12B12C12D12合并为空
+            { s: { r: 21, c: 0 }, e: { r: 21, c: 2 } }, // A22B22C22合并 - 总缺额行
+            { s: { r: 22, c: 0 }, e: { r: 22, c: 2 } }, // A23B23C23合并 - 补助面积行
+            { s: { r: 23, c: 0 }, e: { r: 23, c: 2 } }  // A24B24C24合并 - 含补助总缺额行
         ];
         
         ws['!merges'] = merges;
@@ -1287,28 +1283,6 @@ app.get('/api/users', requireAuth, async (req, res) => {
     }
 });
 
-// 获取可用学生统计年份
-app.get('/api/student-stat-years', async (req, res) => {
-    try {
-        const years = await dataService.getAvailableStudentStatYears();
-        res.json({ success: true, data: years });
-    } catch (error) {
-        console.error('获取学生统计年份数据失败:', error);
-        res.status(500).json({ success: false, error: '获取学生统计年份数据失败' });
-    }
-});
-
-// 获取可用建筑面积统计年份
-app.get('/api/building-stat-years', async (req, res) => {
-    try {
-        const years = await dataService.getAvailableBuildingStatYears();
-        res.json({ success: true, data: years });
-    } catch (error) {
-        console.error('获取建筑面积统计年份数据失败:', error);
-        res.status(500).json({ success: false, error: '获取建筑面积统计年份数据失败' });
-    }
-});
-
 // 获取学校历史记录
 app.get('/api/school-history/:schoolName', requireAuth, async (req, res) => {
     try {
@@ -1773,8 +1747,6 @@ function generateSingleRecordDetailExcel(recordData) {
     const otherLivingArea = Math.max(0, (recordData.total_living_area || 0) - (recordData.dormitory_area || 0));
     
     // 创建与在线下载相同格式的详细测算结果表
-    const studentStatYear = recordData.student_stat_year || recordData.year || new Date().getFullYear();
-    const buildingStatYear = recordData.building_stat_year || recordData.year || new Date().getFullYear();
     
     // 调试：打印填报单位相关信息
     console.log('调试 - recordData.submitter_real_name:', recordData.submitter_real_name);
@@ -1787,7 +1759,6 @@ function generateSingleRecordDetailExcel(recordData) {
         ['基本办学条件缺口（"－"表示超额，"+"表示缺额）', '', '', ''],
         ['', '', '', `测算时间：${new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-')}`],
         ['测算年份', year, '测算用户', submitterUser],
-        ['学生统计年份', studentStatYear, '建筑面积统计年份', buildingStatYear],
         [`单位/学校(机构)名称(章)`, schoolName, '院校类型', cleanSchoolType(recordData.school_type || '')],
         ['', '', '', ''],
         ['规划学生数', '', '', ''],
@@ -1826,13 +1797,13 @@ function generateSingleRecordDetailExcel(recordData) {
         { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, // 标题行
         { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }, // 副标题行 - A2B2C2D2合并
         // 第4行（测算年份和测算用户）不需要合并，保持各自独立
-        // 第5行（学生统计年份和建筑面积统计年份）不需要合并，保持各自独立
-        { s: { r: 6, c: 0 }, e: { r: 6, c: 3 } }, // A7B7C7D7合并为空
-        { s: { r: 7, c: 0 }, e: { r: 7, c: 3 } }, // A8B8C8D8合并并写入"规划学生数"
-        { s: { r: 12, c: 0 }, e: { r: 12, c: 3 } }, // A13B13C13D13合并为空
-        { s: { r: 22, c: 0 }, e: { r: 22, c: 2 } }, // A23B23C23合并 - 总缺额行
-        { s: { r: 23, c: 0 }, e: { r: 23, c: 2 } }, // A24B24C24合并 - 补助面积行
-        { s: { r: 24, c: 0 }, e: { r: 24, c: 2 } }  // A25B25C25合并 - 含补助总缺额行
+        // 第4行（测算年份和测算用户）不需要合并，保持各自独立
+        { s: { r: 5, c: 0 }, e: { r: 5, c: 3 } }, // A6B6C6D6合并为空
+        { s: { r: 6, c: 0 }, e: { r: 6, c: 3 } }, // A7B7C7D7合并并写入"规划学生数"
+        { s: { r: 11, c: 0 }, e: { r: 11, c: 3 } }, // A12B12C12D12合并为空
+        { s: { r: 21, c: 0 }, e: { r: 21, c: 2 } }, // A22B22C22合并 - 总缺额行
+        { s: { r: 22, c: 0 }, e: { r: 22, c: 2 } }, // A23B23C23合并 - 补助面积行
+        { s: { r: 23, c: 0 }, e: { r: 23, c: 2 } }  // A24B24C24合并 - 含补助总缺额行
     ];
     
     ws['!merges'] = merges;
@@ -2370,8 +2341,6 @@ function generateBatchExportExcel(schoolsData, filters = {}) {
                 '学校名称': school.school_name,
                 '院校类别': school.school_type,
                 '测算年份': school.year,
-                '学生统计年份': school.student_stat_year,
-                '建筑面积统计年份': school.building_stat_year,
                 '录入时间': new Date(school.created_at).toLocaleString('zh-CN'),
                 '学生总人数': school.total_students,
                 '全日制专科生': school.fulltime_specialist || 0,
@@ -2554,8 +2523,6 @@ function generateSummarySheet(schoolsData) {
             '学校名称': school.school_name || '',
             '院校类别': cleanSchoolType(school.school_type || ''),
             '测算年份': parseInt(school.year) || 0,
-            '学生统计年份': parseInt(school.student_stat_year) || 0,
-            '建筑面积统计年份': parseInt(school.building_stat_year) || 0,
             '全日制学生总数(人)': fullTimeTotal,
             '留学生总数(人)': internationalTotal,
             '学生总数(人)': totalStudents,
@@ -2624,8 +2591,6 @@ function generateDetailSheet(schoolsData) {
                 '学校名称': school.school_name || '',
                 '院校类别': cleanSchoolType(school.school_type || ''),
                 '测算年份': parseInt(school.year) || 0,
-                '学生统计年份': parseInt(school.student_stat_year) || 0,
-                '建筑面积统计年份': parseInt(school.building_stat_year) || 0,
                 '用房类型': room.type,
                 '现状建筑面积(㎡)': room.current,
                 '学生规模测算建筑面积(㎡)': room.required,
@@ -2658,8 +2623,6 @@ function generateStudentDetailSheet(schoolsData) {
                 '学校名称': school.school_name || '',
                 '院校类别': cleanSchoolType(school.school_type || ''),
                 '测算年份': parseInt(school.year) || 0,
-                '学生统计年份': parseInt(school.student_stat_year) || 0,
-                '建筑面积统计年份': parseInt(school.building_stat_year) || 0,
                 '学生类型': student.type,
                 '学生数(人)': student.count
             });
@@ -2700,8 +2663,6 @@ function generateSubsidyDetailSheet(schoolsData) {
                     '学校名称': school.school_name || '',
                     '院校类别': cleanSchoolType(school.school_type || ''),
                     '测算年份': parseInt(school.year) || 0,
-                    '学生统计年份': parseInt(school.student_stat_year) || 0,
-                    '建筑面积统计年份': parseInt(school.building_stat_year) || 0,
                     '补助名称': subsidy.name || subsidy['特殊用房补助名称'] || '',
                     '补助建筑面积(㎡)': formatAreaToTwoDecimals(parseFloat(subsidy.area || subsidy['补助面积（m²）']) || 0)
                 });
@@ -2712,8 +2673,6 @@ function generateSubsidyDetailSheet(schoolsData) {
                 '学校名称': school.school_name || '',
                 '院校类别': cleanSchoolType(school.school_type || ''),
                 '测算年份': parseInt(school.year) || 0,
-                '学生统计年份': parseInt(school.student_stat_year) || 0,
-                '建筑面积统计年份': parseInt(school.building_stat_year) || 0,
                 '补助名称': '无特殊补助',
                 '补助建筑面积(㎡)': '0.00'
             });

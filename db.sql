@@ -15,8 +15,6 @@ CREATE TABLE IF NOT EXISTS `school_info` (
     `school_name` VARCHAR(255) NOT NULL COMMENT '学校名称',
     `school_type` VARCHAR(50) COMMENT '院校类型',
     `year` INT COMMENT '测算年份',
-    `student_stat_year` INT COMMENT '学生统计年份',
-    `building_stat_year` INT COMMENT '建筑面积统计年份',
     `submitter_username` VARCHAR(50) NULL COMMENT '填报单位用户名',
     `full_time_undergraduate` INT DEFAULT 0 COMMENT '全日制本科生人数',
     `full_time_specialist` INT DEFAULT 0 COMMENT '全日制专科生人数',

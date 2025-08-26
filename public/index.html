@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高校建筑面积缺口测算计算器</title>
+    <title>高校建筑面积缺口计算器</title>
     <!-- 引入模块化CSS样式 -->
     <link rel="stylesheet" href="css/main.css">
 </head>
@@ -15,7 +15,7 @@
         <!-- 左侧菜单 -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h1>高校建筑面积缺口测算计算器</h1>
+                <h1>高校建筑面积缺口计算器</h1>
             </div>
             
             <div class="sidebar-menu">
@@ -47,8 +47,7 @@
                 <div class="content-header">
                     <div class="content-header-left">
                         <h2>高校测算</h2>
-                        <p>根据测算年份的规划学生数，结合生均面积测算标准，测算出学校规划建筑面积，并与现状</p>
-                        <p>建筑面积(含测算年份预计建成项目的建筑面积)进行差值对比，得出建筑面积的测算缺口。</p>
+                        <p>根依据规划学生总数测算规划建筑面积，与现状面积（含拟建成部分）对比，得出建筑面积缺口。</p>
                     </div>
                     <div class="content-header-right">
                         <div class="user-info" id="userInfo">
@@ -128,29 +127,7 @@
                             
                             <div class="card">
                                 <h3>学生人数信息</h3>
-                                <div class="form-row" style="margin-bottom: 20px;">
-                                    <div class="form-group form-group-student-year">
-                                        <label for="student_stat_year">学生统计年份 *</label>
-                                        <div class="year-selector-container">
-                                            <input type="text" id="student_stat_year" name="student_stat_year" value="2025" readonly required class="form-control year-input" onclick="showStudentYearGrid()">
-                                            <div class="year-grid-overlay" id="studentYearGridOverlay" style="display: none;">
-                                                <div class="year-grid-container">
-                                                    <div class="year-grid-header">
-                                                        <button type="button" class="year-nav-btn" id="studentYearPrevBtn" onclick="moveStudentYearGrid(-1)">‹</button>
-                                                        <span class="year-range-text" id="studentYearRangeText"></span>
-                                                        <button type="button" class="year-nav-btn" id="studentYearNextBtn" onclick="moveStudentYearGrid(1)">›</button>
-                                                    </div>
-                                                    <div class="year-grid" id="studentYearGrid">
-                                                        <!-- 学生统计年份九宫格将在这里动态生成 -->
-                                                    </div>
-                                                    <div class="year-grid-footer">
-                                                        <button type="button" class="year-close-btn" onclick="hideStudentYearGrid()">关闭</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <p>请填写测算年份的规划学生数</p>
                                 <div class="student-category">
                                     <div class="form-row">
                                         <div class="form-group">
@@ -203,29 +180,7 @@
                             
                             <div class="card">
                                 <h3>建筑面积信息</h3>
-                                <div class="form-row" style="margin-bottom: 20px;">
-                                    <div class="form-group form-group-building-year">
-                                        <label for="building_stat_year">建筑面积统计年份 *</label>
-                                        <div class="year-selector-container">
-                                            <input type="text" id="building_stat_year" name="building_stat_year" value="2025" readonly required class="form-control year-input" onclick="showBuildingYearGrid()">
-                                            <div class="year-grid-overlay" id="buildingYearGridOverlay" style="display: none;">
-                                                <div class="year-grid-container">
-                                                    <div class="year-grid-header">
-                                                        <button type="button" class="year-nav-btn" id="buildingYearPrevBtn" onclick="moveBuildingYearGrid(-1)">‹</button>
-                                                        <span class="year-range-text" id="buildingYearRangeText"></span>
-                                                        <button type="button" class="year-nav-btn" id="buildingYearNextBtn" onclick="moveBuildingYearGrid(1)">›</button>
-                                                    </div>
-                                                    <div class="year-grid" id="buildingYearGrid">
-                                                        <!-- 建筑面积统计年份九宫格将在这里动态生成 -->
-                                                    </div>
-                                                    <div class="year-grid-footer">
-                                                        <button type="button" class="year-close-btn" onclick="hideBuildingYearGrid()">关闭</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <p>请填写测算年份的现状及拟建成的建筑面积</p>
                                 <div class="form-row">
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
                                         <label for="teachingArea">教学及辅助用房面积(m²)</label>
@@ -271,6 +226,10 @@
                             
                             <div class="card">
                                 <h3>特殊用房补助信息</h3>
+                                <p>请填写：</p>
+                                <p>1, 经国家发改委、教育部、科技部等部委批准并挂牌的国家级重点实验室、工程研究中心、工程技术中心；</p>
+                                <p>2, 纳入国家“双一流”建设、高水平地方高校重点建设名单的学科建设所需用房;</p>
+                                <p>3, 经国家或市编制管理部门批准设立的专职科研机构所需用房。</p>
                                 <div id="specialSubsidies">
                                     <!-- 特殊补助项将在这里动态添加 -->
                                 </div>
@@ -280,7 +239,7 @@
                             <div class="card">
                                 <div class="form-group">
                                     <label for="remarks">备注</label>
-                                    <textarea id="remarks" name="remarks" rows="3" placeholder="其他需要说明的信息" class="form-control" style="background: white; border: 1px solid #ddd;"></textarea>
+                                    <textarea id="remarks" name="remarks" rows="3" placeholder="可补充填写学生人数、建筑面积来源年份" class="form-control" style="background: white; border: 1px solid #ddd;"></textarea>
                                 </div>
                             </div>
                             

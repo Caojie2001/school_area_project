@@ -55,8 +55,6 @@ const CalculationStandards = {
 
 const YearSelectorManager = {
     currentYearGridIndex: 0,
-    currentStudentYearGridIndex: 0,
-    currentBuildingYearGridIndex: 0,
     
     // 初始化事件监听器
     init() {
@@ -66,18 +64,6 @@ const YearSelectorManager = {
             const yearOverlay = document.getElementById('yearGridOverlay');
             if (e.target === yearOverlay) {
                 this.hideYearGrid();
-            }
-            
-            // 关闭学生年份选择器
-            const studentOverlay = document.getElementById('studentYearGridOverlay');
-            if (e.target === studentOverlay) {
-                this.hideStudentYearGrid();
-            }
-            
-            // 关闭建筑年份选择器
-            const buildingOverlay = document.getElementById('buildingYearGridOverlay');
-            if (e.target === buildingOverlay) {
-                this.hideBuildingYearGrid();
             }
         });
     },
@@ -168,186 +154,6 @@ const YearSelectorManager = {
             case 'ArrowRight':
                 e.preventDefault();
                 this.moveYearGrid(1);
-                break;
-        }
-    },
-    
-    // 学生年份选择器
-    showStudentYearGrid() {
-        const overlay = document.getElementById('studentYearGridOverlay');
-        if (overlay) {
-            overlay.style.display = 'flex';
-            const yearInput = document.getElementById('student_stat_year');
-            const currentYear = new Date().getFullYear();
-            const inputYear = parseInt(yearInput ? yearInput.value : currentYear) || currentYear;
-            this.currentStudentYearGridIndex = Math.floor((inputYear - (currentYear - 4)) / 9);
-            this.updateStudentYearGrid();
-            document.addEventListener('keydown', this.handleStudentYearGridKeyboard.bind(this));
-        }
-    },
-    
-    hideStudentYearGrid() {
-        const overlay = document.getElementById('studentYearGridOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
-            document.removeEventListener('keydown', this.handleStudentYearGridKeyboard.bind(this));
-        }
-    },
-    
-    moveStudentYearGrid(direction) {
-        this.currentStudentYearGridIndex += direction;
-        this.updateStudentYearGrid();
-    },
-    
-    updateStudentYearGrid() {
-        const yearGrid = document.getElementById('studentYearGrid');
-        const yearRangeText = document.getElementById('studentYearRangeText');
-        const yearInput = document.getElementById('student_stat_year');
-        const currentYear = new Date().getFullYear();
-        const inputYear = parseInt(yearInput ? yearInput.value : currentYear) || currentYear;
-        
-        if (!yearGrid || !yearRangeText) return;
-        
-        const baseYear = currentYear - 4 + (this.currentStudentYearGridIndex * 9);
-        const years = [];
-        
-        for (let i = 0; i < 9; i++) {
-            years.push(baseYear + i);
-        }
-        
-        yearRangeText.textContent = `${years[0]} - ${years[8]}`;
-        
-        yearGrid.innerHTML = '';
-        years.forEach(year => {
-            const yearItem = document.createElement('div');
-            yearItem.className = 'year-item';
-            yearItem.textContent = year;
-            yearItem.onclick = () => this.selectStudentYear(year);
-            
-            if (year === currentYear) {
-                yearItem.classList.add('current');
-            }
-            
-            if (year === inputYear) {
-                yearItem.classList.add('selected');
-            }
-            
-            yearGrid.appendChild(yearItem);
-        });
-    },
-    
-    selectStudentYear(year) {
-        const yearInput = document.getElementById('student_stat_year');
-        if (yearInput) {
-            yearInput.value = year;
-            const event = new Event('change', { bubbles: true });
-            yearInput.dispatchEvent(event);
-        }
-        this.hideStudentYearGrid();
-    },
-    
-    handleStudentYearGridKeyboard(e) {
-        switch(e.key) {
-            case 'Escape':
-                this.hideStudentYearGrid();
-                break;
-            case 'ArrowLeft':
-                e.preventDefault();
-                this.moveStudentYearGrid(-1);
-                break;
-            case 'ArrowRight':
-                e.preventDefault();
-                this.moveStudentYearGrid(1);
-                break;
-        }
-    },
-    
-    // 建筑年份选择器
-    showBuildingYearGrid() {
-        const overlay = document.getElementById('buildingYearGridOverlay');
-        if (overlay) {
-            overlay.style.display = 'flex';
-            const yearInput = document.getElementById('building_stat_year');
-            const currentYear = new Date().getFullYear();
-            const inputYear = parseInt(yearInput ? yearInput.value : currentYear) || currentYear;
-            this.currentBuildingYearGridIndex = Math.floor((inputYear - (currentYear - 4)) / 9);
-            this.updateBuildingYearGrid();
-            document.addEventListener('keydown', this.handleBuildingYearGridKeyboard.bind(this));
-        }
-    },
-    
-    hideBuildingYearGrid() {
-        const overlay = document.getElementById('buildingYearGridOverlay');
-        if (overlay) {
-            overlay.style.display = 'none';
-            document.removeEventListener('keydown', this.handleBuildingYearGridKeyboard.bind(this));
-        }
-    },
-    
-    moveBuildingYearGrid(direction) {
-        this.currentBuildingYearGridIndex += direction;
-        this.updateBuildingYearGrid();
-    },
-    
-    updateBuildingYearGrid() {
-        const yearGrid = document.getElementById('buildingYearGrid');
-        const yearRangeText = document.getElementById('buildingYearRangeText');
-        const yearInput = document.getElementById('building_stat_year');
-        const currentYear = new Date().getFullYear();
-        const inputYear = parseInt(yearInput ? yearInput.value : currentYear) || currentYear;
-        
-        if (!yearGrid || !yearRangeText) return;
-        
-        const baseYear = currentYear - 4 + (this.currentBuildingYearGridIndex * 9);
-        const years = [];
-        
-        for (let i = 0; i < 9; i++) {
-            years.push(baseYear + i);
-        }
-        
-        yearRangeText.textContent = `${years[0]} - ${years[8]}`;
-        
-        yearGrid.innerHTML = '';
-        years.forEach(year => {
-            const yearItem = document.createElement('div');
-            yearItem.className = 'year-item';
-            yearItem.textContent = year;
-            yearItem.onclick = () => this.selectBuildingYear(year);
-            
-            if (year === currentYear) {
-                yearItem.classList.add('current');
-            }
-            
-            if (year === inputYear) {
-                yearItem.classList.add('selected');
-            }
-            
-            yearGrid.appendChild(yearItem);
-        });
-    },
-    
-    selectBuildingYear(year) {
-        const yearInput = document.getElementById('building_stat_year');
-        if (yearInput) {
-            yearInput.value = year;
-            const event = new Event('change', { bubbles: true });
-            yearInput.dispatchEvent(event);
-        }
-        this.hideBuildingYearGrid();
-    },
-    
-    handleBuildingYearGridKeyboard(e) {
-        switch(e.key) {
-            case 'Escape':
-                this.hideBuildingYearGrid();
-                break;
-            case 'ArrowLeft':
-                e.preventDefault();
-                this.moveBuildingYearGrid(-1);
-                break;
-            case 'ArrowRight':
-                e.preventDefault();
-                this.moveBuildingYearGrid(1);
                 break;
         }
     }
@@ -904,8 +710,6 @@ const DataEntryManager = {
             '学校名称': finalSchoolName,
             '学校类型': schoolType,
             '年份': parseInt(formData.get('year')),
-            '学生统计年份': parseInt(formData.get('student_stat_year')),
-            '建筑面积统计年份': parseInt(formData.get('building_stat_year')),
             '全日制本科生人数': undergraduateVal,
             '全日制专科生人数': specialistVal,
             '全日制硕士生人数': parseInt(formData.get('fullTimeMaster')) || 0,
@@ -1263,20 +1067,6 @@ if (typeof window !== 'undefined') {
     window.updateYearGrid = () => YearSelectorManager.updateYearGrid();
     window.selectYear = (year) => YearSelectorManager.selectYear(year);
     window.handleYearGridKeyboard = (event) => YearSelectorManager.handleYearGridKeyboard(event);
-    
-    window.showStudentYearGrid = () => YearSelectorManager.showStudentYearGrid();
-    window.hideStudentYearGrid = () => YearSelectorManager.hideStudentYearGrid();
-    window.moveStudentYearGrid = (direction) => YearSelectorManager.moveStudentYearGrid(direction);
-    window.updateStudentYearGrid = () => YearSelectorManager.updateStudentYearGrid();
-    window.selectStudentYear = (year) => YearSelectorManager.selectStudentYear(year);
-    window.handleStudentYearGridKeyboard = (event) => YearSelectorManager.handleStudentYearGridKeyboard(event);
-    
-    window.showBuildingYearGrid = () => YearSelectorManager.showBuildingYearGrid();
-    window.hideBuildingYearGrid = () => YearSelectorManager.hideBuildingYearGrid();
-    window.moveBuildingYearGrid = (direction) => YearSelectorManager.moveBuildingYearGrid(direction);
-    window.updateBuildingYearGrid = () => YearSelectorManager.updateBuildingYearGrid();
-    window.selectBuildingYear = (year) => YearSelectorManager.selectBuildingYear(year);
-    window.handleBuildingYearGridKeyboard = (event) => YearSelectorManager.handleBuildingYearGridKeyboard(event);
     
     // 兼容性函数
     window.initializeOnlineForm = initializeOnlineForm;

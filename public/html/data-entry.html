@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高校测算 - 高校建筑面积缺口测算计算器</title>
+    <title>高校测算 - 高校建筑面积缺口计算器</title>
     <!-- 引入模块化CSS样式 -->
     <link rel="stylesheet" href="../css/main.css">
 </head>
@@ -86,29 +86,6 @@
                             
                             <div class="card">
                                 <h3>学生人数信息</h3>
-                                <div class="form-row" style="margin-bottom: 20px;">
-                                    <div class="form-group form-group-student-year">
-                                        <label for="student_stat_year">学生统计年份 *</label>
-                                        <div class="year-selector-container">
-                                            <input type="text" id="student_stat_year" name="student_stat_year" value="2025" readonly required class="form-control year-input" onclick="showStudentYearGrid()">
-                                            <div class="year-grid-overlay" id="studentYearGridOverlay" style="display: none;">
-                                                <div class="year-grid-container">
-                                                    <div class="year-grid-header">
-                                                        <button type="button" class="year-nav-btn" id="studentYearPrevBtn" onclick="moveStudentYearGrid(-1)">‹</button>
-                                                        <span class="year-range-text" id="studentYearRangeText"></span>
-                                                        <button type="button" class="year-nav-btn" id="studentYearNextBtn" onclick="moveStudentYearGrid(1)">›</button>
-                                                    </div>
-                                                    <div class="year-grid" id="studentYearGrid">
-                                                        <!-- 学生统计年份九宫格将在这里动态生成 -->
-                                                    </div>
-                                                    <div class="year-grid-footer">
-                                                        <button type="button" class="year-close-btn" onclick="hideStudentYearGrid()">关闭</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                                 <div class="student-category">
                                     <div class="form-row">
                                         <div class="form-group">
@@ -161,29 +138,6 @@
                             
                             <div class="card">
                                 <h3>建筑面积信息</h3>
-                                <div class="form-row" style="margin-bottom: 20px;">
-                                    <div class="form-group form-group-building-year">
-                                        <label for="building_stat_year">建筑面积统计年份 *</label>
-                                        <div class="year-selector-container">
-                                            <input type="text" id="building_stat_year" name="building_stat_year" value="2025" readonly required class="form-control year-input" onclick="showBuildingYearGrid()">
-                                            <div class="year-grid-overlay" id="buildingYearGridOverlay" style="display: none;">
-                                                <div class="year-grid-container">
-                                                    <div class="year-grid-header">
-                                                        <button type="button" class="year-nav-btn" id="buildingYearPrevBtn" onclick="moveBuildingYearGrid(-1)">‹</button>
-                                                        <span class="year-range-text" id="buildingYearRangeText"></span>
-                                                        <button type="button" class="year-nav-btn" id="buildingYearNextBtn" onclick="moveBuildingYearGrid(1)">›</button>
-                                                    </div>
-                                                    <div class="year-grid" id="buildingYearGrid">
-                                                        <!-- 建筑面积统计年份九宫格将在这里动态生成 -->
-                                                    </div>
-                                                    <div class="year-grid-footer">
-                                                        <button type="button" class="year-close-btn" onclick="hideBuildingYearGrid()">关闭</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                                 <div class="form-row">
                                     <div class="form-group" style="flex: 1; margin-right: 15px;">
                                         <label for="teachingArea">教学及辅助用房面积(m²)</label>

@@ -114,8 +114,6 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
         const insertParams = [
             schoolRegistryId,
             schoolData['年份'],
-            schoolData['学生统计年份'] || schoolData['年份'],
-            schoolData['建筑面积统计年份'] || schoolData['年份'],
             submitterUsername || 'system',
             schoolData['年份'], // base_year 使用同样的年份
             schoolData['全日制本科生人数'] || 0,
@@ -159,14 +157,14 @@ async function saveSchoolInfo(schoolData, specialSubsidies = null, calculationRe
         // 插入新的计算历史记录
         const [schoolResult] = await connection.execute(`
             INSERT INTO calculation_history (
-                school_registry_id, year, student_stat_year, building_stat_year, submitter_username, base_year, full_time_undergraduate, full_time_specialist, 
+                school_registry_id, year, submitter_username, base_year, full_time_undergraduate, full_time_specialist, 
                 full_time_master, full_time_doctor, international_undergraduate, international_specialist,
                 international_master, international_doctor, total_students, teaching_area, 
                 office_area, total_living_area, dormitory_area, logistics_area,
                 current_building_area, required_building_area, teaching_area_gap, office_area_gap,
                 dormitory_area_gap, other_living_area_gap, logistics_area_gap, total_area_gap_with_subsidy,
                 total_area_gap_without_subsidy, special_subsidy_total, calculation_results, remarks
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, insertParams);
         
         const schoolInfoId = schoolResult.insertId;
@@ -207,8 +205,6 @@ async function getSchoolHistoryByUser(userRole, userSchoolName = null, username 
                 sr.school_name,
                 sr.school_type,
                 ch.year,
-                ch.student_stat_year,
-                ch.building_stat_year,
                 ch.submitter_username,
                 ch.full_time_undergraduate,
                 ch.full_time_specialist,
@@ -289,8 +285,6 @@ async function getSchoolHistory(year = null) {
                 sr.school_name,
                 sr.school_type,
                 ch.year,
-                ch.student_stat_year,
-                ch.building_stat_year,
                 ch.full_time_undergraduate,
                 ch.full_time_specialist,
                 ch.full_time_master,
@@ -618,44 +612,6 @@ async function getAvailableSubmitterUsersBySchool(schoolName) {
     }
 }
 
-// 获取可用学生统计年份
-async function getAvailableStudentStatYears() {
-    const pool = await getPool();
-    
-    try {
-        const [rows] = await pool.execute(`
-            SELECT DISTINCT student_stat_year 
-            FROM calculation_history 
-            WHERE student_stat_year IS NOT NULL 
-            ORDER BY student_stat_year DESC
-        `);
-        
-        return rows.map(row => row.student_stat_year);
-    } catch (error) {
-        console.error('获取可用学生统计年份失败:', error);
-        return [];
-    }
-}
-
-// 获取可用建筑面积统计年份
-async function getAvailableBuildingStatYears() {
-    const pool = await getPool();
-    
-    try {
-        const [rows] = await pool.execute(`
-            SELECT DISTINCT building_stat_year 
-            FROM calculation_history 
-            WHERE building_stat_year IS NOT NULL 
-            ORDER BY building_stat_year DESC
-        `);
-        
-        return rows.map(row => row.building_stat_year);
-    } catch (error) {
-        console.error('获取可用建筑面积统计年份失败:', error);
-        return [];
-    }
-}
-
 // 获取特殊补助信息
 async function getSpecialSubsidies(calculationHistoryId) {
     const pool = await getPool();
@@ -961,8 +917,6 @@ module.exports = {
     getAvailableYears,
     getAvailableSubmitterUsers,
     getAvailableSubmitterUsersBySchool,
-    getAvailableStudentStatYears,
-    getAvailableBuildingStatYears,
     getSpecialSubsidies,
     getStatistics,
     deleteSchoolRecord,

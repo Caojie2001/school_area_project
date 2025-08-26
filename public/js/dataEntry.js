@@ -567,7 +567,7 @@ const DataEntryManager = {
      * 重置表单
      */
     resetForm() {
-        // 重置所有输入字段
+        // 重置所有数字输入字段
         const inputs = document.querySelectorAll('#page-data-entry input[type="number"]');
         inputs.forEach(input => {
             input.value = '0';
@@ -579,12 +579,59 @@ const DataEntryManager = {
             schoolSelect.value = '';
         }
         
-        // 重新计算
+        // 重置年份选择
+        const yearInput = document.getElementById('year');
+        if (yearInput) {
+            yearInput.value = '2025';
+        }
+        
+        // 重置备注字段
+        const remarksField = document.getElementById('remarks');
+        if (remarksField) {
+            remarksField.value = '';
+        }
+        
+        // 重置学校类型显示
+        const schoolTypeDisplay = document.getElementById('schoolTypeDisplay');
+        if (schoolTypeDisplay) {
+            schoolTypeDisplay.textContent = '';
+        }
+        
+        // 清空特殊补助
+        const specialSubsidiesContainer = document.getElementById('specialSubsidies');
+        if (specialSubsidiesContainer) {
+            specialSubsidiesContainer.innerHTML = '';
+        }
+        
+        // 重新计算所有字段
         this.calculateTotalStudents();
         this.calculateTotalBuildingArea();
         this.calculateOtherLivingArea();
         
         console.log('表单已重置');
+        
+        // 显示重置成功提示
+        const message = document.createElement('div');
+        message.style.cssText = `
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            background: #28a745; 
+            color: white; 
+            padding: 12px 20px; 
+            border-radius: 6px; 
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        `;
+        message.textContent = '表单已重置';
+        document.body.appendChild(message);
+        
+        // 3秒后移除提示
+        setTimeout(() => {
+            if (document.body.contains(message)) {
+                document.body.removeChild(message);
+            }
+        }, 3000);
     },
     
     /**
@@ -1076,6 +1123,7 @@ if (typeof window !== 'undefined') {
     window.submitOnlineData = submitOnlineData;
     window.updateSchoolType = updateSchoolType;
     window.handleOnlineFormSubmit = handleOnlineFormSubmit;
+    window.resetForm = () => DataEntryManager.resetForm();
     
     // 特殊补助管理函数
     window.addSubsidy = addSubsidy;

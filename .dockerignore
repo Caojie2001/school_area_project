@@ -1,15 +1,116 @@
+# 依赖和包管理文件
 node_modules
 npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+
+# Git相关文件
 .git
 .gitignore
+.gitattributes
+
+# 文档文件
 README.md
+*.md
+CHANGELOG.md
+LICENSE
+
+# 环境配置文件
+.env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# SSL证书和密钥（在容器中使用专门的secrets管理）
+certs/
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+
+# 系统文件
 .DS_Store
-backups/*
-.vscode
+Thumbs.db
+
+# 备份文件
+backups/
+*.backup
+*.bak
+
+# IDE配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 日志文件
 *.log
-coverage
+logs/
+server.log
+access.log
+error.log
+
+# 测试覆盖率报告
+coverage/
 .nyc_output
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+*.temp
+
+# 输出文件（在容器中动态生成）
+output/
+dist/
+build/
+
+# 安全测试文件（不需要在容器中）
+security_test.sh
+https_security_test.sh
+credential_security_test.sh
+HTTPS_SECURITY_GUIDE.md
+security_test_results/
+vulnerability_reports/
+
+# 开发工具配置
+.eslintrc.*
+.prettierrc.*
+.editorconfig
+jest.config.*
+webpack.config.*
+
+# 缓存目录
+.cache/
+cache/
+
+# 监控和指标（在容器中单独配置）
+metrics/
+monitoring/
+
+# 本地开发配置
+local.config.js
+dev.config.js
+
+# 数据库文件（在容器中使用外部数据库）
+*.sqlite
+*.sqlite3
+*.db
+*.sql.backup
+*.dump
+
+# Cookie文件（包含认证信息）
+cookies.txt
+
+# 会话存储
+sessions/
+session-store/
+
+# 密钥管理文件
+secrets/
+keys/
+keystore/

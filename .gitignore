@@ -1,5 +1,17 @@
 # 环境变量文件（包含敏感信息，不应提交到版本控制）
 .env
+.env.local
+.env.production
+.env.staging
+
+# SSL证书和密钥文件（敏感文件，不应提交）
+certs/
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
 
 # 依赖目录
 node_modules/
@@ -7,6 +19,9 @@ node_modules/
 # 日志文件
 *.log
 logs/
+server.log
+access.log
+error.log
 
 # 临时文件
 *.tmp
@@ -116,3 +131,38 @@ dist
 # Temporary folders
 tmp/
 temp/
+
+# 安全测试和配置文件
+security_test_results/
+penetration_test_logs/
+vulnerability_reports/
+
+# 数据库备份和转储文件
+*.sql.backup
+*.dump
+*.sql.gz
+
+# 会话存储文件
+sessions/
+session-store/
+
+# 缓存文件
+.cache/
+cache/
+
+# 本地开发配置文件
+local.config.js
+dev.config.js
+
+# 性能测试结果
+benchmark_results/
+load_test_reports/
+
+# 监控和指标数据
+metrics/
+monitoring/
+
+# 密钥管理文件
+secrets/
+keys/
+keystore/

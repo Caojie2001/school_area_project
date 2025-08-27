@@ -637,10 +637,10 @@ function displayOverviewResults(data) {
     html += '<div class="scrollable-middle-columns" style="margin-left: 280px; margin-right: 0; overflow-x: auto; overflow-y: hidden;">';
     html += '<table class="data-table-scrollable"><thead><tr>';
     html += '<th>现状建筑总面积(m²)</th>';
-    html += '<th>学生规模测算建筑总面积(m²)</th>';
-    html += '<th>学生规模测算建筑面积总缺额(不含补助)(m²)</th>';
-    html += '<th>补助建筑总面积(m²)</th>';
-    html += '<th>学生规模测算建筑面积总缺额(含补助)(m²)</th>';
+    html += '<th>测算建筑总面积(m²)</th>';
+    html += '<th>测算建筑面积总缺额(不含特殊补助)(m²)</th>';
+    html += '<th>特殊补助建筑总面积(m²)</th>';
+    html += '<th>测算建筑面积总缺额(含特殊补助)(m²)</th>';
     html += '</tr></thead><tbody>';
     
     data.forEach(record => {

@@ -265,8 +265,27 @@
                 const password = formData.get('password');
                 const rememberMe = formData.get('rememberMe') === 'on';
 
+                // 前端输入验证
                 if (!username || !password) {
                     showMessage('请填写用户名和密码', 'error');
+                    return;
+                }
+
+                // 长度验证
+                if (username.length > 50) {
+                    showMessage('用户名长度不能超过50个字符', 'error');
+                    return;
+                }
+
+                if (password.length > 200) {
+                    showMessage('密码长度不能超过200个字符', 'error');
+                    return;
+                }
+
+                // 字符验证 - 防止XSS和SQL注入字符
+                const dangerousChars = /[<>'"`;]/;
+                if (dangerousChars.test(username)) {
+                    showMessage('用户名包含非法字符', 'error');
                     return;
                 }
 

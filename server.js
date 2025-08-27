@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const session = require('express-session');
+const https = require('https');
+const http = require('http');
 
 // 引入数据库相关模块
 require('dotenv').config();
@@ -13,6 +15,23 @@ const AuthService = require('./config/authService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
+
+// 检查是否有HTTPS证书
+let httpsEnabled = false;
+let sslOptions = null;
+
+try {
+    sslOptions = {
+        key: fs.readFileSync(path.join(__dirname, 'certs', 'private-key.pem')),
+        cert: fs.readFileSync(path.join(__dirname, 'certs', 'certificate.pem'))
+    };
+    httpsEnabled = true;
+    console.log('✅ SSL证书加载成功，HTTPS已启用');
+} catch (error) {
+    console.warn('⚠️ SSL证书未找到，仅使用HTTP模式');
+    httpsEnabled = false;
+}
 
 // 会话配置
 app.use(session({
@@ -20,11 +39,100 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: false, // 在生产环境中应该设置为true（需要HTTPS）
+        secure: httpsEnabled, // 如果启用HTTPS则设置为true
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000 // 24小时
+        maxAge: 24 * 60 * 60 * 1000, // 24小时
+        sameSite: 'strict' // 防止CSRF攻击
     }
 }));
+
+// HTTPS重定向中间件 - 在生产环境中强制使用HTTPS
+app.use((req, res, next) => {
+    // 如果启用了HTTPS且当前是HTTP请求（不是localhost开发环境）
+    if (httpsEnabled && !req.secure && req.get('X-Forwarded-Proto') !== 'https' && process.env.NODE_ENV === 'production') {
+        // 构建HTTPS URL
+        const httpsUrl = `https://${req.get('Host').replace(/:\d+$/, '')}:${HTTPS_PORT}${req.originalUrl}`;
+        console.log(`重定向到HTTPS: ${req.originalUrl} -> ${httpsUrl}`);
+        return res.redirect(301, httpsUrl);
+    }
+    next();
+});
+
+// 安全头中间件 - 增强HTTPS安全性
+app.use((req, res, next) => {
+    // 基础安全头
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    
+    // 如果是HTTPS连接，添加额外的安全头
+    if (req.secure || req.get('X-Forwarded-Proto') === 'https') {
+        // HSTS - 强制使用HTTPS
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+        // 内容安全策略
+        res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';");
+    }
+    
+    next();
+});
+
+// 安全中间件 - 防止URL重定向和路径穿越攻击
+app.use((req, res, next) => {
+    // 1. 防止URL重定向攻击 - 检查可疑的重定向字符
+    const suspiciousRedirectPatterns = [
+        /\\/,  // 反斜杠
+        /%5c/i,  // URL编码的反斜杠
+        /\/\/+/,  // 多个连续斜杠
+        /%2f%2f/i,  // URL编码的双斜杠
+        /%252f/i,  // 双URL编码的斜杠
+        /https?:\/\//i,  // HTTP/HTTPS协议
+        /ftp:\/\//i,  // FTP协议
+        /javascript:/i,  // JavaScript协议
+        /data:/i,  // Data协议
+    ];
+
+    // 检查请求路径是否包含可疑模式
+    const requestPath = decodeURIComponent(req.path);
+    for (const pattern of suspiciousRedirectPatterns) {
+        if (pattern.test(requestPath) || pattern.test(req.originalUrl)) {
+            console.warn(`可疑的URL重定向尝试: ${req.originalUrl} from IP: ${req.ip}`);
+            return res.status(400).json({ 
+                success: false, 
+                message: '无效的请求路径' 
+            });
+        }
+    }
+
+    // 2. 防止路径穿越攻击
+    const pathTraversalPatterns = [
+        /\.\./,  // 父目录引用
+        /%2e%2e/i,  // URL编码的..
+        /\.\./,  // 相对路径
+        /~+/,  // 波浪号
+    ];
+
+    for (const pattern of pathTraversalPatterns) {
+        if (pattern.test(requestPath)) {
+            console.warn(`可疑的路径穿越尝试: ${req.originalUrl} from IP: ${req.ip}`);
+            return res.status(400).json({ 
+                success: false, 
+                message: '无效的请求路径' 
+            });
+        }
+    }
+
+    // 3. 限制请求路径长度（防止缓冲区溢出）
+    if (req.originalUrl.length > 2048) {
+        console.warn(`过长的URL请求: ${req.originalUrl.length} chars from IP: ${req.ip}`);
+        return res.status(414).json({ 
+            success: false, 
+            message: 'URL过长' 
+        });
+    }
+
+    next();
+});
 
 // 中间件配置
 app.use(cors());
@@ -38,7 +146,7 @@ function requireAuth(req, res, next) {
         if (req.path.startsWith('/api/')) {
             return res.status(401).json({ success: false, message: '请先登录' });
         } else {
-            return res.redirect('/login.html');
+            return safeRedirect(res, '/login.html');
         }
     }
 }
@@ -74,22 +182,71 @@ function requireConstructionCenterOrAdmin(req, res, next) {
 app.use('/login.html', express.static(path.join(__dirname, 'public', 'login.html')));
 app.use(express.static('public', { 
     index: false,  // 禁用默认index文件服务
-    setHeaders: (res, path, stat) => {
-        // 对于非登录页面的静态文件，检查认证状态
-        // 这里我们通过中间件处理，而不是在setHeaders中
+    dotfiles: 'deny',  // 拒绝访问点文件
+    etag: false,  // 禁用ETag
+    extensions: ['html', 'css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'ico', 'svg', 'woff', 'woff2', 'ttf', 'eot'],  // 只允许特定扩展名
+    setHeaders: (res, filePath, stat) => {
+        // 安全头设置
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('X-Frame-Options', 'DENY');
+        res.setHeader('X-XSS-Protection', '1; mode=block');
+        
+        // 确保路径在允许的目录内
+        const normalizedPath = path.normalize(filePath).replace(/\\/g, '/');
+        const publicPath = path.normalize(path.join(__dirname, 'public')).replace(/\\/g, '/');
+        
+        if (!normalizedPath.startsWith(publicPath)) {
+            res.status(403).end();
+            return;
+        }
     }
 }));
+
+// 安全重定向函数 - 只允许重定向到安全的内部URL
+function safeRedirect(res, url) {
+    // 定义允许的重定向URL白名单
+    const allowedUrls = [
+        '/',
+        '/login.html',
+        '/#data-entry',
+        '/#data-management', 
+        '/#statistics',
+        '/html/user-management.html',
+        '/index.html'
+    ];
+    
+    // 检查是否为相对URL且在白名单中
+    if (url && allowedUrls.includes(url)) {
+        return res.redirect(url);
+    } else {
+        console.warn(`阻止不安全的重定向尝试: ${url}`);
+        return res.redirect('/');  // 默认重定向到首页
+    }
+}
 
 // 认证相关路由
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password, rememberMe } = req.body;
         
+        // 输入验证和清理
         if (!username || !password) {
             return res.status(400).json({ success: false, message: '用户名和密码不能为空' });
         }
 
-        const result = await AuthService.login(username, password);
+        // 防止过长输入
+        if (username.length > 50 || password.length > 200) {
+            return res.status(400).json({ success: false, message: '输入长度超出限制' });
+        }
+
+        // 清理输入 - 移除潜在的危险字符
+        const cleanUsername = username.trim().replace(/[<>'"`;]/g, '');
+        
+        if (cleanUsername !== username.trim()) {
+            return res.status(400).json({ success: false, message: '用户名包含非法字符' });
+        }
+
+        const result = await AuthService.login(cleanUsername, password);
         
         if (result.success) {
             req.session.user = result.user;
@@ -486,16 +643,16 @@ app.get('/', requireAuth, (req, res) => {
 
 // 功能页面路由重定向到主页面的相应部分
 app.get('/html/data-entry.html', requireAuth, (req, res) => {
-    res.redirect('/#data-entry');
+    safeRedirect(res, '/#data-entry');
 });
 
 app.get('/html/data-management.html', requireAuth, (req, res) => {
-    res.redirect('/#data-management');
+    safeRedirect(res, '/#data-management');
 });
 
 // 统计页面 - 需要基建中心或管理员权限
 app.get('/html/statistics.html', requireAuth, requireConstructionCenterOrAdmin, (req, res) => {
-    res.redirect('/#statistics');
+    safeRedirect(res, '/#statistics');
 });
 
 // 用户管理页面 - 保持独立页面
@@ -505,7 +662,7 @@ app.get('/html/user-management.html', requireAuth, requireAdmin, (req, res) => {
 
 // 兼容旧的用户管理路由
 app.get('/user-management.html', requireAuth, requireAdmin, (req, res) => {
-    res.redirect('/html/user-management.html');
+    safeRedirect(res, '/html/user-management.html');
 });
 
 // 保护其他需要认证的路由
@@ -751,7 +908,7 @@ app.post('/online-download', (req, res) => {
         
         const data = [
             ['高校测算'],
-            ['基本办学条件缺口（"－"表示超额，"+"表示缺额）', '', '', ''],
+            ['基本办学条件缺口（＞0表示存在缺口）', '', '', ''],
             ['', '', '', `测算时间：${new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-')}`],
             ['测算年份', calcYear, '测算用户', submitterUser],
             [`单位/学校(机构)名称(章)`, calculationData['学校名称'] || '', '院校类型', cleanSchoolType(calculationData['院校类别'] || '')],
@@ -763,7 +920,7 @@ app.post('/online-download', (req, res) => {
             ['博士留学生(人)', calculationData['留学生博士生人数'] || 0, '', ''],
             ['', '', '', ''],
             ['测算结果', '', '', ''],
-            ['用房类型', '现状建筑面积(m²)', '学生规模测算建筑面积(m²)', '学生规模测算建筑面积缺额(m²)'],
+            ['用房类型', '现状建筑面积(m²)', '测算建筑面积(m²)', '测算建筑面积缺额(m²)'],
             ['教学及辅助用房', formatAreaToTwoDecimals(calculationData['现有教学及辅助用房面积']), formatAreaToTwoDecimals(calculationData['总应配教学及辅助用房(A)']), formatAreaToTwoDecimals(calculationData['教学及辅助用房缺口(A)'])],
             ['办公用房', formatAreaToTwoDecimals(calculationData['现有办公用房面积']), formatAreaToTwoDecimals(calculationData['总应配办公用房(B)']), formatAreaToTwoDecimals(calculationData['办公用房缺口(B)'])],
             ['生活配套用房', formatAreaToTwoDecimals(calculationData['现有生活用房总面积']), formatAreaToTwoDecimals((calculationData['总应配学生宿舍(C1)'] || 0) + (calculationData['总应配其他生活用房(C2)'] || 0)), formatAreaToTwoDecimals((calculationData['学生宿舍缺口(C1)'] || 0) + (calculationData['其他生活用房缺口(C2)'] || 0))],
@@ -771,9 +928,9 @@ app.post('/online-download', (req, res) => {
             ['其中:其他生活用房', formatAreaToTwoDecimals(calculationData['现有其他生活用房面积']), formatAreaToTwoDecimals(calculationData['总应配其他生活用房(C2)']), formatAreaToTwoDecimals(calculationData['其他生活用房缺口(C2)'])],
             ['后勤补助用房', formatAreaToTwoDecimals(calculationData['现有后勤辅助用房面积']), formatAreaToTwoDecimals(calculationData['总应配后勤辅助用房(D)']), formatAreaToTwoDecimals(calculationData['后勤辅助用房缺口(D)'])],
             ['小计', formatAreaToTwoDecimals((calculationData['现有教学及辅助用房面积'] || 0) + (calculationData['现有办公用房面积'] || 0) + (calculationData['现有生活用房总面积'] || 0) + (calculationData['现有后勤辅助用房面积'] || 0)), formatAreaToTwoDecimals((calculationData['总应配教学及辅助用房(A)'] || 0) + (calculationData['总应配办公用房(B)'] || 0) + (calculationData['总应配学生宿舍(C1)'] || 0) + (calculationData['总应配其他生活用房(C2)'] || 0) + (calculationData['总应配后勤辅助用房(D)'] || 0)), formatAreaToTwoDecimals(calculationData['建筑面积总缺口（不含特殊补助）'])],
-            ['学生规模测算建筑面积总缺额（不含补助）(m²)', '', '', formatAreaToTwoDecimals(calculationData['建筑面积总缺口（不含特殊补助）'])],
-            ['补助建筑总面积(m²)', '', '', formatAreaToTwoDecimals(calculationData['特殊补助总面积'])],
-            ['学生规模测算建筑面积总缺额（含补助）(m²)', '', '', formatAreaToTwoDecimals(calculationData['建筑面积总缺口（含特殊补助）'])]
+            ['测算建筑面积总缺额（不含特殊补助）(m²)', '', '', formatAreaToTwoDecimals(calculationData['建筑面积总缺口（不含特殊补助）'])],
+            ['特殊补助建筑总面积(m²)', '', '', formatAreaToTwoDecimals(calculationData['特殊补助总面积'])],
+            ['测算建筑面积总缺额（含特殊补助）(m²)', '', '', formatAreaToTwoDecimals(calculationData['建筑面积总缺口（含特殊补助）'])]
         ];
         
         // 创建工作表
@@ -1535,7 +1692,7 @@ app.get('/api/overview/records', requireAuth, async (req, res) => {
             
             // 准备表格数据
             const worksheetData = [
-                ['测算年份', '学校名称', '现状建筑总面积(m²)', '学生规模测算建筑总面积(m²)', '学生规模测算建筑面积总缺额(不含补助)(m²)', '补助建筑总面积(m²)', '学生规模测算建筑面积总缺额(含补助)(m²)', '测算时间', '测算用户']
+                ['测算年份', '学校名称', '现状建筑总面积(m²)', '测算建筑总面积(m²)', '测算建筑面积总缺额(不含特殊补助)(m²)', '特殊补助建筑总面积(m²)', '测算建筑面积总缺额(含特殊补助)(m²)', '测算时间', '测算用户']
             ];
             
             formattedRecords.forEach(record => {
@@ -1559,10 +1716,10 @@ app.get('/api/overview/records', requireAuth, async (req, res) => {
                 { wch: 10 }, // 测算年份
                 { wch: 25 }, // 学校名称
                 { wch: 18 }, // 现状建筑总面积
-                { wch: 22 }, // 学生规模测算建筑总面积
-                { wch: 28 }, // 缺额(不含补助)
-                { wch: 18 }, // 补助建筑总面积
-                { wch: 28 }, // 缺额(含补助)
+                { wch: 22 }, // 测算建筑总面积
+                { wch: 28 }, // 缺额(不含特殊补助)
+                { wch: 18 }, // 特殊补助建筑总面积
+                { wch: 28 }, // 缺额(含特殊补助)
                 { wch: 18 }, // 测算时间
                 { wch: 12 }  // 测算用户
             ];
@@ -1756,7 +1913,7 @@ function generateSingleRecordDetailExcel(recordData) {
     
     const data = [
         ['高校测算'],
-        ['基本办学条件缺口（"－"表示超额，"+"表示缺额）', '', '', ''],
+        ['基本办学条件缺口（＞0表示存在缺口）', '', '', ''],
         ['', '', '', `测算时间：${new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-')}`],
         ['测算年份', year, '测算用户', submitterUser],
         [`单位/学校(机构)名称(章)`, schoolName, '院校类型', cleanSchoolType(recordData.school_type || '')],
@@ -1768,7 +1925,7 @@ function generateSingleRecordDetailExcel(recordData) {
         ['博士留学生(人)', recordData.international_doctor || 0, '', ''],
         ['', '', '', ''],
         ['测算结果', '', '', ''],
-        ['用房类型', '现状建筑面积(m²)', '学生规模测算建筑面积(m²)', '学生规模测算建筑面积缺额(m²)'],
+        ['用房类型', '现状建筑面积(m²)', '测算建筑面积(m²)', '测算建筑面积缺额(m²)'],
         ['教学及辅助用房', formatAreaToTwoDecimals(recordData.teaching_area), recordData.required_building_area ? formatAreaToTwoDecimals(recordData.required_building_area * 0.4) : 0, formatAreaToTwoDecimals(recordData.teaching_area_gap)],
         ['办公用房', formatAreaToTwoDecimals(recordData.office_area), recordData.required_building_area ? formatAreaToTwoDecimals(recordData.required_building_area * 0.1) : 0, formatAreaToTwoDecimals(recordData.office_area_gap)],
         ['生活配套用房', formatAreaToTwoDecimals(recordData.total_living_area), recordData.required_building_area ? formatAreaToTwoDecimals(recordData.required_building_area * 0.4) : 0, formatAreaToTwoDecimals((recordData.dormitory_area_gap || 0) + (recordData.other_living_area_gap || 0))],
@@ -1776,9 +1933,9 @@ function generateSingleRecordDetailExcel(recordData) {
         ['其中:其他生活用房', formatAreaToTwoDecimals(otherLivingArea), recordData.required_building_area ? formatAreaToTwoDecimals(recordData.required_building_area * 0.1) : 0, formatAreaToTwoDecimals(recordData.other_living_area_gap)],
         ['后勤补助用房', formatAreaToTwoDecimals(recordData.logistics_area), recordData.required_building_area ? formatAreaToTwoDecimals(recordData.required_building_area * 0.1) : 0, formatAreaToTwoDecimals(recordData.logistics_area_gap)],
         ['小计', formatAreaToTwoDecimals(recordData.current_building_area), formatAreaToTwoDecimals(recordData.required_building_area), formatAreaToTwoDecimals((recordData.total_area_gap_without_subsidy || (recordData.total_area_gap_with_subsidy || 0) - specialSubsidyTotalArea))],
-        ['学生规模测算建筑面积总缺额（不含补助）(m²)', '', '', formatAreaToTwoDecimals((recordData.total_area_gap_without_subsidy || (recordData.total_area_gap_with_subsidy || 0) - specialSubsidyTotalArea))],
-        ['补助建筑总面积(m²)', '', '', formatAreaToTwoDecimals(specialSubsidyTotalArea)],
-        ['学生规模测算建筑面积总缺额（含补助）(m²)', '', '', formatAreaToTwoDecimals(recordData.total_area_gap_with_subsidy)]
+        ['测算建筑面积总缺额（不含特殊补助）(m²)', '', '', formatAreaToTwoDecimals((recordData.total_area_gap_without_subsidy || (recordData.total_area_gap_with_subsidy || 0) - specialSubsidyTotalArea))],
+        ['特殊补助建筑总面积(m²)', '', '', formatAreaToTwoDecimals(specialSubsidyTotalArea)],
+        ['测算建筑面积总缺额（含特殊补助）(m²)', '', '', formatAreaToTwoDecimals(recordData.total_area_gap_with_subsidy)]
     ];
     
     // 创建工作表
@@ -2270,28 +2427,18 @@ function generateBatchExportExcel(schoolsData, filters = {}) {
         const filePath = path.join(outputDir, fileName);
         
         try {
-            // 单个记录也使用完整的4个工作表格式
+            // 创建新的工作簿
             const wb = XLSX.utils.book_new();
             
-            // 第一个Sheet：测算汇总
-            const summaryData = generateSummarySheet(schoolsData);
-            const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(wb, summarySheet, "测算汇总");
+            // 第一个Sheet：测算数据（宽表格式）
+            const mainData = generateWideTableSheet(schoolsData);
+            const mainSheet = XLSX.utils.json_to_sheet(mainData);
+            XLSX.utils.book_append_sheet(wb, mainSheet, "测算数据");
             
-            // 第二个Sheet：测算明细(不含补助)
-            const detailData = generateDetailSheet(schoolsData);
-            const detailSheet = XLSX.utils.json_to_sheet(detailData);
-            XLSX.utils.book_append_sheet(wb, detailSheet, "测算明细(不含补助)");
-            
-            // 第三个Sheet：学生数明细
-            const studentData = generateStudentDetailSheet(schoolsData);
-            const studentSheet = XLSX.utils.json_to_sheet(studentData);
-            XLSX.utils.book_append_sheet(wb, studentSheet, "学生数明细");
-            
-            // 第四个Sheet：补助明细
+            // 第二个Sheet：特殊补助明细
             const subsidyData = generateSubsidyDetailSheet(schoolsData);
             const subsidySheet = XLSX.utils.json_to_sheet(subsidyData);
-            XLSX.utils.book_append_sheet(wb, subsidySheet, "补助明细");
+            XLSX.utils.book_append_sheet(wb, subsidySheet, "特殊补助明细");
             
             // 写入文件
             XLSX.writeFile(wb, filePath);
@@ -2313,87 +2460,177 @@ function generateBatchExportExcel(schoolsData, filters = {}) {
         try {
             // 创建新的工作簿
             const wb = XLSX.utils.book_new();
-        
-        // 数据转换：将数据库格式转换为Excel输出格式
-        const excelData = schoolsData.map(school => {
-            // 解析特殊补助JSON数据
-            let specialSubsidies = [];
-            let specialSubsidyTotalArea = 0;
-            let specialSubsidyDetails = '无特殊补助';
             
-            try {
-                if (school.special_subsidies) {
-                    specialSubsidies = JSON.parse(school.special_subsidies);
-                    if (Array.isArray(specialSubsidies) && specialSubsidies.length > 0) {
-                        specialSubsidyTotalArea = formatAreaToTwoDecimals(specialSubsidies.reduce((sum, item) => 
-                            sum + (parseFloat(item['补助面积（m²）']) || 0), 0));
-                        specialSubsidyDetails = specialSubsidies.map(item => 
-                            `${item['特殊用房补助名称']}:${formatAreaToTwoDecimals(item['补助面积（m²）'])}m²`
-                        ).join('; ');
-                    }
+            // 第一个Sheet：测算数据（宽表格式）
+            const mainData = generateWideTableSheet(schoolsData);
+            const mainSheet = XLSX.utils.json_to_sheet(mainData);
+            XLSX.utils.book_append_sheet(wb, mainSheet, "测算数据");
+            
+            // 第二个Sheet：特殊补助明细
+            const subsidyData = generateSubsidyDetailSheet(schoolsData);
+            const subsidySheet = XLSX.utils.json_to_sheet(subsidyData);
+            XLSX.utils.book_append_sheet(wb, subsidySheet, "特殊补助明细");
+            
+            // 写入文件
+            XLSX.writeFile(wb, filePath);
+            
+            return fileName;
+        } catch (error) {
+            console.error('生成批量导出Excel时出错:', error);
+            throw error;
+        }
+    }
+}
+
+// 生成宽表格式的测算数据Sheet
+function generateWideTableSheet(schoolsData) {
+    return schoolsData.map(school => {
+        // 解析特殊补助数据
+        let specialSubsidies = [];
+        let specialSubsidyTotalArea = 0;
+        
+        try {
+            if (school.special_subsidies) {
+                specialSubsidies = JSON.parse(school.special_subsidies);
+                if (Array.isArray(specialSubsidies) && specialSubsidies.length > 0) {
+                    specialSubsidyTotalArea = specialSubsidies.reduce((sum, item) => 
+                        sum + (parseFloat(item['补助面积（m²）']) || 0), 0);
                 }
-            } catch (e) {
-                console.warn('解析特殊补助数据失败:', e);
             }
-            
-            // 构建Excel行数据
-            return {
-                '学校名称': school.school_name,
-                '院校类别': school.school_type,
-                '测算年份': school.year,
-                '录入时间': new Date(school.created_at).toLocaleString('zh-CN'),
-                '学生总人数': school.total_students,
-                '全日制专科生': school.fulltime_specialist || 0,
-                '全日制本科生': school.fulltime_undergrad,
-                '全日制硕士生': school.fulltime_master,
-                '全日制博士生': school.fulltime_doctor,
-                '留学生本科生': school.international_undergrad,
-                '留学生硕士生': school.international_master,
-                '留学生博士生': school.international_doctor,
-                '现状教学及辅助用房面积': formatAreaToTwoDecimals(school.current_teaching_area),
-                '现状办公用房面积': formatAreaToTwoDecimals(school.current_office_area),
-                '现状学生宿舍面积': formatAreaToTwoDecimals(school.current_dormitory_area),
-                '现状生活用房总面积': formatAreaToTwoDecimals(school.current_living_area),
-                '现状后勤辅助用房面积': formatAreaToTwoDecimals(school.current_logistics_area),
-                '现状建筑总面积': formatAreaToTwoDecimals(school.current_total_area),
-                '应配建筑总面积': formatAreaToTwoDecimals(school.required_total_area),
-                '建筑面积总缺口（不含补助）': formatAreaToTwoDecimals(school.gap_without_subsidy),
-                '建筑面积总缺口（含补助）': formatAreaToTwoDecimals(school.total_gap),
-                '特殊补助总面积': formatAreaToTwoDecimals(specialSubsidyTotalArea),
-                '特殊补助项目数': specialSubsidies.length,
-                '特殊补助明细': specialSubsidyDetails
-            };
-        });
-        
-        // 第一个Sheet：测算汇总
-        const summaryData = generateSummarySheet(schoolsData);
-        const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(wb, summarySheet, "测算汇总");
-        
-        // 第二个Sheet：测算明细(不含补助)
-        const detailData = generateDetailSheet(schoolsData);
-        const detailSheet = XLSX.utils.json_to_sheet(detailData);
-        XLSX.utils.book_append_sheet(wb, detailSheet, "测算明细(不含补助)");
-        
-        // 第三个Sheet：学生数明细
-        const studentData = generateStudentDetailSheet(schoolsData);
-        const studentSheet = XLSX.utils.json_to_sheet(studentData);
-        XLSX.utils.book_append_sheet(wb, studentSheet, "学生数明细");
-        
-        // 第四个Sheet：补助明细
-        const subsidyData = generateSubsidyDetailSheet(schoolsData);
-        const subsidySheet = XLSX.utils.json_to_sheet(subsidyData);
-        XLSX.utils.book_append_sheet(wb, subsidySheet, "补助明细");
-        
-        // 写入文件
-        XLSX.writeFile(wb, filePath);
-        
-        return fileName;
-    } catch (error) {
-        console.error('生成批量导出Excel时出错:', error);
-        throw error;
-    }
-    }
+        } catch (e) {
+            console.warn('解析特殊补助数据失败:', e);
+        }
+
+        // 获取现状数据（从数据库字段）
+        const currentTeachingArea = parseFloat(school.teaching_area) || 0;
+        const currentOfficeArea = parseFloat(school.office_area) || 0;
+        const currentTotalLivingArea = parseFloat(school.total_living_area) || 0;
+        const currentDormitoryArea = parseFloat(school.dormitory_area) || 0;
+        const currentOtherLivingArea = Math.max(0, currentTotalLivingArea - currentDormitoryArea);
+        const currentLogisticsArea = parseFloat(school.logistics_area) || 0;
+        const currentTotalArea = currentTeachingArea + currentOfficeArea + currentTotalLivingArea + currentLogisticsArea;
+
+        // 计算测算数据（现状 + 缺额）
+        const calculatedTeachingArea = currentTeachingArea + (parseFloat(school.teaching_area_gap) || 0);
+        const calculatedOfficeArea = currentOfficeArea + (parseFloat(school.office_area_gap) || 0);
+        const calculatedDormitoryArea = currentDormitoryArea + (parseFloat(school.dormitory_area_gap) || 0);
+        const calculatedOtherLivingArea = currentOtherLivingArea + (parseFloat(school.other_living_area_gap) || 0);
+        const calculatedTotalLivingArea = calculatedDormitoryArea + calculatedOtherLivingArea;
+        const calculatedLogisticsArea = currentLogisticsArea + (parseFloat(school.logistics_area_gap) || 0);
+        const calculatedTotalArea = calculatedTeachingArea + calculatedOfficeArea + calculatedTotalLivingArea + calculatedLogisticsArea;
+
+        // 计算缺额数据
+        const teachingAreaGap = parseFloat(school.teaching_area_gap) || 0;
+        const officeAreaGap = parseFloat(school.office_area_gap) || 0;
+        const dormitoryAreaGap = parseFloat(school.dormitory_area_gap) || 0;
+        const otherLivingAreaGap = parseFloat(school.other_living_area_gap) || 0;
+        const totalLivingAreaGap = dormitoryAreaGap + otherLivingAreaGap;
+        const logisticsAreaGap = parseFloat(school.logistics_area_gap) || 0;
+        const totalAreaGapWithoutSubsidy = teachingAreaGap + officeAreaGap + totalLivingAreaGap + logisticsAreaGap;
+        const totalAreaGapWithSubsidy = totalAreaGapWithoutSubsidy + specialSubsidyTotalArea;
+
+        // 学生数据
+        const fullTimeSpecialist = parseInt(school.full_time_specialist) || 0;
+        const fullTimeUndergraduate = parseInt(school.full_time_undergraduate) || 0;
+        const fullTimeMaster = parseInt(school.full_time_master) || 0;
+        const fullTimeDoctor = parseInt(school.full_time_doctor) || 0;
+        const fullTimeTotal = fullTimeSpecialist + fullTimeUndergraduate + fullTimeMaster + fullTimeDoctor;
+
+        const internationalUndergraduate = parseInt(school.international_undergraduate) || 0;
+        const internationalMaster = parseInt(school.international_master) || 0;
+        const internationalDoctor = parseInt(school.international_doctor) || 0;
+        const internationalTotal = internationalUndergraduate + internationalMaster + internationalDoctor;
+
+        const totalStudents = fullTimeTotal + internationalTotal;
+
+        // 获取院校类别，清理可能的前缀
+        let schoolType = school.school_type || '';
+        if (schoolType.includes('院校类型：')) {
+            schoolType = schoolType.replace('院校类型：', '');
+        }
+        if (schoolType.includes('院校类别：')) {
+            schoolType = schoolType.replace('院校类别：', '');
+        }
+
+        return {
+            '学校名称': school.school_name || '',
+            '院校类别': schoolType,
+            '测算年份': parseInt(school.year) || 0,
+            '测算用户': school.submitter_real_name || school.submitter_username || '未知用户',
+            '教学及辅助用房面积(㎡)_现状': formatAreaToTwoDecimals(currentTeachingArea),
+            '办公用房面积(㎡)_现状': formatAreaToTwoDecimals(currentOfficeArea),
+            '生活用房总面积(㎡)_现状': formatAreaToTwoDecimals(currentTotalLivingArea),
+            '其中:学生宿舍面积(㎡)_现状': formatAreaToTwoDecimals(currentDormitoryArea),
+            '其中:其他生活用房面积(㎡)_现状': formatAreaToTwoDecimals(currentOtherLivingArea),
+            '后勤辅助用房面积(㎡)_现状': formatAreaToTwoDecimals(currentLogisticsArea),
+            '建筑总面积(㎡)_现状': formatAreaToTwoDecimals(currentTotalArea),
+            '教学及辅助用房面积(㎡)_测算': formatAreaToTwoDecimals(calculatedTeachingArea),
+            '办公用房面积(㎡)_测算': formatAreaToTwoDecimals(calculatedOfficeArea),
+            '生活用房总面积(㎡)_测算': formatAreaToTwoDecimals(calculatedTotalLivingArea),
+            '其中:学生宿舍面积(㎡)_测算': formatAreaToTwoDecimals(calculatedDormitoryArea),
+            '其中:其他生活用房面积(㎡)_测算': formatAreaToTwoDecimals(calculatedOtherLivingArea),
+            '后勤辅助用房面积(㎡)_测算': formatAreaToTwoDecimals(calculatedLogisticsArea),
+            '建筑总面积(㎡)_测算': formatAreaToTwoDecimals(calculatedTotalArea),
+            '教学及辅助用房面积(㎡)_缺额': formatAreaToTwoDecimals(teachingAreaGap),
+            '办公用房面积(㎡)_缺额': formatAreaToTwoDecimals(officeAreaGap),
+            '生活用房总面积(㎡)_缺额': formatAreaToTwoDecimals(totalLivingAreaGap),
+            '其中:学生宿舍面积(㎡)_缺额': formatAreaToTwoDecimals(dormitoryAreaGap),
+            '其中:其他生活用房面积(㎡)_缺额': formatAreaToTwoDecimals(otherLivingAreaGap),
+            '后勤辅助用房面积(㎡)_缺额': formatAreaToTwoDecimals(logisticsAreaGap),
+            '建筑总面积(㎡)_缺额_不含特殊补助': formatAreaToTwoDecimals(totalAreaGapWithoutSubsidy),
+            '建筑总面积(㎡)_缺额_含特殊补助': formatAreaToTwoDecimals(totalAreaGapWithSubsidy),
+            '特殊补助建筑总面积(㎡)': formatAreaToTwoDecimals(specialSubsidyTotalArea),
+            '专科全日制学生数(人)': fullTimeSpecialist,
+            '本科全日制学生数(人)': fullTimeUndergraduate,
+            '硕士全日制学生数(人)': fullTimeMaster,
+            '博士全日制学生数(人)': fullTimeDoctor,
+            '全日制学生总数(人)': fullTimeTotal,
+            '本科留学生数(人)': internationalUndergraduate,
+            '硕士留学生数(人)': internationalMaster,
+            '博士留学生数(人)': internationalDoctor,
+            '留学生总数(人)': internationalTotal,
+            '学生总人数(人)': totalStudents
+        };
+    });
+}
+
+// 生成特殊补助明细Sheet
+function generateSubsidyDetailSheet(schoolsData) {
+    const subsidyDetails = [];
+    
+    schoolsData.forEach(school => {
+        try {
+            if (school.special_subsidies) {
+                const specialSubsidies = JSON.parse(school.special_subsidies);
+                if (Array.isArray(specialSubsidies) && specialSubsidies.length > 0) {
+                    specialSubsidies.forEach(subsidy => {
+                        // 获取院校类别，清理可能的前缀
+                        let schoolType = school.school_type || '';
+                        if (schoolType.includes('院校类型：')) {
+                            schoolType = schoolType.replace('院校类型：', '');
+                        }
+                        if (schoolType.includes('院校类别：')) {
+                            schoolType = schoolType.replace('院校类别：', '');
+                        }
+                        
+                        subsidyDetails.push({
+                            '学校名称': school.school_name || '',
+                            '院校类别': schoolType,
+                            '测算年份': parseInt(school.year) || 0,
+                            '测算用户': school.submitter_real_name || school.submitter_username || '未知用户',
+                            '补助项目': subsidy['补助项目'] || '',
+                            '补助面积（m²）': formatAreaToTwoDecimals(parseFloat(subsidy['补助面积（m²）']) || 0),
+                            '备注': subsidy['备注'] || ''
+                        });
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn(`解析学校 ${school.school_name} 的特殊补助数据失败:`, e);
+        }
+    });
+    
+    return subsidyDetails;
 }
 
 // 生成批量导出的统计汇总数据
@@ -2526,11 +2763,11 @@ function generateSummarySheet(schoolsData) {
             '全日制学生总数(人)': fullTimeTotal,
             '留学生总数(人)': internationalTotal,
             '学生总数(人)': totalStudents,
-            '学生规模测算建筑总面积(㎡)': formatAreaToTwoDecimals(parseFloat(school.required_building_area)),
+            '测算建筑总面积(㎡)': formatAreaToTwoDecimals(parseFloat(school.required_building_area)),
             '现状建筑总面积(㎡)': formatAreaToTwoDecimals(parseFloat(school.current_building_area)),
-            '学生规模测算建筑面积总缺额(不含补助)(㎡)': formatAreaToTwoDecimals(gapWithoutSubsidy),
-            '补助建筑总面积(㎡)': formatAreaToTwoDecimals(specialSubsidyTotalArea),
-            '学生规模测算建筑面积总缺额(含补助)(㎡)': formatAreaToTwoDecimals(parseFloat(school.total_area_gap_with_subsidy)),
+            '测算建筑面积总缺额(不含特殊补助)(㎡)': formatAreaToTwoDecimals(gapWithoutSubsidy),
+            '特殊补助建筑总面积(㎡)': formatAreaToTwoDecimals(specialSubsidyTotalArea),
+            '测算建筑面积总缺额(含特殊补助)(㎡)': formatAreaToTwoDecimals(parseFloat(school.total_area_gap_with_subsidy)),
             '测算用户': school.submitter_real_name || school.submitter_username || '未知用户'
         };
     });
@@ -2593,8 +2830,8 @@ function generateDetailSheet(schoolsData) {
                 '测算年份': parseInt(school.year) || 0,
                 '用房类型': room.type,
                 '现状建筑面积(㎡)': room.current,
-                '学生规模测算建筑面积(㎡)': room.required,
-                '学生规模测算建筑面积缺额(㎡)': room.gap
+                '测算建筑面积(㎡)': room.required,
+                '测算建筑面积缺额(㎡)': room.gap
             });
         });
     });
@@ -2967,15 +3204,47 @@ async function startServer() {
             await loadCalculationStandards();
         }
         
-        // 启动HTTP服务器
-        app.listen(PORT, () => {
-            console.log(`服务器运行在 http://localhost:${PORT}`);
-            if (isConnected) {
-                console.log('MySQL数据库连接正常，数据将被持久化保存');
-            } else {
-                console.log('数据库未连接，数据将不会被持久化保存');
+        // 启动HTTP服务器（用于重定向到HTTPS）
+        const httpServer = http.createServer(app);
+        httpServer.listen(PORT, () => {
+            console.log(`🌐 HTTP服务器运行在 http://localhost:${PORT}`);
+            if (httpsEnabled) {
+                console.log(`   -> 将自动重定向到 HTTPS`);
             }
         });
+        
+        // 如果有SSL证书，启动HTTPS服务器
+        if (httpsEnabled && sslOptions) {
+            const httpsServer = https.createServer(sslOptions, app);
+            httpsServer.listen(HTTPS_PORT, () => {
+                console.log(`🔒 HTTPS服务器运行在 https://localhost:${HTTPS_PORT}`);
+                console.log(`✅ SSL/TLS加密已启用，用户凭据将安全传输`);
+            });
+            
+            // HTTPS服务器错误处理
+            httpsServer.on('error', (error) => {
+                if (error.code === 'EADDRINUSE') {
+                    console.error(`端口 ${HTTPS_PORT} 已被占用`);
+                } else {
+                    console.error('HTTPS服务器错误:', error);
+                }
+            });
+        }
+        
+        // HTTP服务器错误处理
+        httpServer.on('error', (error) => {
+            if (error.code === 'EADDRINUSE') {
+                console.error(`端口 ${PORT} 已被占用`);
+            } else {
+                console.error('HTTP服务器错误:', error);
+            }
+        });
+        
+        if (isConnected) {
+            console.log('📊 MySQL数据库连接正常，数据将被持久化保存');
+        } else {
+            console.log('⚠️ 数据库未连接，数据将不会被持久化保存');
+        }
         
     } catch (error) {
         console.error('服务器启动失败:', error);
@@ -2992,6 +3261,27 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
     console.log('\n正在关闭服务器...');
     process.exit(0);
+});
+
+// 404错误处理中间件 - 防止通过不存在的路由进行攻击
+app.use((req, res, next) => {
+    console.warn(`404页面访问: ${req.originalUrl} from IP: ${req.ip}`);
+    res.status(404).json({ 
+        success: false, 
+        message: '页面不存在' 
+    });
+});
+
+// 全局错误处理中间件
+app.use((err, req, res, next) => {
+    console.error(`服务器错误: ${err.message} from IP: ${req.ip}`);
+    console.error(err.stack);
+    
+    // 不暴露敏感错误信息
+    res.status(500).json({ 
+        success: false, 
+        message: '服务器内部错误' 
+    });
 });
 
 // 启动服务器

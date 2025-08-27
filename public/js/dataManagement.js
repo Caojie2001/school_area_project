@@ -332,10 +332,10 @@ const DataManagementManager = {
         html += '<div class="scrollable-middle-columns" style="margin-left: 280px; margin-right: 250px; overflow-x: auto; overflow-y: hidden;">';
         html += '<table class="data-table-scrollable"><thead><tr>';
         html += '<th>现状建筑总面积(m²)</th>';
-        html += '<th>学生规模测算建筑总面积(m²)</th>';
-        html += '<th>学生规模测算建筑面积总缺额(不含补助)(m²)</th>';
-        html += '<th>补助建筑总面积(m²)</th>';
-        html += '<th>学生规模测算建筑面积总缺额(含补助)(m²)</th>';
+        html += '<th>测算建筑总面积(m²)</th>';
+        html += '<th>测算建筑面积总缺额(不含特殊补助)(m²)</th>';
+        html += '<th>特殊补助建筑总面积(m²)</th>';
+        html += '<th>测算建筑面积总缺额(含特殊补助)(m²)</th>';
         html += '<th>测算时间</th>';
         html += '<th>测算用户</th>';
         html += '</tr></thead><tbody>';
@@ -570,7 +570,7 @@ const DataManagementManager = {
         let detailsHtml = `
             <div style="max-width: 900px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="color: #2c3e50; margin: 0;">记录详情</h2>
+                    <h2 style="color: #2c3e50; margin: 0;">测算详情</h2>
                     <button onclick="closeDetailsModal()" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">关闭</button>
                 </div>
                 
@@ -581,7 +581,7 @@ const DataManagementManager = {
                             <td colspan="4" style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #f0f0f0;">高校测算</td>
                         </tr>
                         <tr>
-                            <td colspan="4" style="border: 1px solid #000; padding: 6px; background: #f8f8f8;">基本办学条件缺口（"－"表示超额，"+"表示缺额）</td>
+                            <td colspan="4" style="border: 1px solid #000; padding: 6px; background: #f8f8f8;">基本办学条件缺口（＞0表示存在缺口）</td>
                         </tr>
                         <tr>
                             <td colspan="3" style="border: 1px solid #000; padding: 6px;"></td>
@@ -638,8 +638,8 @@ const DataManagementManager = {
                         <tr style="font-weight: bold; background: #f0f0f0;">
                             <td style="border: 1px solid #000; padding: 6px;">用房类型</td>
                             <td style="border: 1px solid #000; padding: 6px;">现状建筑面积(m²)</td>
-                            <td style="border: 1px solid #000; padding: 6px;">学生规模测算建筑面积(m²)</td>
-                            <td style="border: 1px solid #000; padding: 6px;">学生规模测算建筑面积缺额(m²)</td>
+                            <td style="border: 1px solid #000; padding: 6px;">测算建筑面积(m²)</td>
+                            <td style="border: 1px solid #000; padding: 6px;">测算建筑面积缺额(m²)</td>
                         </tr>
                         <tr>
                             <td style="border: 1px solid #000; padding: 6px;">教学及辅助用房</td>
@@ -684,7 +684,7 @@ const DataManagementManager = {
                             <td style="border: 1px solid #000; padding: 6px; text-align: right;">${parseFloat(gapWithoutSubsidy || 0).toFixed(2)}</td>
                         </tr>
                         <tr>
-                            <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生规模测算建筑面积总缺额（不含补助）(m²)</td>
+                            <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">测算建筑面积总缺额（不含特殊补助）(m²)</td>
                             <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(gapWithoutSubsidy || 0).toFixed(2)}</td>
                         </tr>
                         <tr>
@@ -692,7 +692,7 @@ const DataManagementManager = {
                             <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(school.special_subsidy_total || 0).toFixed(2)}</td>
                         </tr>
                         <tr>
-                            <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">学生规模测算建筑面积总缺额（含补助）(m²)</td>
+                            <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">测算建筑面积总缺额（含特殊补助）(m²)</td>
                             <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(school.total_area_gap_with_subsidy || 0).toFixed(2)}</td>
                         </tr>
                     </table>
@@ -1414,17 +1414,17 @@ const AnalysisResultsManager = {
                         <div class="stat-unit">(m²)</div>
                     </div>
                     <div class="stat-card">
-                        <h4>学生规模测算总建筑面积</h4>
+                        <h4>测算总建筑面积</h4>
                         <div class="stat-value">${formatNumber(totalRequiredArea)}</div>
                         <div class="stat-unit">(m²)</div>
                     </div>
                     <div class="stat-card">
-                        <h4>学生规模测算建筑面积总缺额(不含补助)</h4>
+                        <h4>测算建筑面积总缺额(不含特殊补助)</h4>
                         <div class="stat-value">${gapWithoutSubsidy > 0 ? '+' : ''}${formatNumber(gapWithoutSubsidy)}</div>
                         <div class="stat-unit">(m²)</div>
                     </div>
                     <div class="stat-card">
-                        <h4>学生规模测算建筑面积总缺额(含补助)</h4>
+                        <h4>测算建筑面积总缺额(含特殊补助)</h4>
                         <div class="stat-value">${gapWithSubsidy > 0 ? '+' : ''}${formatNumber(gapWithSubsidy)}</div>
                         <div class="stat-unit">(m²)</div>
                     </div>
@@ -1499,11 +1499,11 @@ const AnalysisResultsManager = {
                                 <span>${formatNumber(area.current || 0)}㎡</span>
                             </div>
                             <div>
-                                <span>学生规模测算建筑面积:</span>
+                                <span>测算建筑面积:</span>
                                 <span>${formatNumber(area.required || 0)}㎡</span>
                             </div>
                             <div>
-                                <span>学生规模测算建筑面积缺额:</span>
+                                <span>测算建筑面积缺额:</span>
                                 <span class="${gapValue > 0 ? 'gap-positive' : 'gap-negative'}">
                                     ${gapValue > 0 ? '+' : ''}${formatNumber(gapValue)}㎡
                                 </span>
@@ -1534,11 +1534,11 @@ const AnalysisResultsManager = {
             <div class="summary-note" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; color: #5a6c7d; font-size: 14px; line-height: 1.5;">
                 <strong>计算说明：</strong>
                 <ul style="margin: 10px 0; padding-left: 20px;">
-                    <li>现状面积 = 既有建筑面积 + 在建建筑面积</li>
-                    <li>测算面积 = 各类用房面积系数 × 全日制学生数 + 全日制及留学硕博生补助面积</li>
-                    <li>缺额面积（不含补助） = 测算面积 − 现状面积</li>
-                    <li>缺额面积（含补助） = 测算面积 + 特殊用房补助面积 − 现状面积</li>
-                    <li>若缺额面积 > 0，则存在缺口；否则无缺口。</li>
+                    <li>现状面积 = 既有建筑面积 + 拟建成面积</li>
+                    <li>测算面积 = 学生总人数测算面积 + 全日制硕博补助面积 + 留学生总数补助面积 + 留学生硕博补助面积</li>
+                    <li>缺额面积 (不含特殊补助) = 测算面积 - 现状面积</li>
+                    <li>缺额面积 (含特殊补助) = 测算面积 + 特殊用房补助面积 - 现状面积</li>
+                    <li>若缺额面积 > 0，则存在缺口，否则超额 (无缺口)。</li>
                 </ul>
             </div>
         `;

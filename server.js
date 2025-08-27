@@ -4,8 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const session = require('express-session');
-const https = require('https');
-const http = require('http');
 
 // 引入数据库相关模块
 require('dotenv').config();
@@ -15,23 +13,6 @@ const AuthService = require('./config/authService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
-
-// 检查是否有HTTPS证书
-let httpsEnabled = false;
-let sslOptions = null;
-
-try {
-    sslOptions = {
-        key: fs.readFileSync(path.join(__dirname, 'certs', 'private-key.pem')),
-        cert: fs.readFileSync(path.join(__dirname, 'certs', 'certificate.pem'))
-    };
-    httpsEnabled = true;
-    console.log('✅ SSL证书加载成功，HTTPS已启用');
-} catch (error) {
-    console.warn('⚠️ SSL证书未找到，仅使用HTTP模式');
-    httpsEnabled = false;
-}
 
 // 会话配置
 app.use(session({
@@ -39,43 +20,11 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: httpsEnabled, // 如果启用HTTPS则设置为true
+        secure: false, // 在生产环境中应该设置为true（需要HTTPS）
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000, // 24小时
-        sameSite: 'strict' // 防止CSRF攻击
+        maxAge: 24 * 60 * 60 * 1000 // 24小时
     }
 }));
-
-// HTTPS重定向中间件 - 在生产环境中强制使用HTTPS
-app.use((req, res, next) => {
-    // 如果启用了HTTPS且当前是HTTP请求（不是localhost开发环境）
-    if (httpsEnabled && !req.secure && req.get('X-Forwarded-Proto') !== 'https' && process.env.NODE_ENV === 'production') {
-        // 构建HTTPS URL
-        const httpsUrl = `https://${req.get('Host').replace(/:\d+$/, '')}:${HTTPS_PORT}${req.originalUrl}`;
-        console.log(`重定向到HTTPS: ${req.originalUrl} -> ${httpsUrl}`);
-        return res.redirect(301, httpsUrl);
-    }
-    next();
-});
-
-// 安全头中间件 - 增强HTTPS安全性
-app.use((req, res, next) => {
-    // 基础安全头
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
-    // 如果是HTTPS连接，添加额外的安全头
-    if (req.secure || req.get('X-Forwarded-Proto') === 'https') {
-        // HSTS - 强制使用HTTPS
-        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-        // 内容安全策略
-        res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';");
-    }
-    
-    next();
-});
 
 // 安全中间件 - 防止URL重定向和路径穿越攻击
 app.use((req, res, next) => {
@@ -2440,6 +2389,16 @@ function generateBatchExportExcel(schoolsData, filters = {}) {
             const subsidySheet = XLSX.utils.json_to_sheet(subsidyData);
             XLSX.utils.book_append_sheet(wb, subsidySheet, "特殊补助明细");
             
+            // 第三个Sheet：测算明细（不含特殊补助）
+            const detailData = generateDetailSheet(schoolsData);
+            const detailSheet = XLSX.utils.json_to_sheet(detailData);
+            XLSX.utils.book_append_sheet(wb, detailSheet, "测算明细");
+            
+            // 第四个Sheet：学生数明细
+            const studentData = generateStudentDetailSheet(schoolsData);
+            const studentSheet = XLSX.utils.json_to_sheet(studentData);
+            XLSX.utils.book_append_sheet(wb, studentSheet, "学生数明细");
+            
             // 写入文件
             XLSX.writeFile(wb, filePath);
             
@@ -2470,6 +2429,16 @@ function generateBatchExportExcel(schoolsData, filters = {}) {
             const subsidyData = generateSubsidyDetailSheet(schoolsData);
             const subsidySheet = XLSX.utils.json_to_sheet(subsidyData);
             XLSX.utils.book_append_sheet(wb, subsidySheet, "特殊补助明细");
+            
+            // 第三个Sheet：测算明细（不含特殊补助）
+            const detailData = generateDetailSheet(schoolsData);
+            const detailSheet = XLSX.utils.json_to_sheet(detailData);
+            XLSX.utils.book_append_sheet(wb, detailSheet, "测算明细");
+            
+            // 第四个Sheet：学生数明细
+            const studentData = generateStudentDetailSheet(schoolsData);
+            const studentSheet = XLSX.utils.json_to_sheet(studentData);
+            XLSX.utils.book_append_sheet(wb, studentSheet, "学生数明细");
             
             // 写入文件
             XLSX.writeFile(wb, filePath);
@@ -3204,47 +3173,15 @@ async function startServer() {
             await loadCalculationStandards();
         }
         
-        // 启动HTTP服务器（用于重定向到HTTPS）
-        const httpServer = http.createServer(app);
-        httpServer.listen(PORT, () => {
-            console.log(`🌐 HTTP服务器运行在 http://localhost:${PORT}`);
-            if (httpsEnabled) {
-                console.log(`   -> 将自动重定向到 HTTPS`);
-            }
-        });
-        
-        // 如果有SSL证书，启动HTTPS服务器
-        if (httpsEnabled && sslOptions) {
-            const httpsServer = https.createServer(sslOptions, app);
-            httpsServer.listen(HTTPS_PORT, () => {
-                console.log(`🔒 HTTPS服务器运行在 https://localhost:${HTTPS_PORT}`);
-                console.log(`✅ SSL/TLS加密已启用，用户凭据将安全传输`);
-            });
-            
-            // HTTPS服务器错误处理
-            httpsServer.on('error', (error) => {
-                if (error.code === 'EADDRINUSE') {
-                    console.error(`端口 ${HTTPS_PORT} 已被占用`);
-                } else {
-                    console.error('HTTPS服务器错误:', error);
-                }
-            });
-        }
-        
-        // HTTP服务器错误处理
-        httpServer.on('error', (error) => {
-            if (error.code === 'EADDRINUSE') {
-                console.error(`端口 ${PORT} 已被占用`);
+        // 启动HTTP服务器
+        app.listen(PORT, () => {
+            console.log(`服务器运行在 http://localhost:${PORT}`);
+            if (isConnected) {
+                console.log('MySQL数据库连接正常，数据将被持久化保存');
             } else {
-                console.error('HTTP服务器错误:', error);
+                console.log('数据库未连接，数据将不会被持久化保存');
             }
         });
-        
-        if (isConnected) {
-            console.log('📊 MySQL数据库连接正常，数据将被持久化保存');
-        } else {
-            console.log('⚠️ 数据库未连接，数据将不会被持久化保存');
-        }
         
     } catch (error) {
         console.error('服务器启动失败:', error);

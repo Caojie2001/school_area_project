@@ -1,9 +1,6 @@
 # 使用官方Node.js运行时作为基础镜像
 FROM node:18-alpine AS base
 
-# 安装必要的系统包（包括OpenSSL用于证书管理）
-RUN apk add --no-cache openssl
-
 # 设置工作目录
 WORKDIR /app
 
@@ -21,20 +18,15 @@ RUN addgroup -g 1001 -S nodejs && \
 ARG BUILD_DATE
 ENV BUILD_DATE=$BUILD_DATE
 
-# 复制应用程序代码（.dockerignore会排除敏感文件）
+# 复制应用程序代码
 COPY --chown=nodejs:nodejs . .
 
 # 创建必要的目录
-RUN mkdir -p output uploads certs && \
-    chown -R nodejs:nodejs output uploads certs
-
-# 设置环境变量
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HTTPS_PORT=3443
+RUN mkdir -p output uploads && \
+    chown -R nodejs:nodejs output uploads
 
 # 暴露端口
-EXPOSE 3000 3443
+EXPOSE 3000
 
 # 切换到非root用户
 USER nodejs

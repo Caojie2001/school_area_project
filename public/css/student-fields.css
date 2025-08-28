@@ -5,6 +5,7 @@
     display: flex;
     gap: 12px;
     align-items: flex-end;
+    margin-bottom: 25px; /* 增加底部间距以容纳错误信息 */
 }
 
 /* === 通用字段样式 === */

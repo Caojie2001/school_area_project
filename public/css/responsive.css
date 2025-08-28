@@ -110,12 +110,13 @@
     .student-category .form-row {
         flex-wrap: wrap;
         gap: 8px;
+        margin-bottom: 30px; /* 移动端增加更多底部间距以容纳错误信息 */
     }
     
     .student-category .form-group {
         min-width: calc(50% - 4px);
         max-width: calc(50% - 4px);
-        margin-bottom: 10px;
+        margin-bottom: 15px; /* 增加字段之间的间距 */
     }
     
     .student-category .form-group:last-child {

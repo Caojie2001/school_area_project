@@ -184,6 +184,9 @@ const DataEntryManager = {
             // 加载学校选项
             await this.loadSchoolOptions();
             
+            // 初始化按钮状态
+            this.updateCalculateButtonState();
+            
             console.log('数据填报模块初始化完成');
             
         } catch (error) {
@@ -224,8 +227,89 @@ const DataEntryManager = {
             console.log('表单提交事件监听器已绑定');
         }
         
+        // 为所有建筑面积输入字段添加事件监听器
+        const buildingAreaInputs = [
+            'teachingArea', 'officeArea', 'logisticsArea', 'totalLivingArea', 'dormitoryArea'
+        ];
+        
+        buildingAreaInputs.forEach(fieldId => {
+            const element = document.getElementById(fieldId);
+            if (element) {
+                element.addEventListener('input', (event) => {
+                    // 调用计算函数
+                    if (fieldId === 'totalLivingArea' || fieldId === 'dormitoryArea') {
+                        this.calculateOtherLivingArea();
+                    }
+                    this.calculateTotalBuildingArea();
+                    
+                    // 调用验证函数
+                    this.validateBuildingAreaInput(event.target);
+                });
+            }
+        });
+        
+        // 为所有学生人数输入字段添加事件监听器
+        const studentInputs = [
+            'fullTimeSpecialist', 'fullTimeUndergraduate', 'fullTimeMaster', 'fullTimeDoctor',
+            'internationalUndergraduate', 'internationalMaster', 'internationalDoctor'
+        ];
+        
+        studentInputs.forEach(fieldId => {
+            const element = document.getElementById(fieldId);
+            if (element) {
+                element.addEventListener('input', (event) => {
+                    this.calculateTotalStudents();
+                    this.validateStudentNumberInput(event.target);
+                });
+            }
+        });
+        
         // 学生数据输入事件（已在HTML中通过oninput设置）
         // 建筑面积输入事件（已在HTML中通过oninput设置）
+        
+        // 初始化按钮状态检查
+        this.updateCalculateButtonState();
+    },
+    
+    /**
+     * 检查页面是否有错误
+     * @returns {boolean} 是否有错误
+     */
+    hasPageErrors() {
+        // 检查是否有错误的输入框
+        const errorInputs = document.querySelectorAll('.form-control.error');
+        // 检查是否有显示的错误消息
+        const errorMessages = document.querySelectorAll('.form-group.has-error .error-message');
+        
+        // 检查学校是否已选择（必填项）
+        const schoolSelect = document.getElementById('schoolName');
+        const schoolNotSelected = !schoolSelect || !schoolSelect.value;
+        
+        // 只要有表单验证错误或学校未选择就禁用按钮
+        // 不再检查学生总数和建筑面积，允许用户输入0或空值，在提交时再验证
+        return errorInputs.length > 0 || 
+               errorMessages.length > 0 || 
+               schoolNotSelected;
+    },
+    
+    /**
+     * 更新计算分析按钮状态
+     */
+    updateCalculateButtonState() {
+        const calculateButton = document.getElementById('calculateButton');
+        if (!calculateButton) return;
+        
+        const hasErrors = this.hasPageErrors();
+        
+        if (hasErrors) {
+            calculateButton.disabled = true;
+            calculateButton.classList.add('disabled');
+            calculateButton.style.cursor = 'not-allowed';
+        } else {
+            calculateButton.disabled = false;
+            calculateButton.classList.remove('disabled');
+            calculateButton.style.cursor = 'pointer';
+        }
     },
     
     /**
@@ -380,6 +464,9 @@ const DataEntryManager = {
         
         console.log('计算完成:', { fullTimeTotal, internationalTotal, totalStudents });
         
+        // 更新按钮状态
+        this.updateCalculateButtonState();
+        
         return {
             fullTimeTotal,
             internationalTotal,
@@ -434,6 +521,9 @@ const DataEntryManager = {
             totalBuildingArea
         });
         
+        // 更新按钮状态
+        this.updateCalculateButtonState();
+        
         return {
             teachingArea,
             officeArea,
@@ -463,6 +553,11 @@ const DataEntryManager = {
         if (otherLivingAreaEl) {
             otherLivingAreaEl.value = otherLivingArea.toFixed(2);
             console.log('设置其他生活用房面积:', otherLivingArea);
+        }
+        
+        // 触发验证检查宿舍面积和生活用房总面积的关系
+        if (dormitoryAreaEl) {
+            this.validateBuildingAreaInput(dormitoryAreaEl);
         }
         
         return {
@@ -538,6 +633,12 @@ const DataEntryManager = {
             errors.push('建筑总面积必须大于0');
         }
         
+        // 验证补助信息
+        const subsidyValid = this.validateSubsidyAreas();
+        if (!subsidyValid) {
+            errors.push('请检查补助信息');
+        }
+        
         return {
             isValid: errors.length === 0,
             errors
@@ -608,6 +709,15 @@ const DataEntryManager = {
         this.calculateTotalBuildingArea();
         this.calculateOtherLivingArea();
         
+        // 清除所有错误状态
+        const errorInputs = document.querySelectorAll('.form-control.error');
+        errorInputs.forEach(input => {
+            this.clearFieldError(input);
+        });
+        
+        // 更新按钮状态
+        this.updateCalculateButtonState();
+        
         console.log('表单已重置');
         
         // 显示重置成功提示
@@ -637,8 +747,462 @@ const DataEntryManager = {
     /**
      * 处理在线表单提交（从 script.js 迁移）
      */
+    /**
+     * 实时验证建筑面积输入
+     * @param {HTMLElement} element - 输入框元素
+     */
+    validateBuildingAreaInput(element) {
+        const value = parseFloat(element.value);
+        
+        // 清除之前的错误状态
+        this.clearFieldError(element);
+        
+        // 检查负值（无论浏览器是否阻止，都要检查）
+        if (element.value !== '' && (isNaN(value) || value < 0)) {
+            this.showFieldError(element, '建筑面积不能为负数');
+            return;
+        }
+        
+        // 特殊验证：宿舍面积和生活用房总面积的关系
+        if (element.id === 'dormitoryArea' || element.id === 'totalLivingArea') {
+            const totalLivingArea = parseFloat(document.getElementById('totalLivingArea').value) || 0;
+            const dormitoryArea = parseFloat(document.getElementById('dormitoryArea').value) || 0;
+            
+            const dormElement = document.getElementById('dormitoryArea');
+            const totalLivingElement = document.getElementById('totalLivingArea');
+            
+            // 清除两个字段的关系验证错误（保留负值验证错误）
+            [dormElement, totalLivingElement].forEach(el => {
+                if (el !== element) { // 不影响当前正在输入的字段
+                    const elValue = parseFloat(el.value);
+                    // 只清除关系验证错误，如果字段本身没有负值错误就清除
+                    if (!(el.value !== '' && (isNaN(elValue) || elValue < 0))) {
+                        this.clearFieldError(el);
+                    }
+                }
+            });
+            
+            // 检查逻辑关系（只有在两个值都非负时才检查关系）
+            if (dormitoryArea >= 0 && totalLivingArea >= 0 && dormitoryArea > totalLivingArea) {
+                this.showFieldError(dormElement, '学生宿舍面积不能大于生活用房总面积');
+                this.showFieldError(totalLivingElement, '生活用房总面积不能小于学生宿舍面积');
+            }
+        }
+    },
+
+    /**
+     * 验证建筑面积输入
+     * @returns {boolean} 验证是否通过
+     */
+    validateBuildingAreas() {
+        const buildingFields = [
+            { id: 'teachingArea', name: '教学及辅助用房面积' },
+            { id: 'officeArea', name: '办公用房面积' },
+            { id: 'logisticsArea', name: '后勤辅助用房面积' },
+            { id: 'totalLivingArea', name: '生活用房总面积' },
+            { id: 'dormitoryArea', name: '学生宿舍面积' }
+        ];
+
+        let hasError = false;
+        let errorMessages = [];
+
+        // 清除之前的错误状态
+        buildingFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                this.clearFieldError(element);
+            }
+        });
+
+        // 验证每个字段
+        buildingFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                const value = parseFloat(element.value) || 0;
+                
+                if (value < 0) {
+                    hasError = true;
+                    errorMessages.push(`${field.name}不能为负数`);
+                    this.showFieldError(element, `${field.name}不能为负数`);
+                }
+            }
+        });
+
+        // 验证宿舍面积不能大于生活用房总面积
+        const totalLivingArea = parseFloat(document.getElementById('totalLivingArea').value) || 0;
+        const dormitoryArea = parseFloat(document.getElementById('dormitoryArea').value) || 0;
+        
+        // 检查宿舍面积是否大于生活用房总面积
+        if (dormitoryArea > totalLivingArea) {
+            hasError = true;
+            errorMessages.push('学生宿舍面积不能大于生活用房总面积');
+            
+            const dormElement = document.getElementById('dormitoryArea');
+            const totalLivingElement = document.getElementById('totalLivingArea');
+            
+            this.showFieldError(dormElement, '学生宿舍面积不能大于生活用房总面积');
+            this.showFieldError(totalLivingElement, '生活用房总面积不能小于学生宿舍面积');
+        }
+        
+        // 额外检查：如果生活用房总面积为0但宿舍面积大于0，也是错误的
+        if (totalLivingArea === 0 && dormitoryArea > 0) {
+            hasError = true;
+            errorMessages.push('生活用房总面积不能为0，因为学生宿舍面积大于0');
+            
+            const totalLivingElement = document.getElementById('totalLivingArea');
+            this.showFieldError(totalLivingElement, '生活用房总面积不能为0，因为学生宿舍面积大于0');
+        }
+
+        // 如果有错误，显示提示
+        if (hasError) {
+            const errorMessage = '请检查以下问题：\n• ' + errorMessages.join('\n• ');
+            if (typeof showErrorMessage === 'function') {
+                showErrorMessage(errorMessage);
+            } else {
+                alert(errorMessage);
+            }
+            
+            // 滚动到第一个错误字段
+            const firstErrorField = buildingFields.find(field => {
+                const element = document.getElementById(field.id);
+                return element && element.classList.contains('error');
+            });
+            
+            if (firstErrorField) {
+                const element = document.getElementById(firstErrorField.id);
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => element.focus(), 300);
+            }
+        }
+
+        return !hasError;
+    },
+
+    /**
+     * 显示字段错误提示
+     * @param {HTMLElement} element - 输入框元素
+     * @param {string} message - 错误消息
+     */
+    showFieldError(element, message) {
+        const formGroup = element.closest('.form-group');
+        if (!formGroup) return;
+        
+        // 添加错误样式
+        element.classList.add('error');
+        element.style.borderColor = '#e74c3c';
+        element.style.backgroundColor = '#fdf2f2';
+        formGroup.classList.add('has-error');
+        
+        // 检查是否已有错误消息元素
+        let errorElement = formGroup.querySelector('.error-message');
+        if (!errorElement) {
+            errorElement = document.createElement('span');
+            errorElement.className = 'error-message';
+            formGroup.appendChild(errorElement);
+        }
+        
+        errorElement.textContent = message;
+        
+        // 更新按钮状态
+        this.updateCalculateButtonState();
+    },
+
+    /**
+     * 清除字段错误提示
+     * @param {HTMLElement} element - 输入框元素
+     */
+    clearFieldError(element) {
+        const formGroup = element.closest('.form-group');
+        if (!formGroup) return;
+        
+        // 清除错误样式
+        element.classList.remove('error');
+        element.style.borderColor = '#ddd';
+        element.style.backgroundColor = 'white';
+        formGroup.classList.remove('has-error');
+        
+        // 移除错误消息
+        const errorElement = formGroup.querySelector('.error-message');
+        if (errorElement) {
+            errorElement.remove();
+        }
+        
+        // 更新按钮状态
+        this.updateCalculateButtonState();
+    },
+
+    /**
+     * 实时验证学生人数输入
+     * @param {HTMLElement} element - 输入框元素
+     */
+    validateStudentNumberInput(element) {
+        const value = parseFloat(element.value);
+        
+        // 清除之前的错误状态
+        this.clearFieldError(element);
+        
+        // 检查负值（无论浏览器是否阻止，都要检查）
+        if (element.value !== '' && (isNaN(value) || value < 0)) {
+            this.showFieldError(element, '学生人数不能为负数');
+        }
+    },
+
+    /**
+     * 验证学生人数输入
+     * @returns {boolean} 验证是否通过
+     */
+    validateStudentNumbers() {
+        const studentFields = [
+            { id: 'fullTimeSpecialist', name: '专科全日制学生数' },
+            { id: 'fullTimeUndergraduate', name: '本科全日制学生数' },
+            { id: 'fullTimeMaster', name: '硕士全日制学生数' },
+            { id: 'fullTimeDoctor', name: '博士全日制学生数' },
+            { id: 'internationalUndergraduate', name: '本科留学生数' },
+            { id: 'internationalMaster', name: '硕士留学生数' },
+            { id: 'internationalDoctor', name: '博士留学生数' }
+        ];
+
+        let hasError = false;
+        let errorMessages = [];
+
+        // 清除之前的错误状态
+        studentFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                this.clearFieldError(element);
+            }
+        });
+
+        // 验证每个字段
+        studentFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                const value = parseFloat(element.value) || 0;
+                
+                if (value < 0) {
+                    hasError = true;
+                    errorMessages.push(`${field.name}不能为负数`);
+                    this.showFieldError(element, `${field.name}不能为负数`);
+                }
+            }
+        });
+
+        // 如果有错误，显示提示
+        if (hasError) {
+            const errorMessage = '请检查以下问题：\n• ' + errorMessages.join('\n• ');
+            if (typeof showErrorMessage === 'function') {
+                showErrorMessage(errorMessage);
+            } else {
+                alert(errorMessage);
+            }
+            
+            // 滚动到第一个错误字段
+            const firstErrorField = studentFields.find(field => {
+                const element = document.getElementById(field.id);
+                return element && element.classList.contains('error');
+            });
+            
+            if (firstErrorField) {
+                const element = document.getElementById(firstErrorField.id);
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => element.focus(), 300);
+            }
+        }
+
+        return !hasError;
+    },
+
+    /**
+     * 验证必填项
+     * @returns {boolean} 验证是否通过
+     */
+    validateRequiredFields() {
+        const requiredFields = [
+            { id: 'schoolName', name: '学校名称' },
+            { id: 'year', name: '年份' }
+        ];
+
+        let hasError = false;
+        let errorMessages = [];
+
+        // 清除之前的错误状态
+        requiredFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                this.clearFieldError(element);
+            }
+        });
+
+        // 验证每个字段
+        requiredFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                const value = element.value ? element.value.trim() : '';
+                
+                if (!value) {
+                    hasError = true;
+                    errorMessages.push(`${field.name}为必填项，不能为空`);
+                    this.showFieldError(element, `${field.name}为必填项，不能为空`);
+                }
+            }
+        });
+
+        // 如果有错误，显示提示
+        if (hasError) {
+            const errorMessage = '请检查以下问题：\n• ' + errorMessages.join('\n• ');
+            if (typeof showErrorMessage === 'function') {
+                showErrorMessage(errorMessage);
+            } else {
+                alert(errorMessage);
+            }
+            
+            // 滚动到第一个错误字段
+            const firstErrorField = requiredFields.find(field => {
+                const element = document.getElementById(field.id);
+                return element && element.classList.contains('error');
+            });
+            
+            if (firstErrorField) {
+                const element = document.getElementById(firstErrorField.id);
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => element.focus(), 300);
+            }
+        }
+
+        return !hasError;
+    },
+
+    /**
+     * 实时验证必填项输入
+     * @param {HTMLElement} element - 输入框元素
+     */
+    validateRequiredInput(element) {
+        const value = element.value ? element.value.trim() : '';
+        
+        // 清除之前的错误状态
+        this.clearFieldError(element);
+        
+        // 如果值为空，添加错误样式
+        if (!value) {
+            this.showFieldError(element, '此字段为必填项，不能为空');
+        }
+    },
+
+    /**
+     * 验证补助名称输入
+     * @param {HTMLElement} element - 输入元素
+     */
+    validateSubsidyNameInput(element) {
+        const value = element.value.trim();
+        
+        // 清除之前的错误状态
+        this.clearFieldError(element);
+        
+        // 检查是否为空
+        if (value === '') {
+            this.showFieldError(element, '补助名称不能为空');
+        }
+    },
+
+    /**
+     * 实时验证补助面积输入
+     * @param {HTMLElement} element - 输入框元素
+     */
+    validateSubsidyAreaInput(element) {
+        const value = parseFloat(element.value);
+        
+        // 清除之前的错误状态
+        this.clearFieldError(element);
+        
+        // 检查是否大于0
+        if (element.value !== '' && (isNaN(value) || value <= 0)) {
+            this.showFieldError(element, '补助建筑面积必须大于0');
+        }
+    },
+
+    /**
+     * 验证补助信息（名称和面积）
+     * @returns {boolean} 验证是否通过
+     */
+    validateSubsidyAreas() {
+        const subsidyNameInputs = document.querySelectorAll('input[name="subsidyName[]"]');
+        const subsidyAreaInputs = document.querySelectorAll('input[name="subsidyArea[]"]');
+        
+        let hasError = false;
+        let errorMessages = [];
+
+        // 清除之前的错误状态
+        subsidyNameInputs.forEach(element => {
+            this.clearFieldError(element);
+        });
+        subsidyAreaInputs.forEach(element => {
+            this.clearFieldError(element);
+        });
+
+        // 验证每个补助名称和面积字段
+        subsidyNameInputs.forEach((nameElement, index) => {
+            const nameValue = nameElement.value.trim();
+            const areaElement = subsidyAreaInputs[index];
+            const areaValue = areaElement ? parseFloat(areaElement.value) : 0;
+            
+            // 验证补助名称
+            if (nameValue === '') {
+                hasError = true;
+                errorMessages.push(`第${index + 1}个补助名称不能为空`);
+                this.showFieldError(nameElement, '补助名称不能为空');
+            }
+            
+            // 验证补助面积（必须大于0）
+            if (areaElement && (isNaN(areaValue) || areaValue <= 0)) {
+                hasError = true;
+                errorMessages.push(`第${index + 1}个补助建筑面积必须大于0`);
+                this.showFieldError(areaElement, '补助建筑面积必须大于0');
+            }
+        });
+
+        // 如果有错误，显示提示
+        if (hasError) {
+            const errorMessage = '请检查以下问题：\n• ' + errorMessages.join('\n• ');
+            if (typeof showErrorMessage === 'function') {
+                showErrorMessage(errorMessage);
+            } else {
+                alert(errorMessage);
+            }
+            
+            // 滚动到第一个错误字段
+            const allInputs = [...subsidyNameInputs, ...subsidyAreaInputs];
+            const firstErrorField = allInputs.find(element => {
+                return element.classList.contains('error');
+            });
+            
+            if (firstErrorField) {
+                firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => firstErrorField.focus(), 300);
+            }
+        }
+
+        return !hasError;
+    },
+
     async handleFormSubmit(event) {
         event.preventDefault();
+        
+        // 验证必填项
+        const requiredValidation = this.validateRequiredFields();
+        
+        // 验证学生人数输入
+        const studentValidation = this.validateStudentNumbers();
+        
+        // 验证建筑面积输入
+        const buildingValidation = this.validateBuildingAreas();
+        
+        // 验证补助面积输入
+        const subsidyValidation = this.validateSubsidyAreas();
+        
+        // 如果任何验证失败，停止提交
+        if (!requiredValidation || !studentValidation || !buildingValidation || !subsidyValidation) {
+            return;
+        }
         
         try {
             const formData = new FormData(event.target);
@@ -846,6 +1410,9 @@ const DataEntryManager = {
                 schoolTypeDisplay.textContent = '';
             }
         }
+        
+        // 更新按钮状态
+        this.updateCalculateButtonState();
     },
     
     /**
@@ -874,10 +1441,16 @@ const DataEntryManager = {
         const subsidyHtml = `
             <div class="subsidy-item" style="display: flex; align-items: center; margin-bottom: 10px; padding: 10px; background: white; border: 1px solid #e9ecef; border-radius: 5px;">
                 <div style="flex: 2; margin-right: 15px;">
-                    <input type="text" name="subsidyName[]" placeholder="例如：重点实验室补助" class="form-control" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
+                    <div class="form-group has-error">
+                        <input type="text" name="subsidyName[]" placeholder="例如：重点实验室补助" class="form-control subsidy-name-input error" oninput="DataEntryManager.validateSubsidyNameInput(this);" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
+                        <span class="error-message">补助名称不能为空</span>
+                    </div>
                 </div>
                 <div style="flex: 1; margin-right: 15px;">
-                    <input type="number" name="subsidyArea[]" value="0.00" min="0" step="0.01" class="form-control" oninput="DataEntryManager.updateSubsidySummary()" onblur="formatSubsidyArea(this)" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
+                    <div class="form-group has-error">
+                        <input type="number" name="subsidyArea[]" value="0.00" step="0.01" class="form-control subsidy-area-input error" oninput="DataEntryManager.updateSubsidySummary(); DataEntryManager.validateSubsidyAreaInput(this);" onblur="formatSubsidyArea(this)" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
+                        <span class="error-message">补助建筑面积必须大于0</span>
+                    </div>
                 </div>
                 <div style="width: 80px;">
                     <button type="button" onclick="DataEntryManager.removeSubsidy(this)" style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">删除</button>
@@ -896,6 +1469,9 @@ const DataEntryManager = {
         }
         
         this.updateSubsidySummary();
+        
+        // 更新按钮状态（新添加的补助项有错误状态）
+        this.updateCalculateButtonState();
     },
     
     /**
@@ -916,6 +1492,9 @@ const DataEntryManager = {
             } else {
                 this.updateSubsidySummary();
             }
+            
+            // 更新按钮状态
+            this.updateCalculateButtonState();
         }
     },
     
@@ -1050,7 +1629,50 @@ function formatSubsidyArea(input) {
     input.value = (typeof formatToTwoDecimals === 'function') ? formatToTwoDecimals(value) : value.toFixed(2);
     // 触发汇总更新
     DataEntryManager.updateSubsidySummary();
+    // 触发验证
+    DataEntryManager.validateSubsidyAreaInput(input);
 };
+
+/**
+ * 验证学生人数输入（全局函数）
+ */
+function validateStudentInput(element) {
+    if (typeof DataEntryManager !== 'undefined') {
+        DataEntryManager.validateStudentNumberInput(element);
+    } else {
+        console.error('DataEntryManager is not defined');
+    }
+}
+
+/**
+ * 验证建筑面积输入（全局函数）
+ */
+function validateBuildingAreaInput(element) {
+    console.log('validateBuildingAreaInput called for:', element.id, 'value:', element.value);
+    if (typeof DataEntryManager !== 'undefined') {
+        DataEntryManager.validateBuildingAreaInput(element);
+    } else {
+        console.error('DataEntryManager is not defined');
+    }
+}
+
+/**
+ * 验证必填项输入（全局函数）
+ */
+function validateRequiredInput(element) {
+    if (typeof DataEntryManager !== 'undefined') {
+        DataEntryManager.validateRequiredInput(element);
+    }
+}
+
+/**
+ * 验证补助面积输入（全局函数）
+ */
+function validateSubsidyAreaInput(element) {
+    if (typeof DataEntryManager !== 'undefined') {
+        DataEntryManager.validateSubsidyAreaInput(element);
+    }
+}
 
 // ========================================
 // 兼容性函数（保持向后兼容）
@@ -1130,6 +1752,12 @@ if (typeof window !== 'undefined') {
     window.removeSubsidy = removeSubsidy;
     window.updateSubsidySummary = updateSubsidySummary;
     window.formatSubsidyArea = formatSubsidyArea;
+    
+    // 验证函数
+    window.validateStudentInput = validateStudentInput;
+    window.validateBuildingAreaInput = validateBuildingAreaInput;
+    window.validateRequiredInput = validateRequiredInput;
+    window.validateSubsidyAreaInput = validateSubsidyAreaInput;
     
     // 常量
     window.FormState = FormState;

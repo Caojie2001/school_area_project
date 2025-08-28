@@ -65,6 +65,13 @@ class StatisticsManager {
             charts: {}
         };
         this.autoRefreshTimer = null;
+        // 分页相关属性
+        this.currentPage = 1;
+        this.pageSize = 10;
+        this.totalPages = 1;
+        this.allOverviewData = [];
+        // 防重复请求标志
+        this.isSearching = false;
     }
 
     /**
@@ -559,12 +566,27 @@ function refreshStatisticsData() {
  * 搜索填报概览记录
  */
 async function searchOverviewRecords() {
+    // 防止重复请求
+    if (statisticsManager && statisticsManager.isSearching) {
+        console.log('统计搜索正在进行中，忽略重复请求');
+        return;
+    }
+    
     const yearFilter = document.getElementById('overviewYearFilter');
     const userTypeFilter = document.getElementById('overviewUserTypeFilter');
+    const searchButton = document.querySelector('button[onclick="searchOverviewRecords()"]');
     const year = yearFilter ? yearFilter.value : '2025';
     const userType = userTypeFilter ? userTypeFilter.value : 'construction_center';
     
     console.log('开始搜索填报概览记录，筛选条件:', { year, userType });
+    
+    // 设置搜索状态
+    if (statisticsManager) {
+        statisticsManager.isSearching = true;
+    }
+    
+    // 锁定统计页面
+    lockStatisticsPage();
     
     const resultsContainer = document.getElementById('overviewDataResults');
     const recordCount = document.getElementById('overviewRecordCount');
@@ -599,6 +621,179 @@ async function searchOverviewRecords() {
     } catch (error) {
         console.error('搜索填报概览记录失败:', error);
         resultsContainer.innerHTML = '<div class="alert alert-danger">网络错误，请稍后重试</div>';
+    } finally {
+        // 恢复搜索状态和解锁页面
+        if (statisticsManager) {
+            statisticsManager.isSearching = false;
+        }
+        unlockStatisticsPage();
+    }
+}
+
+/**
+ * 锁定统计页面
+ */
+function lockStatisticsPage() {
+    // 禁用筛选下拉框
+    const filters = [
+        document.getElementById('overviewYearFilter'),
+        document.getElementById('overviewUserTypeFilter')
+    ];
+    filters.forEach(filter => {
+        if (filter) {
+            filter.disabled = true;
+            filter.style.opacity = '0.6';
+        }
+    });
+    
+    // 禁用搜索按钮
+    const searchButton = document.querySelector('button[onclick="searchOverviewRecords()"]');
+    if (searchButton) {
+        searchButton.disabled = true;
+        searchButton.textContent = '搜索中...';
+        searchButton.style.opacity = '0.6';
+    }
+    
+    // 禁用侧边栏菜单项
+    const menuItems = document.querySelectorAll('.sidebar .menu-item');
+    menuItems.forEach(item => {
+        if (item) {
+            item.style.pointerEvents = 'none';
+            item.style.opacity = '0.6';
+            item.setAttribute('data-stats-locked', 'true');
+        }
+    });
+    
+    // 禁用结果区域的所有按钮
+    const overviewDataResults = document.getElementById('overviewDataResults');
+    if (overviewDataResults) {
+        const buttons = overviewDataResults.querySelectorAll('button');
+        buttons.forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            btn.setAttribute('data-stats-locked', 'true');
+        });
+    }
+    
+    // 添加页面遮罩层
+    addStatisticsPageOverlay('正在搜索统计数据，请稍候...');
+}
+
+/**
+ * 解锁统计页面
+ */
+function unlockStatisticsPage() {
+    // 启用筛选下拉框
+    const filters = [
+        document.getElementById('overviewYearFilter'),
+        document.getElementById('overviewUserTypeFilter')
+    ];
+    filters.forEach(filter => {
+        if (filter) {
+            filter.disabled = false;
+            filter.style.opacity = '1';
+        }
+    });
+    
+    // 恢复搜索按钮
+    const searchButton = document.querySelector('button[onclick="searchOverviewRecords()"]');
+    if (searchButton) {
+        searchButton.disabled = false;
+        searchButton.textContent = '查找';
+        searchButton.style.opacity = '1';
+    }
+    
+    // 恢复侧边栏菜单项
+    const menuItems = document.querySelectorAll('.sidebar .menu-item[data-stats-locked="true"]');
+    menuItems.forEach(item => {
+        if (item) {
+            item.style.pointerEvents = 'auto';
+            item.style.opacity = '1';
+            item.removeAttribute('data-stats-locked');
+        }
+    });
+    
+    // 恢复结果区域的按钮
+    const overviewDataResults = document.getElementById('overviewDataResults');
+    if (overviewDataResults) {
+        const buttons = overviewDataResults.querySelectorAll('button[data-stats-locked="true"]');
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.removeAttribute('data-stats-locked');
+        });
+    }
+    
+    // 移除页面遮罩层
+    removeStatisticsPageOverlay();
+}
+
+/**
+ * 添加统计页面遮罩层
+ */
+function addStatisticsPageOverlay(message = '正在处理，请稍候...') {
+    // 移除已存在的遮罩层
+    removeStatisticsPageOverlay();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'statisticsOverlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        backdrop-filter: blur(2px);
+    `;
+    
+    const messageBox = document.createElement('div');
+    messageBox.style.cssText = `
+        background: white;
+        padding: 30px 40px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        text-align: center;
+        font-size: 16px;
+        color: #333;
+        max-width: 300px;
+    `;
+    
+    const spinner = document.createElement('div');
+    spinner.style.cssText = `
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px auto;
+    `;
+    
+    const text = document.createElement('div');
+    text.textContent = message;
+    text.style.cssText = `
+        font-weight: 500;
+        color: #2c3e50;
+    `;
+    
+    messageBox.appendChild(spinner);
+    messageBox.appendChild(text);
+    overlay.appendChild(messageBox);
+    document.body.appendChild(overlay);
+}
+
+/**
+ * 移除统计页面遮罩层
+ */
+function removeStatisticsPageOverlay() {
+    const overlay = document.getElementById('statisticsOverlay');
+    if (overlay && overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
     }
 }
 
@@ -613,77 +808,145 @@ function displayOverviewResults(data) {
         return;
     }
     
-    // 复用数据管理的表格结构，但去掉操作列和右侧空间
-    let html = '<div class="table-container">';
-    html += '<div class="data-table-wrapper">';
+    // 保存所有数据用于分页
+    statisticsManager.allOverviewData = data;
     
-    // 左侧冻结列
-    html += '<div class="frozen-left-columns">';
-    html += '<table class="data-table-frozen-left"><thead><tr>';
-    html += '<th>测算年份</th>';
-    html += '<th>学校名称</th>';
-    html += '</tr></thead><tbody>';
+    // 计算分页信息
+    statisticsManager.totalPages = Math.ceil(data.length / statisticsManager.pageSize);
     
-    data.forEach(record => {
-        html += `<tr>
-            <td><strong>${record.year || '未知'}</strong></td>
-            <td><strong>${record.school_name || '未知'}</strong></td>
-        </tr>`;
-    });
+    // 确保当前页码在有效范围内
+    if (statisticsManager.currentPage > statisticsManager.totalPages) {
+        statisticsManager.currentPage = 1;
+    }
     
-    html += '</tbody></table></div>';
+    // 获取当前页的数据
+    const startIndex = (statisticsManager.currentPage - 1) * statisticsManager.pageSize;
+    const endIndex = startIndex + statisticsManager.pageSize;
+    const currentPageData = data.slice(startIndex, endIndex);
     
-    // 中间滚动数据列（去掉右侧margin，占满剩余空间）
-    html += '<div class="scrollable-middle-columns" style="margin-left: 280px; margin-right: 0; overflow-x: auto; overflow-y: hidden;">';
-    html += '<table class="data-table-scrollable"><thead><tr>';
-    html += '<th>现状建筑总面积(m²)</th>';
-    html += '<th>测算建筑总面积(m²)</th>';
-    html += '<th>测算建筑面积总缺额(不含特殊补助)(m²)</th>';
-    html += '<th>特殊补助建筑总面积(m²)</th>';
-    html += '<th>测算建筑面积总缺额(含特殊补助)(m²)</th>';
-    html += '</tr></thead><tbody>';
+    // 使用一般表格结构
+    let html = '<div class="table-container" style="width: 100%; margin: 0; padding: 0;">';
+    html += '<div class="table-responsive" style="overflow-x: auto; overflow-y: hidden; width: 100%;">';
     
-    data.forEach(record => {
+    // 单一普通表格
+    html += '<table class="data-table" style="width: 100%; min-width: 950px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">';
+    html += '<thead style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">';
+    html += '<tr>';
+    html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; width: 60px;">测算年份</th>';
+    html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; width: 200px;">学校名称</th>';
+    html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2; width: 100px;">现状建筑总面积<br/>(m²)</th>';
+    html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2; width: 100px;">测算建筑总面积<br/>(m²)</th>';
+    html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2; width: 130px;">测算建筑面积总缺额<br/>(不含特殊补助)(m²)</th>';
+    html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2; width: 100px;">特殊补助建筑总面积<br/>(m²)</th>';
+    html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; font-size: 12px; line-height: 1.2; width: 130px;">测算建筑面积总缺额<br/>(含特殊补助)(m²)</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
+    
+    currentPageData.forEach((record, index) => {
         // 直接使用API返回的正确值
         const gapWithoutSubsidy = record.gap_without_subsidy || 0;
         const gapWithSubsidy = record.gap_with_subsidy || 0;
         
-        html += `<tr>
-            <td>${formatNumber(record.current_total_area || 0)}</td>
-            <td>${formatNumber(record.required_total_area || 0)}</td>
-            <td>${gapWithoutSubsidy > 0 ? '+' : ''}${formatNumber(gapWithoutSubsidy)}</td>
-            <td>${formatNumber(record.total_subsidy_area || 0)}</td>
-            <td>${gapWithSubsidy > 0 ? '+' : ''}${formatNumber(gapWithSubsidy)}</td>
+        const rowStyle = index % 2 === 0 ? 'background: #fff;' : 'background: #f8f9fa;';
+        
+        // 检查学校名称是否需要显示title（8个字符及以上）
+        const schoolName = record.school_name || '未知';
+        const schoolNameTitle = schoolName.length >= 8 ? `title="${schoolName}"` : '';
+        
+        html += `<tr style="${rowStyle} border-bottom: 1px solid #dee2e6;" onmouseover="this.style.background='#e3f2fd'" onmouseout="this.style.background='${index % 2 === 0 ? '#fff' : '#f8f9fa'}'">
+            <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; font-weight: 600; font-size: 12px; text-align: center;">${record.year || '未知'}</td>
+            <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; font-weight: 600; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; text-align: center;" ${schoolNameTitle}>${schoolName}</td>
+            <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${formatNumber(record.current_total_area || 0)}</td>
+            <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${formatNumber(record.required_total_area || 0)}</td>
+            <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${gapWithoutSubsidy > 0 ? '+' : ''}${formatNumber(gapWithoutSubsidy)}</td>
+            <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${formatNumber(record.total_subsidy_area || 0)}</td>
+            <td style="padding: 6px 7px; text-align: center; font-size: 12px;">${gapWithSubsidy > 0 ? '+' : ''}${formatNumber(gapWithSubsidy)}</td>
         </tr>`;
     });
     
-    html += '</tbody></table></div>';
-    
-    // 不需要右侧操作列，直接结束
-    html += '</div>'; // data-table-wrapper
+    html += '</tbody></table>';
+    html += '</div>'; // table-responsive
     html += '</div>'; // table-container
     
-    html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
-        <p style="margin: 0; color: #6c757d; font-size: 14px;">
-            <strong>共找到 ${data.length} 条记录</strong>
-        </p>
-    </div>`;
+    // 添加分页控件
+    html += generateOverviewPaginationHTML(data.length);
     
     resultsContainer.innerHTML = html;
     
     // 更新汇总数据
     updateOverviewSummary(data);
+}
+
+/**
+ * 生成填报概览分页HTML
+ */
+function generateOverviewPaginationHTML(totalRecords) {
+    if (totalRecords <= statisticsManager.pageSize) {
+        return `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
+            <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                <strong>共找到 ${totalRecords} 条记录</strong>
+            </p>
+        </div>`;
+    }
+
+    let html = '<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db; display: flex; justify-content: space-between; align-items: center;">';
     
-    // 同步表格行高度和滚动 - 使用更好的时机
-    requestAnimationFrame(() => {
-        syncOverviewTableRows();
-        syncOverviewTableScroll();
-        
-        // 再次确保同步，处理可能的渲染延迟
-        setTimeout(() => {
-            syncOverviewTableRows();
-        }, 100);
-    });
+    // 左侧记录信息
+    const startRecord = (statisticsManager.currentPage - 1) * statisticsManager.pageSize + 1;
+    const endRecord = Math.min(statisticsManager.currentPage * statisticsManager.pageSize, totalRecords);
+    html += `<p style="margin: 0; color: #6c757d; font-size: 14px;">
+        显示第 <strong>${startRecord}</strong> 到 <strong>${endRecord}</strong> 条记录，共 <strong>${totalRecords}</strong> 条
+    </p>`;
+    
+    // 右侧分页控件
+    html += '<div style="display: flex; gap: 5px; align-items: center;">';
+    
+    // 首页和上一页
+    const prevDisabled = statisticsManager.currentPage === 1;
+    html += `<button onclick="goToOverviewPage(1)" ${prevDisabled ? 'disabled' : ''} 
+        style="padding: 6px 12px; border: 1px solid ${prevDisabled ? '#ddd' : '#000'}; background: white; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; border-radius: 4px; font-size: 12px; ${prevDisabled ? 'color: #999;' : 'color: #000;'}">首页</button>`;
+    
+    html += `<button onclick="goToOverviewPage(${statisticsManager.currentPage - 1})" ${prevDisabled ? 'disabled' : ''} 
+        style="padding: 6px 12px; border: 1px solid ${prevDisabled ? '#ddd' : '#000'}; background: white; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; border-radius: 4px; font-size: 12px; ${prevDisabled ? 'color: #999;' : 'color: #000;'}">上一页</button>`;
+    
+    // 页码按钮
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, statisticsManager.currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(statisticsManager.totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === statisticsManager.currentPage;
+        html += `<button onclick="goToOverviewPage(${i})" 
+            style="padding: 6px 12px; border: 1px solid ${isActive ? '#007bff' : '#000'}; background: ${isActive ? '#007bff' : 'white'}; color: ${isActive ? 'white' : '#000'}; cursor: pointer; border-radius: 4px; font-size: 12px; font-weight: ${isActive ? 'bold' : 'normal'};">${i}</button>`;
+    }
+    
+    // 下一页和末页
+    const nextDisabled = statisticsManager.currentPage === statisticsManager.totalPages;
+    html += `<button onclick="goToOverviewPage(${statisticsManager.currentPage + 1})" ${nextDisabled ? 'disabled' : ''} 
+        style="padding: 6px 12px; border: 1px solid ${nextDisabled ? '#ddd' : '#000'}; background: white; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; border-radius: 4px; font-size: 12px; ${nextDisabled ? 'color: #999;' : 'color: #000;'}">下一页</button>`;
+    
+    html += `<button onclick="goToOverviewPage(${statisticsManager.totalPages})" ${nextDisabled ? 'disabled' : ''} 
+        style="padding: 6px 12px; border: 1px solid ${nextDisabled ? '#ddd' : '#000'}; background: white; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; border-radius: 4px; font-size: 12px; ${nextDisabled ? 'color: #999;' : 'color: #000;'}">末页</button>`;
+    
+    html += '</div></div>';
+    
+    return html;
+}
+
+/**
+ * 跳转到指定页面
+ */
+function goToOverviewPage(page) {
+    if (page < 1 || page > statisticsManager.totalPages) {
+        return;
+    }
+    
+    statisticsManager.currentPage = page;
+    displayOverviewResults(statisticsManager.allOverviewData);
 }
 
 /**

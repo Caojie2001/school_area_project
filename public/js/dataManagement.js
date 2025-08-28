@@ -37,6 +37,15 @@ const DataManagementManager = {
     // 存储所有学校数据
     allDataSchoolsData: [],
     
+    // 分页相关属性
+    currentPage: 1,
+    pageSize: 15,
+    totalPages: 0,
+    
+    // 防重复请求标志
+    isSearching: false,
+    isBatchDownloading: false,
+    
     /**
      * 初始化数据管理模块
      */
@@ -123,28 +132,39 @@ const DataManagementManager = {
      * 搜索数据记录
      */
     async searchDataRecords() {
+        // 防止重复请求
+        if (this.isSearching) {
+            console.log('搜索正在进行中，忽略重复请求');
+            return;
+        }
+        
         const yearFilter = document.getElementById('dataYearFilter');
         const schoolFilter = document.getElementById('dataSchoolNameFilter');
         const userFilter = document.getElementById('dataUserFilter');
+        const searchButton = document.querySelector('button[onclick="searchDataRecords()"]');
         const year = yearFilter ? yearFilter.value : 'all';
         const school = schoolFilter ? schoolFilter.value : 'all';
         const user = userFilter ? userFilter.value : 'all';
         
         console.log('开始搜索数据记录，筛选条件:', { year, school, user });
         
+        // 设置搜索状态
+        this.isSearching = true;
+        
+        // 锁定整个数据管理页面
+        this.lockDataManagementPage();
+        
         const resultsContainer = document.getElementById('dataHistoryResults');
         const batchDownloadBtn = document.getElementById('batchDownloadBtn');
         resultsContainer.innerHTML = '<div class="loading">正在搜索...</div>';
+        
+        // 搜索时重置分页
+        this.currentPage = 1;
         
         // 搜索时隐藏汇总栏
         const summarySection = document.getElementById('dataSummarySection');
         if (summarySection) {
             summarySection.style.display = 'none';
-        }
-        
-        // 禁用批量下载按钮
-        if (batchDownloadBtn) {
-            batchDownloadBtn.disabled = true;
         }
         
         try {
@@ -162,17 +182,223 @@ const DataManagementManager = {
                 console.log('记录ID列表:', result.data.map(r => r.id));
                 this.displayDataSchoolsResults(result.data);
                 
-                // 如果有搜索结果，启用批量下载按钮
-                if (batchDownloadBtn && result.data.length > 0) {
-                    batchDownloadBtn.disabled = false;
-                }
+                // 注意：批量下载按钮的状态将在 unlockDataManagementPage 中统一处理
             } else {
                 console.error('搜索失败:', result.error);
                 this.showDataError('搜索失败: ' + result.error);
+                // 搜索失败时清空数据
+                this.allDataSchoolsData = [];
             }
         } catch (error) {
             console.error('搜索失败:', error);
             this.showDataError('搜索失败: ' + error.message);
+            // 搜索失败时清空数据
+            this.allDataSchoolsData = [];
+        } finally {
+            // 恢复搜索状态和解锁页面
+            this.isSearching = false;
+            this.unlockDataManagementPage();
+        }
+    },
+    
+    /**
+     * 锁定数据管理页面
+     */
+    lockDataManagementPage() {
+        // 禁用所有筛选下拉框
+        const filters = [
+            document.getElementById('dataYearFilter'),
+            document.getElementById('dataSchoolNameFilter'),
+            document.getElementById('dataUserFilter')
+        ];
+        filters.forEach(filter => {
+            if (filter) {
+                filter.disabled = true;
+                filter.style.opacity = '0.6';
+            }
+        });
+        
+        // 禁用搜索和批量下载按钮
+        const searchButton = document.querySelector('button[onclick="searchDataRecords()"]');
+        const batchDownloadBtn = document.getElementById('batchDownloadBtn');
+        
+        if (searchButton) {
+            searchButton.disabled = true;
+            searchButton.textContent = '搜索中...';
+            searchButton.style.opacity = '0.6';
+        }
+        
+        if (batchDownloadBtn) {
+            batchDownloadBtn.disabled = true;
+            batchDownloadBtn.style.opacity = '0.6';
+        }
+        
+        // 禁用侧边栏菜单项
+        const menuItems = document.querySelectorAll('.sidebar .menu-item');
+        menuItems.forEach(item => {
+            if (item) {
+                item.style.pointerEvents = 'none';
+                item.style.opacity = '0.6';
+                item.setAttribute('data-locked', 'true');
+            }
+        });
+        
+        // 禁用结果区域的所有按钮
+        const dataHistoryResults = document.getElementById('dataHistoryResults');
+        if (dataHistoryResults) {
+            const buttons = dataHistoryResults.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.setAttribute('data-locked', 'true');
+            });
+        }
+        
+        // 添加页面遮罩层
+        this.addPageOverlay('正在搜索数据，请稍候...');
+    },
+    
+    /**
+     * 解锁数据管理页面
+     */
+    unlockDataManagementPage() {
+        // 启用所有筛选下拉框
+        const filters = [
+            document.getElementById('dataYearFilter'),
+            document.getElementById('dataSchoolNameFilter'),
+            document.getElementById('dataUserFilter')
+        ];
+        filters.forEach(filter => {
+            if (filter) {
+                filter.disabled = false;
+                filter.style.opacity = '1';
+            }
+        });
+        
+        // 恢复搜索按钮
+        const searchButton = document.querySelector('button[onclick="searchDataRecords()"]');
+        if (searchButton) {
+            searchButton.disabled = false;
+            searchButton.textContent = '查找';
+            searchButton.style.opacity = '1';
+        }
+        
+        // 恢复批量下载按钮状态
+        const batchDownloadBtn = document.getElementById('batchDownloadBtn');
+        if (batchDownloadBtn) {
+            // 根据是否有搜索结果来决定按钮状态
+            if (this.allDataSchoolsData && this.allDataSchoolsData.length > 0) {
+                batchDownloadBtn.disabled = false;
+            } else {
+                batchDownloadBtn.disabled = true;
+            }
+            batchDownloadBtn.style.opacity = '1';
+        }
+        
+        // 恢复侧边栏菜单项
+        const menuItems = document.querySelectorAll('.sidebar .menu-item[data-locked="true"]');
+        menuItems.forEach(item => {
+            if (item) {
+                item.style.pointerEvents = 'auto';
+                item.style.opacity = '1';
+                item.removeAttribute('data-locked');
+            }
+        });
+        
+        // 恢复结果区域的按钮
+        const dataHistoryResults = document.getElementById('dataHistoryResults');
+        if (dataHistoryResults) {
+            const buttons = dataHistoryResults.querySelectorAll('button[data-locked="true"]');
+            buttons.forEach(btn => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.removeAttribute('data-locked');
+            });
+        }
+        
+        // 移除页面遮罩层
+        this.removePageOverlay();
+    },
+    
+    /**
+     * 添加页面遮罩层
+     */
+    addPageOverlay(message = '正在处理，请稍候...') {
+        // 移除已存在的遮罩层
+        this.removePageOverlay();
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'dataManagementOverlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            backdrop-filter: blur(2px);
+        `;
+        
+        const messageBox = document.createElement('div');
+        messageBox.style.cssText = `
+            background: white;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            font-size: 16px;
+            color: #333;
+            max-width: 300px;
+        `;
+        
+        const spinner = document.createElement('div');
+        spinner.style.cssText = `
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        `;
+        
+        const text = document.createElement('div');
+        text.textContent = message;
+        text.style.cssText = `
+            font-weight: 500;
+            color: #2c3e50;
+        `;
+        
+        // 添加旋转动画
+        if (!document.getElementById('spinnerStyle')) {
+            const style = document.createElement('style');
+            style.id = 'spinnerStyle';
+            style.textContent = `
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        messageBox.appendChild(spinner);
+        messageBox.appendChild(text);
+        overlay.appendChild(messageBox);
+        document.body.appendChild(overlay);
+    },
+    
+    /**
+     * 移除页面遮罩层
+     */
+    removePageOverlay() {
+        const overlay = document.getElementById('dataManagementOverlay');
+        if (overlay && overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
         }
     },
     
@@ -262,6 +488,9 @@ const DataManagementManager = {
         document.getElementById('dataSchoolNameFilter').value = 'all';
         document.getElementById('dataUserFilter').value = 'all';
         
+        // 重置分页
+        this.currentPage = 1;
+        
         // 清空结果显示
         const resultsContainer = document.getElementById('dataHistoryResults');
         resultsContainer.innerHTML = '<div class="alert alert-info">请选择筛选条件并点击查找按钮</div>';
@@ -309,96 +538,213 @@ const DataManagementManager = {
         // 计算并显示汇总信息
         this.updateDataSummary(schoolsData);
         
-        let html = '<div class="table-container">';
-        html += '<div class="data-table-wrapper">';
+        // 计算分页信息
+        this.totalPages = Math.ceil(schoolsData.length / this.pageSize);
         
-        // 左侧冻结列
-        html += '<div class="frozen-left-columns">';
-        html += '<table class="data-table-frozen-left"><thead><tr>';
-        html += '<th>测算年份</th>';
-        html += '<th>学校名称</th>';
-        html += '</tr></thead><tbody>';
+        // 确保当前页码在有效范围内
+        if (this.currentPage > this.totalPages) {
+            this.currentPage = 1;
+        }
         
-        schoolsData.forEach(school => {
-            html += `<tr>
-                <td><strong>${school.year || '未知'}</strong></td>
-                <td><strong>${school.school_name || '未知'}</strong></td>
-            </tr>`;
-        });
+        // 获取当前页的数据
+        const startIndex = (this.currentPage - 1) * this.pageSize;
+        const endIndex = startIndex + this.pageSize;
+        const currentPageData = schoolsData.slice(startIndex, endIndex);
         
-        html += '</tbody></table></div>';
+        let html = '<div class="table-container" style="width: 100%; margin: 0; padding: 0;">';
+        html += '<div class="table-responsive" style="overflow-x: auto; overflow-y: hidden; width: 100%;">';
         
-        // 中间滚动数据列
-        html += '<div class="scrollable-middle-columns" style="margin-left: 280px; margin-right: 250px; overflow-x: auto; overflow-y: hidden;">';
-        html += '<table class="data-table-scrollable"><thead><tr>';
-        html += '<th>现状建筑总面积(m²)</th>';
-        html += '<th>测算建筑总面积(m²)</th>';
-        html += '<th>测算建筑面积总缺额(不含特殊补助)(m²)</th>';
-        html += '<th>特殊补助建筑总面积(m²)</th>';
-        html += '<th>测算建筑面积总缺额(含特殊补助)(m²)</th>';
-        html += '<th>测算时间</th>';
-        html += '<th>测算用户</th>';
-        html += '</tr></thead><tbody>';
+        // 单一普通表格
+        html += '<table class="data-table" style="width: 100%; min-width: 1000px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">';
+        html += '<thead style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">';
+        html += '<tr>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px;">测算年份</th>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; width: 120px;">学校名称</th>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2; width: 110px;">现状建筑总面积<br/>(m²)</th>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2; width: 110px;">测算建筑总面积<br/>(m²)</th>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2;">测算建筑面积总缺额<br/>(不含特殊补助)(m²)</th>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2; width: 130px;">特殊补助建筑总面积<br/>(m²)</th>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; line-height: 1.2;">测算建筑面积总缺额<br/>(含特殊补助)(m²)</th>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; font-size: 12px; width: 120px;">测算用户</th>';
+        html += '<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #495057; font-size: 12px; width: 180px;">操作</th>';
+        html += '</tr></thead>';
+        html += '<tbody>';
         
-        schoolsData.forEach(school => {
-            const date = new Date(school.created_at).toLocaleDateString('zh-CN');
-            const time = new Date(school.created_at).toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
-            
+        // 使用当前页的数据生成表格行
+        currentPageData.forEach((school, index) => {
             // 计算不含补助的缺口
             const gapWithoutSubsidy = school.total_area_gap_without_subsidy ? parseFloat(school.total_area_gap_without_subsidy) : ((school.total_area_gap_with_subsidy || 0) - (school.special_subsidy_total || 0));
             
-            html += `<tr>
-                <td>${school.current_building_area || '0.00'}</td>
-                <td>${school.required_building_area || '0.00'}</td>
-                <td>${gapWithoutSubsidy.toFixed ? gapWithoutSubsidy.toFixed(2) : '0.00'}</td>
-                <td>${school.special_subsidy_total || '0.00'}</td>
-                <td>${school.total_area_gap_with_subsidy || '0.00'}</td>
-                <td>${date} ${time}</td>
-                <td>${school.submitter_real_name || school.submitter_username || '未知用户'}</td>
-            </tr>`;
-        });
-        
-        html += '</tbody></table></div>';
-        
-        // 右侧冻结操作列
-        html += '<div class="frozen-right-columns">';
-        html += '<table class="data-table-frozen-right"><thead><tr>';
-        html += '<th>操作</th>';
-        html += '</tr></thead><tbody>';
-        
-        schoolsData.forEach(school => {
-            html += `<tr>
-                <td>
-                    <button style="background: none; color: #3498db; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="viewDataSchoolDetails(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">详情</button>
-                    <button style="background: none; color: #3498db; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="downloadRecord(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">下载</button>
-                    <button style="background: none; color: #f39c12; border: none; padding: 4px 8px; cursor: pointer; margin-right: 8px; font-size: 12px; text-decoration: underline;" onclick="editDataRecord(${school.id})" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">编辑</button>
-                    <button style="background: none; color: #e74c3c; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px; text-decoration: underline;" onclick="deleteSchoolCombination('${school.school_name}', '${school.year}', '${school.submitter_username || ''}')" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">删除</button>
+            const rowStyle = index % 2 === 0 ? 'background: #fff;' : 'background: #f8f9fa;';
+            
+            // 检查学校名称是否需要显示title（8个字符及以上）
+            const schoolName = school.school_name || '未知';
+            const schoolNameTitle = schoolName.length >= 8 ? `title="${schoolName}"` : '';
+            
+            // 检查测算用户是否需要显示title（8个字符及以上）
+            const userName = school.submitter_real_name || school.submitter_username || '未知用户';
+            const userNameTitle = userName.length >= 8 ? `title="${userName}"` : '';
+            
+            html += `<tr style="${rowStyle} border-bottom: 1px solid #dee2e6;" onmouseover="this.style.background='#e3f2fd'" onmouseout="this.style.background='${index % 2 === 0 ? '#fff' : '#f8f9fa'}'">
+                <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; font-weight: 600; font-size: 12px; text-align: center;">${school.year || '未知'}</td>
+                <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; font-weight: 600; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; text-align: center;" ${schoolNameTitle}>${schoolName}</td>
+                <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${school.current_building_area || '0.00'}</td>
+                <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${school.required_building_area || '0.00'}</td>
+                <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${gapWithoutSubsidy.toFixed ? gapWithoutSubsidy.toFixed(2) : '0.00'}</td>
+                <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${school.special_subsidy_total || '0.00'}</td>
+                <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px;">${school.total_area_gap_with_subsidy || '0.00'}</td>
+                <td style="padding: 6px 7px; border-right: 1px solid #dee2e6; text-align: center; font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" ${userNameTitle}>${userName}</td>
+                <td style="padding: 6px 7px; text-align: center; font-size: 12px; width: 180px;">
+                    <span style="color: #3498db; text-decoration: underline; cursor: pointer; margin: 0 4px; font-size: 11px;" onclick="viewDataSchoolDetails(${school.id})" onmouseover="this.style.color='#2980b9'" onmouseout="this.style.color='#3498db'">详情</span>
+                    <span style="color: #27ae60; text-decoration: underline; cursor: pointer; margin: 0 4px; font-size: 11px;" onclick="downloadRecord(${school.id})" onmouseover="this.style.color='#229954'" onmouseout="this.style.color='#27ae60'">下载</span>
+                    <span style="color: #f39c12; text-decoration: underline; cursor: pointer; margin: 0 4px; font-size: 11px;" onclick="editDataRecord(${school.id})" onmouseover="this.style.color='#e67e22'" onmouseout="this.style.color='#f39c12'">编辑</span>
+                    <span style="color: #e74c3c; text-decoration: underline; cursor: pointer; margin: 0 4px; font-size: 11px;" onclick="deleteSchoolCombination('${school.school_name}', '${school.year}', '${school.submitter_username || ''}')" onmouseover="this.style.color='#c0392b'" onmouseout="this.style.color='#e74c3c'">删除</span>
                 </td>
             </tr>`;
         });
         
-        html += '</tbody></table></div>';
-        html += '</div>'; // data-table-wrapper
+        html += '</tbody></table>';
+        html += '</div>'; // table-responsive
         html += '</div>'; // table-container
         
-        html += `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
-            <p style="margin: 0; color: #6c757d; font-size: 14px;">
-                <strong>共找到 ${schoolsData.length} 条记录</strong> | 
-                可以使用上方的"批量下载"按钮下载所有搜索结果
-            </p>
-        </div>`;
+        // 添加分页控件
+        html += this.generatePaginationHTML(schoolsData.length);
+        
         container.innerHTML = html;
         
-        // 同步表格行高度和滚动 - 使用更好的时机
-        requestAnimationFrame(() => {
-            this.syncTableRows();
-            this.syncTableScroll();
-            
-            // 再次确保同步，处理可能的渲染延迟
-            setTimeout(() => {
-                this.syncTableRows();
-            }, 100);
-        });
+        // 普通表格无需同步处理
+    },
+    
+    /**
+     * 生成分页HTML
+     */
+    generatePaginationHTML(totalRecords) {
+        if (this.totalPages <= 1) {
+            return `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
+                <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                    <strong>共找到 ${totalRecords} 条记录</strong> | 
+                    可以使用上方的"批量下载"按钮下载所有搜索结果
+                </p>
+            </div>`;
+        }
+        
+        let paginationHTML = `
+            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                        <strong>共找到 ${totalRecords} 条记录</strong>，当前第 ${this.currentPage} 页，共 ${this.totalPages} 页 | 
+                        可以使用上方的"批量下载"按钮下载所有搜索结果
+                    </p>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+        `;
+        
+        // 上一页按钮
+        if (this.currentPage > 1) {
+            paginationHTML += `
+                <button onclick="dataManagementManager.goToPage(${this.currentPage - 1})" 
+                        style="padding: 6px 12px; background: white; color: black; border: 1px solid black; border-radius: 4px; cursor: pointer; font-size: 13px;"
+                        onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                    上一页
+                </button>
+            `;
+        } else {
+            paginationHTML += `
+                <button disabled style="padding: 6px 12px; background: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; border-radius: 4px; cursor: not-allowed; font-size: 13px;">
+                    上一页
+                </button>
+            `;
+        }
+        
+        // 页码按钮（显示当前页前后2页）
+        const startPage = Math.max(1, this.currentPage - 2);
+        const endPage = Math.min(this.totalPages, this.currentPage + 2);
+        
+        if (startPage > 1) {
+            paginationHTML += `
+                <button onclick="dataManagementManager.goToPage(1)" 
+                        style="padding: 6px 10px; background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 13px;"
+                        onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
+                    1
+                </button>
+            `;
+            if (startPage > 2) {
+                paginationHTML += `<span style="color: #6c757d; font-size: 13px;">...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            if (i === this.currentPage) {
+                paginationHTML += `
+                    <button style="padding: 6px 10px; background: #007bff; color: white; border: 1px solid #007bff; border-radius: 4px; cursor: default; font-size: 13px; font-weight: bold;">
+                        ${i}
+                    </button>
+                `;
+            } else {
+                paginationHTML += `
+                    <button onclick="dataManagementManager.goToPage(${i})" 
+                            style="padding: 6px 10px; background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 13px;"
+                            onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
+                        ${i}
+                    </button>
+                `;
+            }
+        }
+        
+        if (endPage < this.totalPages) {
+            if (endPage < this.totalPages - 1) {
+                paginationHTML += `<span style="color: #6c757d; font-size: 13px;">...</span>`;
+            }
+            paginationHTML += `
+                <button onclick="dataManagementManager.goToPage(${this.totalPages})" 
+                        style="padding: 6px 10px; background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 13px;"
+                        onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
+                    ${this.totalPages}
+                </button>
+            `;
+        }
+        
+        // 下一页按钮
+        if (this.currentPage < this.totalPages) {
+            paginationHTML += `
+                <button onclick="dataManagementManager.goToPage(${this.currentPage + 1})" 
+                        style="padding: 6px 12px; background: white; color: #007bff; border: 1px solid #007bff; border-radius: 4px; cursor: pointer; font-size: 13px;"
+                        onmouseover="this.style.background='#f0f8ff'" onmouseout="this.style.background='white'">
+                    下一页
+                </button>
+            `;
+        } else {
+            paginationHTML += `
+                <button disabled style="padding: 6px 12px; background: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; border-radius: 4px; cursor: not-allowed; font-size: 13px;">
+                    下一页
+                </button>
+            `;
+        }
+        
+        paginationHTML += `
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        return paginationHTML;
+    },
+    
+    /**
+     * 跳转到指定页码
+     */
+    goToPage(pageNumber) {
+        if (pageNumber < 1 || pageNumber > this.totalPages) {
+            return;
+        }
+        
+        this.currentPage = pageNumber;
+        this.displayDataSchoolsResults(this.allDataSchoolsData);
+        
+        // 滚动到表格顶部
+        const container = document.getElementById('dataHistoryResults');
+        if (container) {
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     },
     
     /**
@@ -418,96 +764,9 @@ const DataManagementManager = {
     },
     
     /**
-     * 同步表格行高度
-     */
-    syncTableRows() {
-        const leftRows = document.querySelectorAll('.data-table-frozen-left tbody tr');
-        const middleRows = document.querySelectorAll('.data-table-scrollable tbody tr');
-        const rightRows = document.querySelectorAll('.data-table-frozen-right tbody tr');
-        
-        if (leftRows.length === middleRows.length && middleRows.length === rightRows.length) {
-            for (let i = 0; i < leftRows.length; i++) {
-                // 强制设置统一的行高
-                const fixedHeight = '42px';
-                
-                leftRows[i].style.height = fixedHeight;
-                middleRows[i].style.height = fixedHeight;
-                rightRows[i].style.height = fixedHeight;
-                
-                // 同时设置每个单元格的高度
-                const leftCells = leftRows[i].querySelectorAll('td, th');
-                const middleCells = middleRows[i].querySelectorAll('td, th');
-                const rightCells = rightRows[i].querySelectorAll('td, th');
-                
-                leftCells.forEach(cell => cell.style.height = fixedHeight);
-                middleCells.forEach(cell => cell.style.height = fixedHeight);
-                rightCells.forEach(cell => cell.style.height = fixedHeight);
-            }
-        }
-    },
-    
-    /**
-     * 改进的表格滚动同步函数
-     */
-    syncTableScroll() {
-        const leftTable = document.querySelector('.frozen-left-columns');
-        const middleTable = document.querySelector('.scrollable-middle-columns');
-        const rightTable = document.querySelector('.frozen-right-columns');
-        
-        if (!leftTable || !middleTable || !rightTable) return;
-        
-        let isScrolling = false;
-        
-        function syncVerticalScroll(source, targets) {
-            if (isScrolling) return;
-            isScrolling = true;
-            
-            targets.forEach(target => {
-                target.scrollTop = source.scrollTop;
-            });
-            
-            requestAnimationFrame(() => {
-                isScrolling = false;
-            });
-        }
-        
-        // 监听中间表格滚动，同步到左右表格
-        middleTable.addEventListener('scroll', () => {
-            syncVerticalScroll(middleTable, [leftTable, rightTable]);
-        });
-        
-        // 强制同步容器高度
-        function syncContainerHeights() {
-            const leftHeight = leftTable.scrollHeight;
-            const middleHeight = middleTable.scrollHeight;
-            const rightHeight = rightTable.scrollHeight;
-            
-            const maxHeight = Math.max(leftHeight, middleHeight, rightHeight);
-            
-            // 设置相同的滚动区域高度
-            if (maxHeight > 600) {
-                leftTable.style.height = '600px';
-                rightTable.style.height = '600px';
-            } else {
-                leftTable.style.height = maxHeight + 'px';
-                rightTable.style.height = maxHeight + 'px';
-            }
-        }
-        
-        // 初始同步和定期检查
-        syncContainerHeights();
-        const syncInterval = setInterval(() => {
-            if (document.querySelector('.data-table-wrapper')) {
-                syncContainerHeights();
-                this.syncTableRows();
-            } else {
-                clearInterval(syncInterval);
-            }
-        }, 100); // 更频繁的检查
-    },
-    
-    /**
-     * 格式化院校类型显示
+     * 格式化学校类型显示
+     * @param {string} schoolType - 学校类型
+     * @returns {string} 格式化后的学校类型
      */
     formatSchoolType(schoolType) {
         if (!schoolType) return '';
@@ -708,8 +967,8 @@ const DataManagementManager = {
                             <td colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #f0f0f0;">特殊补助明细</td>
                         </tr>
                         <tr style="font-weight: bold; background: #f8f8f8;">
-                            <td style="border: 1px solid #000; padding: 6px;">补助名称</td>
-                            <td style="border: 1px solid #000; padding: 6px;">补助面积(㎡)</td>
+                            <td style="border: 1px solid #000; padding: 6px;">特殊用房补助名称 *</td>
+                            <td style="border: 1px solid #000; padding: 6px;">特殊用房补助面积(㎡) *</td>
                         </tr>
             `;
             
@@ -1019,6 +1278,10 @@ const DataManagementManager = {
                     
                     if (nameInput) {
                         nameInput.value = subsidy['特殊用房补助名称'] || subsidy.name || '';
+                        // 触发验证以清除错误状态，标记为自动填充
+                        if (typeof DataEntryManager !== 'undefined' && DataEntryManager.validateSubsidyNameInput) {
+                            DataEntryManager.validateSubsidyNameInput(nameInput, true);
+                        }
                     }
                     
                     // 填充面积
@@ -1027,6 +1290,10 @@ const DataManagementManager = {
                     
                     if (areaInput) {
                         areaInput.value = subsidy['补助面积（m²）'] || subsidy.area || 0;
+                        // 触发验证以清除错误状态，标记为自动填充
+                        if (typeof DataEntryManager !== 'undefined' && DataEntryManager.validateSubsidyAreaInput) {
+                            DataEntryManager.validateSubsidyAreaInput(areaInput, true);
+                        }
                     }
                     
                     console.log(`成功填充第${index + 1}个特殊补助项`);
@@ -1252,6 +1519,13 @@ if (typeof window !== 'undefined') {
 
     // 批量下载搜索结果
     window.batchDownloadSearchResults = async function() {
+        // 防止重复请求
+        if (dataManagementManager.isBatchDownloading) {
+            console.log('批量下载正在进行中，忽略重复请求');
+            showMessage('批量下载正在进行中，请稍候...', 'warning');
+            return;
+        }
+        
         const yearFilter = document.getElementById('dataYearFilter');
         const schoolFilter = document.getElementById('dataSchoolNameFilter');
         const userFilter = document.getElementById('dataUserFilter');
@@ -1266,12 +1540,17 @@ if (typeof window !== 'undefined') {
             return;
         }
         
+        // 设置下载状态
+        dataManagementManager.isBatchDownloading = true;
+        
+        // 锁定整个数据管理页面
+        dataManagementManager.lockDataManagementPage();
+        
+        // 更新遮罩层信息
+        dataManagementManager.removePageOverlay();
+        dataManagementManager.addPageOverlay('正在生成下载文件，请稍候...');
+        
         try {
-            // 显示加载状态
-            const originalText = batchDownloadBtn.textContent;
-            batchDownloadBtn.disabled = true;
-            batchDownloadBtn.textContent = '下载中...';
-            
             // 构建请求参数
             const requestBody = {
                 exportType: 'filtered'
@@ -1311,9 +1590,9 @@ if (typeof window !== 'undefined') {
             console.error('批量下载失败:', error);
             showMessage('批量下载失败: ' + error.message, 'error');
         } finally {
-            // 恢复按钮状态
-            batchDownloadBtn.disabled = false;
-            batchDownloadBtn.textContent = '批量下载';
+            // 恢复下载状态和解锁页面
+            dataManagementManager.isBatchDownloading = false;
+            dataManagementManager.unlockDataManagementPage();
         }
     };
 }

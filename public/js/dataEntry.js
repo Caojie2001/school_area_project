@@ -668,6 +668,11 @@ const DataEntryManager = {
      * 重置表单
      */
     resetForm() {
+        // 显示确认弹窗
+        if (!confirm('确定要清空表单吗？此操作将清除所有已填写的数据，且无法撤销。')) {
+            return; // 用户取消，不执行清空操作
+        }
+        
         // 重置所有数字输入字段
         const inputs = document.querySelectorAll('#page-data-entry input[type="number"]');
         inputs.forEach(input => {
@@ -718,9 +723,9 @@ const DataEntryManager = {
         // 更新按钮状态
         this.updateCalculateButtonState();
         
-        console.log('表单已重置');
+        console.log('表单已清空');
         
-        // 显示重置成功提示
+        // 显示清空成功提示
         const message = document.createElement('div');
         message.style.cssText = `
             position: fixed; 
@@ -733,7 +738,7 @@ const DataEntryManager = {
             z-index: 1000;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         `;
-        message.textContent = '表单已重置';
+        message.textContent = '表单已清空';
         document.body.appendChild(message);
         
         // 3秒后移除提示
@@ -1091,32 +1096,82 @@ const DataEntryManager = {
     /**
      * 验证补助名称输入
      * @param {HTMLElement} element - 输入元素
+     * @param {boolean} isAutoFill - 是否为自动填充，自动填充时不立即显示错误
      */
-    validateSubsidyNameInput(element) {
+    validateSubsidyNameInput(element, isAutoFill = false) {
         const value = element.value.trim();
         
         // 清除之前的错误状态
         this.clearFieldError(element);
         
+        // 如果是自动填充且有值，不显示错误
+        if (isAutoFill && value !== '') {
+            return;
+        }
+        
         // 检查是否为空
         if (value === '') {
-            this.showFieldError(element, '补助名称不能为空');
+            this.showFieldError(element, '特殊用房补助名称不能为空');
         }
     },
 
     /**
      * 实时验证补助面积输入
      * @param {HTMLElement} element - 输入框元素
+     * @param {boolean} isAutoFill - 是否为自动填充，自动填充时不立即显示错误
      */
-    validateSubsidyAreaInput(element) {
+    validateSubsidyAreaInput(element, isAutoFill = false) {
         const value = parseFloat(element.value);
         
         // 清除之前的错误状态
         this.clearFieldError(element);
         
+        // 如果是自动填充且值大于0，不显示错误
+        if (isAutoFill && value > 0) {
+            return;
+        }
+        
         // 检查是否大于0
         if (element.value !== '' && (isNaN(value) || value <= 0)) {
-            this.showFieldError(element, '补助建筑面积必须大于0');
+            this.showFieldError(element, '特殊用房补助建筑面积必须大于0');
+        }
+    },
+
+    /**
+     * 处理补助名称输入（标记用户交互）
+     * @param {HTMLElement} element - 输入元素
+     */
+    handleSubsidyNameInput(element) {
+        // 标记用户已经开始输入
+        element.dataset.userInteracted = 'true';
+        
+        // 清除错误状态（允许用户输入时清除错误）
+        this.clearFieldError(element);
+        
+        // 如果输入为空，立即显示错误
+        if (element.value.trim() === '') {
+            this.validateSubsidyNameInput(element, false);
+        }
+    },
+
+    /**
+     * 处理补助面积输入（标记用户交互）
+     * @param {HTMLElement} element - 输入元素
+     */
+    handleSubsidyAreaInput(element) {
+        // 标记用户已经开始输入
+        element.dataset.userInteracted = 'true';
+        
+        // 更新汇总
+        this.updateSubsidySummary();
+        
+        // 清除错误状态（允许用户输入时清除错误）
+        this.clearFieldError(element);
+        
+        // 如果值无效，立即显示错误
+        const value = parseFloat(element.value);
+        if (element.value !== '' && (isNaN(value) || value <= 0)) {
+            this.validateSubsidyAreaInput(element, false);
         }
     },
 
@@ -1429,8 +1484,8 @@ const DataEntryManager = {
         if (container.children.length === 0) {
             const headerHtml = `
                 <div class="subsidy-header" style="display: flex; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-weight: bold; color: #495057;">
-                    <div style="flex: 2; margin-right: 15px;">补助名称</div>
-                    <div style="flex: 1; margin-right: 15px;">补助建筑面积(m²)</div>
+                    <div style="flex: 2; margin-right: 15px;">特殊用房补助名称 *</div>
+                    <div style="flex: 1; margin-right: 15px;">特殊用房补助建筑面积(m²) *</div>
                     <div style="width: 80px;">操作</div>
                 </div>
             `;
@@ -1441,15 +1496,13 @@ const DataEntryManager = {
         const subsidyHtml = `
             <div class="subsidy-item" style="display: flex; align-items: center; margin-bottom: 10px; padding: 10px; background: white; border: 1px solid #e9ecef; border-radius: 5px;">
                 <div style="flex: 2; margin-right: 15px;">
-                    <div class="form-group has-error">
-                        <input type="text" name="subsidyName[]" placeholder="例如：重点实验室补助" class="form-control subsidy-name-input error" oninput="DataEntryManager.validateSubsidyNameInput(this);" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
-                        <span class="error-message">补助名称不能为空</span>
+                    <div class="form-group">
+                        <input type="text" name="subsidyName[]" placeholder="例如：重点实验室补助" class="form-control subsidy-name-input" oninput="DataEntryManager.handleSubsidyNameInput(this);" onblur="DataEntryManager.validateSubsidyNameInput(this, false);" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
                     </div>
                 </div>
                 <div style="flex: 1; margin-right: 15px;">
-                    <div class="form-group has-error">
-                        <input type="number" name="subsidyArea[]" value="0.00" step="0.01" class="form-control subsidy-area-input error" oninput="DataEntryManager.updateSubsidySummary(); DataEntryManager.validateSubsidyAreaInput(this);" onblur="formatSubsidyArea(this)" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
-                        <span class="error-message">补助建筑面积必须大于0</span>
+                    <div class="form-group">
+                        <input type="number" name="subsidyArea[]" value="0.00" step="0.01" class="form-control subsidy-area-input" oninput="DataEntryManager.handleSubsidyAreaInput(this);" onblur="formatSubsidyArea(this); DataEntryManager.validateSubsidyAreaInput(this, false);" onchange="DataEntryManager.validateSubsidyAreaInput(this, false);" style="background: white; border: 1px solid #ddd; padding: 8px; border-radius: 4px; width: 100%;">
                     </div>
                 </div>
                 <div style="width: 80px;">
@@ -1470,8 +1523,22 @@ const DataEntryManager = {
         
         this.updateSubsidySummary();
         
-        // 更新按钮状态（新添加的补助项有错误状态）
-        this.updateCalculateButtonState();
+        // 延迟验证新添加的补助项，让用户知道需要填写
+        setTimeout(() => {
+            const newItems = container.querySelectorAll('.subsidy-item:not(.subsidy-summary)');
+            if (newItems.length > 0) {
+                const lastItem = newItems[newItems.length - 1];
+                const nameInput = lastItem.querySelector('input[name="subsidyName[]"]');
+                const areaInput = lastItem.querySelector('input[name="subsidyArea[]"]');
+                
+                if (nameInput) {
+                    this.validateSubsidyNameInput(nameInput, false);
+                }
+                if (areaInput) {
+                    this.validateSubsidyAreaInput(areaInput, false);
+                }
+            }
+        }, 100);
     },
     
     /**
@@ -1508,11 +1575,11 @@ const DataEntryManager = {
         const summaryHtml = `
             <div class="subsidy-summary subsidy-item" style="display: flex; align-items: center; margin-top: 15px; padding: 10px; background: transparent; border: none; border-radius: 5px; font-weight: bold;">
                 <div style="flex: 2; margin-right: 15px;">
-                    <div style="margin-bottom: 5px; color: #495057; font-size: 14px;">补助数量</div>
+                    <div style="margin-bottom: 5px; color: #495057; font-size: 14px;">特殊用房补助数量</div>
                     <input type="text" id="subsidyTotalCount" readonly class="form-control calculated-field" value="0" style="background: #f5f5f5; border: none; padding: 8px; border-radius: 4px; width: 100%; font-weight: bold; text-align: center;">
                 </div>
                 <div style="flex: 1; margin-right: 15px;">
-                    <div style="margin-bottom: 5px; color: #495057; font-size: 14px;">补助建筑总面积(m²)</div>
+                    <div style="margin-bottom: 5px; color: #495057; font-size: 14px;">特殊用房补助建筑总面积(m²)</div>
                     <input type="text" id="subsidyTotalArea" readonly class="form-control calculated-field" value="0.00" style="background: #f5f5f5; border: none; padding: 8px; border-radius: 4px; width: 100%; font-weight: bold; text-align: center;">
                 </div>
                 <div style="width: 80px;"></div>
@@ -1630,7 +1697,7 @@ function formatSubsidyArea(input) {
     // 触发汇总更新
     DataEntryManager.updateSubsidySummary();
     // 触发验证
-    DataEntryManager.validateSubsidyAreaInput(input);
+    DataEntryManager.validateSubsidyAreaInput(input, false);
 };
 
 /**
@@ -1670,7 +1737,7 @@ function validateRequiredInput(element) {
  */
 function validateSubsidyAreaInput(element) {
     if (typeof DataEntryManager !== 'undefined') {
-        DataEntryManager.validateSubsidyAreaInput(element);
+        DataEntryManager.validateSubsidyAreaInput(element, false);
     }
 }
 

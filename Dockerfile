@@ -22,11 +22,11 @@ ENV BUILD_DATE=$BUILD_DATE
 COPY --chown=nodejs:nodejs . .
 
 # 创建必要的目录
-RUN mkdir -p output uploads && \
-    chown -R nodejs:nodejs output uploads
+RUN mkdir -p output uploads config/certs && \
+    chown -R nodejs:nodejs output uploads config
 
-# 暴露端口
-EXPOSE 3000
+# 暴露端口（HTTP 和 HTTPS）
+EXPOSE 3000 3443
 
 # 切换到非root用户
 USER nodejs

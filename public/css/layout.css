@@ -118,8 +118,11 @@
 }
 
 .content-body {
-    padding: 30px;
-    max-width: 1200px;
+    padding: 20px;
+    max-width: none;
+    width: 100%;
+    overflow-x: hidden; /* 防止内容区域横向溢出 */
+    box-sizing: border-box;
 }
 
 /* === 用户信息显示 === */

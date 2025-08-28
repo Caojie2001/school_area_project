@@ -178,18 +178,43 @@
 /* 按钮禁用状态样式 */
 .btn.disabled,
 .btn:disabled {
-    background: #95a5a6 !important;
-    color: #7f8c8d !important;
+    background: white !important;
+    color: #999999 !important;
+    border: 2px solid #cccccc !important;
     cursor: not-allowed !important;
-    opacity: 0.6 !important;
+    opacity: 1 !important;
     pointer-events: none !important;
     box-shadow: none !important;
 }
 
 .btn.disabled:hover,
 .btn:disabled:hover {
-    background: #95a5a6 !important;
+    background: white !important;
+    color: #999999 !important;
+    border: 2px solid #cccccc !important;
     transform: none !important;
+    box-shadow: none !important;
+}
+
+/* 特别针对计算分析按钮的禁用状态 */
+#calculateButton.disabled,
+#calculateButton:disabled {
+    background: white !important;
+    color: #999999 !important;
+    border: 2px solid #cccccc !important;
+    cursor: not-allowed !important;
+    opacity: 1 !important;
+    pointer-events: none !important;
+    box-shadow: none !important;
+}
+
+#calculateButton.disabled:hover,
+#calculateButton:disabled:hover {
+    background: white !important;
+    color: #999999 !important;
+    border: 2px solid #cccccc !important;
+    transform: none !important;
+    box-shadow: none !important;
 }
 
 /* === 学生信息表单特殊样式 === */

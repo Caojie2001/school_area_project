@@ -954,6 +954,10 @@ const DataManagementManager = {
                             <td colspan="3" style="border: 1px solid #000; padding: 6px; font-weight: bold;">测算建筑面积总缺额（含特殊补助）(m²)</td>
                             <td style="border: 1px solid #000; padding: 6px; text-align: right; font-weight: bold;">${parseFloat(school.total_area_gap_with_subsidy || 0).toFixed(2)}</td>
                         </tr>
+                        <tr>
+                            <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">备注</td>
+                            <td colspan="3" style="border: 1px solid #000; padding: 6px; text-align: left;">${school.remarks || ''}</td>
+                        </tr>
                     </table>
                 </div>
         `;
@@ -967,8 +971,8 @@ const DataManagementManager = {
                             <td colspan="2" style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; background: #f0f0f0;">特殊补助明细</td>
                         </tr>
                         <tr style="font-weight: bold; background: #f8f8f8;">
-                            <td style="border: 1px solid #000; padding: 6px;">特殊用房补助名称 *</td>
-                            <td style="border: 1px solid #000; padding: 6px;">特殊用房补助面积(㎡) *</td>
+                            <td style="border: 1px solid #000; padding: 6px;">特殊用房补助名称</td>
+                            <td style="border: 1px solid #000; padding: 6px;">特殊用房补助面积(㎡)</td>
                         </tr>
             `;
             

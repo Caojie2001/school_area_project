@@ -1,7 +1,8 @@
 const express = require('express');
+const https = require('https');
+const fs = require('fs');
 const XLSX = require('xlsx');
 const path = require('path');
-const fs = require('fs');
 const cors = require('cors');
 const session = require('express-session');
 
@@ -13,6 +14,39 @@ const AuthService = require('./config/authService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
+
+// SSL证书配置
+let sslOptions = null;
+try {
+    const keyPath = process.env.SSL_KEY_PATH || './config/certs/key.pem';
+    const certPath = process.env.SSL_CERT_PATH || './config/certs/cert.pem';
+    
+    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+        sslOptions = {
+            key: fs.readFileSync(keyPath),
+            cert: fs.readFileSync(certPath)
+        };
+        console.log('SSL证书加载成功');
+    } else {
+        console.warn('SSL证书文件不存在，将仅启用HTTP服务器');
+        console.warn(`检查路径: ${keyPath}, ${certPath}`);
+    }
+} catch (error) {
+    console.error('SSL证书加载失败:', error.message);
+    console.warn('将仅启用HTTP服务器');
+}
+
+// HTTPS强制重定向中间件
+app.use((req, res, next) => {
+    // 检查是否启用强制HTTPS重定向且SSL证书可用
+    if (process.env.HTTPS_FORCE_REDIRECT === 'true' && sslOptions && !req.secure && req.get('x-forwarded-proto') !== 'https') {
+        const httpsUrl = `https://${req.get('host').replace(/:\d+/, '')}:${HTTPS_PORT}${req.originalUrl}`;
+        console.log(`重定向到HTTPS: ${req.originalUrl} -> ${httpsUrl}`);
+        return res.redirect(301, httpsUrl);
+    }
+    next();
+});
 
 // 会话配置
 app.use(session({
@@ -20,7 +54,7 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: false, // 在生产环境中应该设置为true（需要HTTPS）
+        secure: sslOptions && process.env.HTTPS_FORCE_REDIRECT === 'true', // 当HTTPS可用且强制重定向时启用secure cookies
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000 // 24小时
     }
@@ -3175,13 +3209,24 @@ async function startServer() {
         
         // 启动HTTP服务器
         app.listen(PORT, () => {
-            console.log(`服务器运行在 http://localhost:${PORT}`);
+            console.log(`HTTP服务器运行在 http://localhost:${PORT}`);
             if (isConnected) {
                 console.log('MySQL数据库连接正常，数据将被持久化保存');
             } else {
                 console.log('数据库未连接，数据将不会被持久化保存');
             }
         });
+        
+        // 如果SSL证书可用，启动HTTPS服务器
+        if (sslOptions) {
+            const httpsServer = https.createServer(sslOptions, app);
+            httpsServer.listen(HTTPS_PORT, () => {
+                console.log(`HTTPS服务器运行在 https://localhost:${HTTPS_PORT}`);
+                if (process.env.HTTPS_FORCE_REDIRECT === 'true') {
+                    console.log('强制HTTPS重定向已启用，所有HTTP请求将重定向到HTTPS');
+                }
+            });
+        }
         
     } catch (error) {
         console.error('服务器启动失败:', error);

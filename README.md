@@ -2,9 +2,13 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-16+-green.svg)](https://nodejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0+-blue.svg)](https://www.mysql.com/)
+[![HTTPS](https://img.shields.io/badge/HTTPS-Enabled-green.svg)](https://developer.mozilla.org/en-US/docs/Web/HTTP/HTTPS)
+[![Security](https://img.shields.io/badge/Security-Hardened-blue.svg)](./SECURITY_IMPLEMENTATION.md)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 一个现代化的Web应用程序，用于高校建筑面积缺口分析与计算。支持在线数据录入、自动标准化计算、智能缺口分析和专业报告生成。
+
+**🔒 安全特性**: 全站HTTPS加密、安全会话管理、URL重定向保护、防止路径遍历攻击
 
 ## 核心功能
 
@@ -48,8 +52,22 @@ MySQL 8.0+               关系型数据库
 mysql2 3.14+             MySQL连接驱动
 bcrypt 6.0+              密码加密
 express-session          会话管理
+https                    HTTPS服务器支持
+fs                       文件系统操作
 xlsx 0.18+               Excel文件处理
 cors 2.8+                跨域资源共享
+dotenv 17.2+             环境变量管理
+```
+
+### 安全特性
+```
+SSL/TLS 加密             HTTPS协议全站加密
+强制重定向               HTTP自动重定向到HTTPS
+安全会话管理              httpOnly + secure cookies
+URL重定向保护            防止恶意重定向攻击
+路径遍历防护              防止目录遍历攻击
+输入验证                 严格的数据验证机制
+会话固化防护              安全的会话管理
 ```
 
 ### 前端技术栈
@@ -86,7 +104,12 @@ school_area_project/
 │       ├── dataService.js           数据访问层服务
 │       ├── routes.js                路由配置
 │       ├── appConfig.js             应用配置
-│       └── .env.example             环境变量配置模板
+│       ├── .env.example             环境变量配置模板
+│       └── certs/                   SSL证书目录
+│           ├── key.pem              SSL私钥文件
+│           ├── cert.pem             SSL证书文件
+│           ├── generate_cert.sh     证书生成脚本
+│           └── README.md            证书使用说明
 │
 ├── 前端资源
 │   └── public/
@@ -137,10 +160,12 @@ school_area_project/
 │   ├── package.json                 项目依赖和脚本配置
 │   ├── package-lock.json            依赖版本锁定文件
 │   ├── .env                         环境变量配置文件
+│   ├── .env.example                 环境变量配置模板
 │   ├── .gitignore                   Git版本控制忽略规则
 │   ├── Dockerfile                   Docker容器化配置
 │   ├── .dockerignore               Docker构建忽略文件
-│   └── README.md                    项目说明文档
+│   ├── README.md                    项目说明文档
+│   └── SECURITY_IMPLEMENTATION.md  安全实施报告
 │
 └── node_modules/                    依赖包目录
 ```
@@ -151,9 +176,8 @@ school_area_project/
 - **Node.js**: 16.0 或更高版本
 - **npm**: 8.0 或更高版本  
 - **MySQL**: 8.0 或更高版本
+- **OpenSSL**: 1.1.1 或更高版本 (SSL证书生成)
 - **操作系统**: Windows 10+, macOS 10.15+, Ubuntu 18.04+
-
-### 安装步骤
 
 ### 安装步骤
 
@@ -164,14 +188,15 @@ git clone <repository-url>
 cd school_area_project
 
 # 2. 初始化数据库（必须先执行）
-```
-# 方式2a：使用MySQL命令行
 mysql -u root -p < db.sql
 
-# 方式2b：使用MySQL客户端工具
-# 直接导入 db.sql 文件到MySQL
+# 3. 生成SSL证书（生产环境可使用CA签名证书）
+cd config/certs
+chmod +x generate_cert.sh
+./generate_cert.sh
 
-# 3. 运行自动安装脚本
+# 4. 运行自动安装脚本
+cd ../..
 chmod +x install.sh
 ./install.sh
 ```
@@ -181,17 +206,23 @@ chmod +x install.sh
 # 1. 初始化数据库（必须先执行）
 mysql -u root -p < db.sql
 
-# 2. 安装项目依赖
+# 2. 生成SSL证书
+cd config/certs
+chmod +x generate_cert.sh
+./generate_cert.sh
+cd ../..
+
+# 3. 安装项目依赖
 npm install
 
-# 3. 复制环境配置文件
+# 4. 复制环境配置文件
 cp config/.env.example .env
 
-# 4. 编辑数据库配置
+# 5. 编辑配置文件
 nano .env
 ```
 
-### 数据库配置
+### 环境配置
 
 **重要提示：** 必须先执行 `db.sql` 文件来创建数据库和表结构，然后再配置环境变量。
 
@@ -204,8 +235,14 @@ DB_USER=your_username
 DB_PASSWORD=your_password
 DB_NAME=school_area_management
 
-# 会话配置
-SESSION_SECRET=your_secret_key_here
+# 安全配置
+SESSION_SECRET=your_strong_256_bit_secret_key_here
+
+# SSL/HTTPS配置
+SSL_KEY_PATH=./config/certs/key.pem
+SSL_CERT_PATH=./config/certs/cert.pem
+HTTPS_PORT=3443
+HTTPS_FORCE_REDIRECT=true
 
 # 服务器配置
 PORT=3000
@@ -222,30 +259,44 @@ npm start
 npm run dev
 ```
 
-访问应用: http://localhost:3000
+**访问地址:**
+- HTTP: http://localhost:3000 (自动重定向到HTTPS)
+- HTTPS: https://localhost:3443 (推荐使用)
+
+**首次访问说明:**  
+由于使用自签名证书，浏览器会显示安全警告，请点击"高级"→"继续访问"即可。生产环境建议使用CA签名的正式SSL证书。
 
 ## 使用指南
 
+### 安全访问
+系统采用全站HTTPS加密，确保数据传输安全：
+- **HTTPS强制重定向**: 所有HTTP请求自动重定向到HTTPS
+- **安全会话管理**: 使用httpOnly和secure cookies
+- **SSL证书支持**: 支持自签名证书和CA签名证书
+- **URL重定向保护**: 防止恶意重定向攻击
+
 ### 数据录入流程
-1. **登录系统** - 使用学校用户账号登录
+1. **安全登录** - 通过HTTPS加密通道使用学校用户账号登录
 2. **选择学校类型** - 根据实际情况选择院校类型
 3. **录入学生数据** - 分类录入全日制和留学生人数
 4. **录入建筑面积** - 填写现有建筑面积数据
 5. **添加特殊补助** - 根据需要添加特殊用房补助
 6. **自动计算** - 系统自动计算缺口并生成分析结果
-7. **生成报告** - 导出Excel格式的详细分析报告
+7. **生成报告** - 导出Excel格式的详细分析报告（含4个工作表）
 
 ### 数据管理功能
 - **数据查询** - 支持多条件组合查询
 - **数据编辑** - 在线编辑已保存的数据
 - **数据删除** - 安全删除不需要的记录
 - **批量操作** - 批量导入导出数据
+- **历史追踪** - 完整的数据修改历史记录
 
 ### 统计分析功能
 - **年份筛选** - 按测算年份查看数据
 - **用户筛选** - 按用户类型分析数据
 - **汇总统计** - 查看总体统计指标
 - **趋势分析** - 多年数据对比分析
+- **Excel报告** - 生成包含测算数据、特殊补助明细、测算明细和学生数明细的综合报告
 
 ## 系统配置
 
@@ -358,11 +409,73 @@ npm run dev
 - **基建中心**: 数据审核和统计分析权限
 - **学校用户**: 数据录入和查看权限
 
+### 安全配置说明
+
+#### SSL证书管理
+```bash
+# 生成新的SSL证书（有效期365天）
+cd config/certs
+./generate_cert.sh
+
+# 检查证书有效期
+openssl x509 -in cert.pem -text -noout | grep "Not After"
+
+# 验证证书是否正确
+openssl verify -CAfile cert.pem cert.pem
+```
+
+#### 安全配置项
+- **SESSION_SECRET**: 建议使用256位随机密钥
+- **HTTPS_FORCE_REDIRECT**: 生产环境建议设置为true
+- **SSL证书路径**: 确保key.pem和cert.pem文件存在且权限正确
+- **安全cookies**: 在HTTPS环境下自动启用
+
+#### 生产环境建议
+1. **使用CA签名证书**: 替换自签名证书避免浏览器警告
+2. **配置防火墙**: 限制不必要的端口访问
+3. **启用日志记录**: 监控异常访问行为
+4. **定期更新**: 及时更新依赖包和证书
+
+## 安全特性
+
+### 已修复的安全漏洞
+✅ **URL重定向漏洞** (CVSS: 6.5) - 已通过白名单验证完全修复  
+✅ **用户凭证明文传输** (CVSS: 5.3) - 已通过HTTPS加密完全修复
+
+详细的安全实施报告请查看: [SECURITY_IMPLEMENTATION.md](./SECURITY_IMPLEMENTATION.md)
+
+### 安全防护措施
+- **全站HTTPS加密**: 所有数据传输使用SSL/TLS加密
+- **强制重定向**: HTTP请求自动重定向到HTTPS
+- **URL重定向保护**: 防止恶意重定向攻击
+- **路径遍历防护**: 防止目录遍历攻击
+- **安全会话管理**: httpOnly + secure cookies
+- **输入验证**: 严格的数据验证和过滤
+
 ## 故障排除
 
 ### 常见问题
 
-**1. 数据库连接失败**
+**1. SSL证书相关问题**
+```bash
+# 检查证书文件是否存在
+ls -la config/certs/
+
+# 重新生成证书
+cd config/certs && ./generate_cert.sh
+
+# 检查证书权限
+chmod 600 config/certs/key.pem
+chmod 644 config/certs/cert.pem
+```
+
+**2. HTTPS连接问题**
+- 浏览器显示"不安全"警告是正常的（自签名证书）
+- 点击"高级" → "继续访问"即可
+- 生产环境建议使用CA签名证书
+
+**3. 数据库连接失败**
+**4. 数据库连接失败**
 ```bash
 # 检查MySQL服务状态
 sudo systemctl status mysql
@@ -371,16 +484,17 @@ sudo systemctl status mysql
 cat .env
 ```
 
-**2. 端口被占用**
+**5. 端口被占用**
 ```bash
 # 查找占用端口的进程
 lsof -i :3000
+lsof -i :3443
 
 # 终止进程
 kill -9 <PID>
 ```
 
-**3. 依赖安装失败**
+**6. 依赖安装失败**
 ```bash
 # 清除npm缓存
 npm cache clean --force

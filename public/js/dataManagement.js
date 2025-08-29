@@ -627,106 +627,54 @@ const DataManagementManager = {
                 </p>
             </div>`;
         }
+
+        let html = '<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db; display: flex; justify-content: space-between; align-items: center;">';
         
-        let paginationHTML = `
-            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                    <p style="margin: 0; color: #6c757d; font-size: 14px;">
-                        <strong>共找到 ${totalRecords} 条记录</strong>，当前第 ${this.currentPage} 页，共 ${this.totalPages} 页 | 
-                        可以使用上方的"批量下载"按钮下载所有搜索结果
-                    </p>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
-        `;
+        // 左侧记录信息
+        const startRecord = (this.currentPage - 1) * this.pageSize + 1;
+        const endRecord = Math.min(this.currentPage * this.pageSize, totalRecords);
+        html += `<p style="margin: 0; color: #6c757d; font-size: 14px;">
+            显示第 <strong>${startRecord}</strong> 到 <strong>${endRecord}</strong> 条记录，共 <strong>${totalRecords}</strong> 条 | 
+            可以使用上方的"批量下载"按钮下载所有搜索结果
+        </p>`;
         
-        // 上一页按钮
-        if (this.currentPage > 1) {
-            paginationHTML += `
-                <button onclick="dataManagementManager.goToPage(${this.currentPage - 1})" 
-                        style="padding: 6px 12px; background: white; color: black; border: 1px solid black; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                        onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
-                    上一页
-                </button>
-            `;
-        } else {
-            paginationHTML += `
-                <button disabled style="padding: 6px 12px; background: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; border-radius: 4px; cursor: not-allowed; font-size: 13px;">
-                    上一页
-                </button>
-            `;
-        }
+        // 右侧分页控件
+        html += '<div style="display: flex; gap: 5px; align-items: center;">';
         
-        // 页码按钮（显示当前页前后2页）
-        const startPage = Math.max(1, this.currentPage - 2);
-        const endPage = Math.min(this.totalPages, this.currentPage + 2);
+        // 首页和上一页
+        const prevDisabled = this.currentPage === 1;
+        html += `<button onclick="dataManagementManager.goToPage(1)" ${prevDisabled ? 'disabled' : ''} 
+            style="padding: 6px 12px; border: 1px solid ${prevDisabled ? '#ddd' : '#000'}; background: white; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; border-radius: 4px; font-size: 12px; ${prevDisabled ? 'color: #999;' : 'color: #000;'}">首页</button>`;
         
-        if (startPage > 1) {
-            paginationHTML += `
-                <button onclick="dataManagementManager.goToPage(1)" 
-                        style="padding: 6px 10px; background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                        onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
-                    1
-                </button>
-            `;
-            if (startPage > 2) {
-                paginationHTML += `<span style="color: #6c757d; font-size: 13px;">...</span>`;
-            }
+        html += `<button onclick="dataManagementManager.goToPage(${this.currentPage - 1})" ${prevDisabled ? 'disabled' : ''} 
+            style="padding: 6px 12px; border: 1px solid ${prevDisabled ? '#ddd' : '#000'}; background: white; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; border-radius: 4px; font-size: 12px; ${prevDisabled ? 'color: #999;' : 'color: #000;'}">上一页</button>`;
+        
+        // 页码按钮
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
+        
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
         }
         
         for (let i = startPage; i <= endPage; i++) {
-            if (i === this.currentPage) {
-                paginationHTML += `
-                    <button style="padding: 6px 10px; background: #007bff; color: white; border: 1px solid #007bff; border-radius: 4px; cursor: default; font-size: 13px; font-weight: bold;">
-                        ${i}
-                    </button>
-                `;
-            } else {
-                paginationHTML += `
-                    <button onclick="dataManagementManager.goToPage(${i})" 
-                            style="padding: 6px 10px; background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                            onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
-                        ${i}
-                    </button>
-                `;
-            }
+            const isActive = i === this.currentPage;
+            html += `<button onclick="dataManagementManager.goToPage(${i})" 
+                style="padding: 6px 12px; border: 1px solid ${isActive ? '#007bff' : '#000'}; background: ${isActive ? '#007bff' : 'white'}; color: ${isActive ? 'white' : '#000'}; cursor: pointer; border-radius: 4px; font-size: 12px; font-weight: ${isActive ? 'bold' : 'normal'};">${i}</button>`;
         }
         
-        if (endPage < this.totalPages) {
-            if (endPage < this.totalPages - 1) {
-                paginationHTML += `<span style="color: #6c757d; font-size: 13px;">...</span>`;
-            }
-            paginationHTML += `
-                <button onclick="dataManagementManager.goToPage(${this.totalPages})" 
-                        style="padding: 6px 10px; background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                        onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">
-                    ${this.totalPages}
-                </button>
-            `;
-        }
+        // 下一页和末页
+        const nextDisabled = this.currentPage === this.totalPages;
+        html += `<button onclick="dataManagementManager.goToPage(${this.currentPage + 1})" ${nextDisabled ? 'disabled' : ''} 
+            style="padding: 6px 12px; border: 1px solid ${nextDisabled ? '#ddd' : '#000'}; background: white; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; border-radius: 4px; font-size: 12px; ${nextDisabled ? 'color: #999;' : 'color: #000;'}">下一页</button>`;
         
-        // 下一页按钮
-        if (this.currentPage < this.totalPages) {
-            paginationHTML += `
-                <button onclick="dataManagementManager.goToPage(${this.currentPage + 1})" 
-                        style="padding: 6px 12px; background: white; color: #007bff; border: 1px solid #007bff; border-radius: 4px; cursor: pointer; font-size: 13px;"
-                        onmouseover="this.style.background='#f0f8ff'" onmouseout="this.style.background='white'">
-                    下一页
-                </button>
-            `;
-        } else {
-            paginationHTML += `
-                <button disabled style="padding: 6px 12px; background: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; border-radius: 4px; cursor: not-allowed; font-size: 13px;">
-                    下一页
-                </button>
-            `;
-        }
+        html += `<button onclick="dataManagementManager.goToPage(${this.totalPages})" ${nextDisabled ? 'disabled' : ''} 
+            style="padding: 6px 12px; border: 1px solid ${nextDisabled ? '#ddd' : '#000'}; background: white; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; border-radius: 4px; font-size: 12px; ${nextDisabled ? 'color: #999;' : 'color: #000;'}">末页</button>`;
         
-        paginationHTML += `
-                    </div>
-                </div>
-            </div>
-        `;
+        html += '</div></div>';
         
-        return paginationHTML;
+        return html;
     },
     
     /**

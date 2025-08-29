@@ -9,13 +9,22 @@ CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- 使用数据库
 USE `school_area_management`;
 
--- 创建学校信息表
-CREATE TABLE IF NOT EXISTS `school_info` (
+-- 创建学校注册表
+CREATE TABLE IF NOT EXISTS `school_registry` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `school_name` VARCHAR(255) NOT NULL COMMENT '学校名称',
-    `school_type` VARCHAR(50) COMMENT '院校类型',
-    `year` INT COMMENT '测算年份',
+    `school_name` VARCHAR(255) NOT NULL UNIQUE COMMENT '学校名称',
+    `school_type` VARCHAR(50) DEFAULT '综合院校' COMMENT '院校类型',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 创建计算历史表
+CREATE TABLE IF NOT EXISTS `calculation_history` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `school_registry_id` INT NOT NULL COMMENT '关联的学校注册ID',
+    `year` INT NOT NULL COMMENT '测算年份',
     `submitter_username` VARCHAR(50) NULL COMMENT '填报单位用户名',
+    `base_year` INT NULL COMMENT '基准年份',
     `full_time_undergraduate` INT DEFAULT 0 COMMENT '全日制本科生人数',
     `full_time_specialist` INT DEFAULT 0 COMMENT '全日制专科生人数',
     `full_time_master` INT DEFAULT 0 COMMENT '全日制硕士生人数',
@@ -40,20 +49,20 @@ CREATE TABLE IF NOT EXISTS `school_info` (
     `total_area_gap_with_subsidy` DECIMAL(12,2) DEFAULT 0 COMMENT '建筑面积总缺口（含特殊补助）',
     `total_area_gap_without_subsidy` DECIMAL(12,2) DEFAULT 0 COMMENT '建筑面积总缺口（不含特殊补助）',
     `special_subsidy_total` DECIMAL(12,2) DEFAULT 0 COMMENT '特殊补助总面积',
-    `overall_compliance` BOOLEAN DEFAULT FALSE COMMENT '整体达标情况',
     `calculation_results` LONGTEXT COMMENT '计算结果详情（JSON格式）',
     `remarks` TEXT COMMENT '备注',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间'
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    FOREIGN KEY (`school_registry_id`) REFERENCES `school_registry`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 创建特殊补助表
+-- 创建计算历史特殊补助表
 CREATE TABLE IF NOT EXISTS `special_subsidies` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `school_info_id` INT NOT NULL COMMENT '关联的学校信息ID',
+    `school_info_id` INT NOT NULL COMMENT '关联的计算历史记录ID（对应calculation_history.id）',
     `subsidy_name` VARCHAR(200) NOT NULL COMMENT '补助名称',
     `subsidy_area` DECIMAL(12,2) NOT NULL COMMENT '补助面积',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    FOREIGN KEY (`school_info_id`) REFERENCES `school_info`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`school_info_id`) REFERENCES `calculation_history`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 创建用户表
@@ -99,10 +108,14 @@ CREATE TABLE IF NOT EXISTS `subsidized_area_standards` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 创建索引以提高查询性能
-CREATE INDEX `idx_school_info_name_year` ON `school_info`(`school_name`, `year`);
-CREATE INDEX `idx_school_info_year` ON `school_info`(`year`);
-CREATE INDEX `idx_special_subsidies_school_id` ON `special_subsidies`(`school_info_id`);
-CREATE INDEX `idx_users_username` ON `users`(`username`);
+CREATE INDEX `idx_school_registry_name` ON `school_registry`(`school_name`);
+CREATE INDEX `idx_school_registry_type` ON `school_registry`(`school_type`);
+CREATE INDEX `idx_calculation_history_school_id` ON `calculation_history`(`school_registry_id`);
+CREATE INDEX `idx_calculation_history_year` ON `calculation_history`(`year`);
+CREATE INDEX `idx_calculation_history_submitter` ON `calculation_history`(`submitter_username`);
+CREATE INDEX `idx_calculation_history_school_year` ON `calculation_history`(`school_registry_id`, `year`);
+CREATE INDEX `idx_special_subsidies_calc_history_id` ON `special_subsidies`(`school_info_id`);
+-- 注意: username字段已经有UNIQUE约束，无需额外创建索引
 CREATE INDEX `idx_users_role` ON `users`(`role`);
 CREATE INDEX `idx_basic_area_standards_room_type` ON `basic_area_standards`(`room_type`);
 CREATE INDEX `idx_subsidized_area_standards_school_type` ON `subsidized_area_standards`(`school_type`);

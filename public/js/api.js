@@ -649,7 +649,7 @@ const DataManagementAPI = {
             url += '?' + params.join('&');
         }
         
-        return apiGet(url, {}, { preventCache: true });
+        return apiGet(url, {}, { preventCache: true, useCache: false });
     },
 
     /**

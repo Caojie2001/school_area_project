@@ -998,6 +998,11 @@ const DataManagementManager = {
             return;
         }
         
+        // 启用编辑模式，禁用自动刷新
+        if (typeof AutoRefreshManager !== 'undefined') {
+            AutoRefreshManager.setEditMode(true);
+        }
+        
         // 切换到数据填报页面
         if (typeof showPage === 'function') {
             showPage('data-entry');
@@ -1298,25 +1303,19 @@ const DataManagementManager = {
             if (result.success) {
                 console.log(`删除成功！共删除了 ${result.deletedCount} 条记录`);
                 
-                // 清空当前显示的数据
-                this.allDataSchoolsData = [];
-                
-                // 立即显示加载状态
-                const resultsContainer = document.getElementById('dataHistoryResults');
-                if (resultsContainer) {
-                    resultsContainer.innerHTML = '<div class="loading">正在刷新数据列表...</div>';
+                // 使用自动刷新管理器刷新数据
+                if (typeof AutoRefreshManager !== 'undefined') {
+                    AutoRefreshManager.refreshAfterDataDelete();
+                } else {
+                    // 备用方案：手动刷新当前页面数据
+                    console.log('AutoRefreshManager不可用，手动刷新数据');
+                    setTimeout(() => {
+                        this.searchDataRecords().catch(err => {
+                            console.error('手动刷新数据失败:', err);
+                            alert('数据刷新失败，请手动点击"查找"按钮重新加载。');
+                        });
+                    }, 500);
                 }
-                
-                // 延迟一点时间再刷新，确保数据库操作完成
-                setTimeout(() => {
-                    console.log('执行数据刷新...');
-                    this.searchDataRecords().then(() => {
-                        console.log('数据刷新完成');
-                    }).catch(err => {
-                        console.error('刷新数据失败:', err);
-                        alert('刷新数据失败，请手动点击"查找"按钮重新加载。');
-                    });
-                }, 1000);
             } else {
                 console.error('删除失败:', result.error);
                 this.showDataError('删除失败: ' + result.error);

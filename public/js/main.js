@@ -139,9 +139,19 @@ const AppManager = {
      * 初始化页面状态
      */
     initializePageState() {
-        // 根据当前URL或默认显示数据填报页面
-        const defaultPage = 'data-entry';
+        // 优先根据 URL hash (#data-entry | #data-management | #statistics) 决定默认页面
+        const hash = (window.location.hash || '').replace('#', '');
+        const validPages = ['data-entry', 'data-management', 'statistics'];
+        const defaultPage = validPages.includes(hash) ? hash : 'data-entry';
         this.showPage(defaultPage);
+        
+        // 监听hash变化，同步页面状态
+        window.addEventListener('hashchange', () => {
+            const newHash = (window.location.hash || '').replace('#', '');
+            if (validPages.includes(newHash) && newHash !== pageState.currentPage) {
+                this.showPage(newHash);
+            }
+        });
     },
     
     /**
@@ -151,6 +161,9 @@ const AppManager = {
     showPage(pageId) {
         try {
             console.log(`切换到页面: ${pageId}`);
+            
+            // 记录前一个页面，用于自动刷新判断
+            const previousPage = pageState.currentPage;
             
             // 更新页面状态
             pageState.currentPage = pageId;
@@ -170,6 +183,42 @@ const AppManager = {
             // 移动端自动关闭菜单
             if (pageState.isMobile) {
                 this.closeSidebar();
+            }
+
+            // 同步 URL hash，确保刷新后保持在当前子页面
+            try {
+                if (window.location.hash !== `#${pageId}`) {
+                    history.replaceState(null, '', `#${pageId}`);
+                }
+            } catch (e) {
+                console.warn('同步 URL hash 失败', e);
+            }
+            
+            // 触发页面切换后的自动刷新（如果之前已有页面且不同）
+            console.log(`[PageSwitch] 检查自动刷新条件: previousPage=${previousPage}, pageId=${pageId}, AutoRefreshManager存在=${typeof AutoRefreshManager !== 'undefined'}`);
+            if (previousPage && previousPage !== pageId && typeof AutoRefreshManager !== 'undefined') {
+                console.log(`[PageSwitch] 触发自动刷新: ${previousPage} -> ${pageId}`);
+                AutoRefreshManager.refreshAfterPageSwitch(previousPage, pageId);
+            } else if (pageId === 'data-management' && typeof AutoRefreshManager !== 'undefined') {
+                // 特殊处理：每次切换到历史测算页面都刷新数据（即使是第一次访问）
+                console.log(`[PageSwitch] 特殊处理：切换到历史测算页面，强制刷新数据`);
+                setTimeout(() => {
+                    // 检查dataManagementManager是否准备好，如果没有就重试
+                    const checkAndRefresh = (retries = 0) => {
+                        if (typeof dataManagementManager !== 'undefined' && dataManagementManager.searchDataRecords) {
+                            console.log(`[PageSwitch] dataManagementManager已准备好，执行刷新`);
+                            AutoRefreshManager.refreshPageData('data-management');
+                        } else if (retries < 5) {
+                            console.log(`[PageSwitch] dataManagementManager未准备好，500ms后重试 (${retries + 1}/5)`);
+                            setTimeout(() => checkAndRefresh(retries + 1), 500);
+                        } else {
+                            console.log(`[PageSwitch] 重试次数已达上限，停止尝试刷新`);
+                        }
+                    };
+                    checkAndRefresh();
+                }, 100); // 初始延迟
+            } else {
+                console.log(`[PageSwitch] 跳过自动刷新: previousPage=${previousPage}, pageId=${pageId}`);
             }
             
         } catch (error) {
@@ -230,7 +279,9 @@ const AppManager = {
                 
             case 'data-management':
                 if (typeof loadDataManagementContent === 'function') {
-                    loadDataManagementContent();
+                    console.log('[PageLoad] 开始加载历史测算页面内容');
+                    loadDataManagementContent(); // 同步加载页面内容
+                    console.log('[PageLoad] 历史测算页面内容加载完成');
                 }
                 break;
                 
@@ -399,12 +450,207 @@ function initializeApp() {
 }
 
 // ========================================
+// 自动刷新管理器
+// ========================================
+
+/**
+ * 自动刷新管理器
+ * 用于在关键操作后自动刷新页面以保持数据同步
+ */
+const AutoRefreshManager = {
+    
+    /**
+     * 配置项
+     */
+    config: {
+        refreshDelay: 1500, // 刷新延迟（毫秒）
+        enabledForOperations: {
+            pageSwitch: true,        // 页面切换
+            // 重要：禁用数据提交后的自动整页刷新，避免“计算分析”后刷新
+            dataSubmit: false,       // 数据提交
+            dataDelete: true,        // 数据删除
+            editDataFill: false      // 编辑数据填充（排除以避免冲突）
+        }
+    },
+    
+    /**
+     * 是否正在编辑模式（用于避免与编辑自动填充冲突）
+     */
+    isEditMode: false,
+    
+    /**
+     * 上次操作时间（用于防抖）
+     */
+    lastOperationTime: 0,
+    
+    /**
+     * 设置编辑模式状态
+     */
+    setEditMode(isEdit) {
+        this.isEditMode = isEdit;
+        console.log(`编辑模式状态: ${isEdit ? '开启' : '关闭'}`);
+    },
+    
+    /**
+     * 页面切换后自动刷新
+     */
+    refreshAfterPageSwitch(fromPage, toPage) {
+        console.log(`[AutoRefreshManager] 页面切换检查: ${fromPage} -> ${toPage}`);
+        console.log(`[AutoRefreshManager] 配置状态: pageSwitch=${this.config.enabledForOperations.pageSwitch}, isEditMode=${this.isEditMode}`);
+        
+        if (!this.config.enabledForOperations.pageSwitch || this.isEditMode) {
+            console.log(`[AutoRefreshManager] 跳过页面切换刷新 - pageSwitch: ${this.config.enabledForOperations.pageSwitch}, isEditMode: ${this.isEditMode}`);
+            return;
+        }
+        
+        console.log(`[AutoRefreshManager] 页面切换: ${fromPage} -> ${toPage}，准备刷新页面数据`);
+        
+        // 延迟一点时间让页面切换完成，然后刷新数据
+        setTimeout(() => {
+            this.refreshPageData(toPage);
+        }, 100);
+    },
+    
+    /**
+     * 刷新指定页面的数据
+     */
+    async refreshPageData(pageId) {
+        try {
+            console.log(`开始刷新 ${pageId} 页面数据`);
+            
+            switch (pageId) {
+                case 'data-entry':
+                    // 刷新数据录入页面的数据
+                    if (typeof DataEntryManager !== 'undefined' && DataEntryManager.loadSchoolOptions) {
+                        await DataEntryManager.loadSchoolOptions();
+                        console.log('数据录入页面数据已刷新');
+                    }
+                    break;
+                    
+                case 'data-management':
+                    // 刷新历史测算页面的数据
+                    console.log('[AutoRefresh] 开始刷新历史测算页面数据');
+                    console.log('[AutoRefresh] dataManagementManager 存在:', typeof dataManagementManager !== 'undefined');
+                    
+                    if (typeof dataManagementManager !== 'undefined') {
+                        console.log('[AutoRefresh] 准备重新加载筛选器数据');
+                        
+                        // 重新加载筛选器数据
+                        if (dataManagementManager.loadDataAvailableYears) {
+                            console.log('[AutoRefresh] 加载可用年份数据');
+                            await dataManagementManager.loadDataAvailableYears();
+                        }
+                        if (dataManagementManager.loadDataAvailableUsers) {
+                            console.log('[AutoRefresh] 加载可用用户数据');
+                            await dataManagementManager.loadDataAvailableUsers();
+                        }
+                        if (dataManagementManager.loadSchoolOptions) {
+                            console.log('[AutoRefresh] 加载学校选项数据');
+                            await dataManagementManager.loadSchoolOptions();
+                        }
+                        
+                        // 总是执行搜索以获取最新数据（无论之前是否有搜索结果）
+                        if (dataManagementManager.searchDataRecords) {
+                            console.log('[AutoRefresh] 执行搜索以获取最新数据');
+                            // 强制重置搜索状态，确保能够执行新的搜索
+                            if (dataManagementManager.isSearching) {
+                                console.log('[AutoRefresh] 重置搜索状态');
+                                dataManagementManager.isSearching = false;
+                            }
+                            await dataManagementManager.searchDataRecords();
+                            console.log('[AutoRefresh] 搜索完成，当前数据记录数:', dataManagementManager.allDataSchoolsData ? dataManagementManager.allDataSchoolsData.length : 0);
+                        } else {
+                            console.log('[AutoRefresh] 警告: searchDataRecords 方法不存在');
+                        }
+                        
+                        console.log('[AutoRefresh] 历史测算页面数据刷新完成');
+                    } else {
+                        console.log('[AutoRefresh] 错误: dataManagementManager 未定义');
+                    }
+                    break;
+                    
+                case 'statistics':
+                    // 刷新统计页面的数据
+                    if (typeof statisticsManager !== 'undefined' && statisticsManager.loadAllStatistics) {
+                        await statisticsManager.loadAllStatistics();
+                        console.log('统计页面基础数据已刷新');
+                    }
+                    
+                    // 也刷新概览年份数据
+                    if (typeof loadOverviewAvailableYears === 'function') {
+                        await loadOverviewAvailableYears();
+                    }
+                    
+                    // 刷新概览记录数据
+                    if (typeof searchOverviewRecords === 'function') {
+                        console.log('刷新统计概览数据');
+                        await searchOverviewRecords();
+                    }
+                    
+                    console.log('统计页面数据已刷新');
+                    break;
+                    
+                default:
+                    console.log(`未知页面类型: ${pageId}，跳过数据刷新`);
+            }
+        } catch (error) {
+            console.error(`刷新 ${pageId} 页面数据失败:`, error);
+        }
+    },
+    
+    /**
+     * 数据提交后自动刷新
+     */
+    refreshAfterDataSubmit() {
+        // 已禁用：避免"计算分析"后刷新
+        console.log('数据提交后自动刷新已禁用（避免干扰计算分析功能）');
+    },
+    
+    /**
+     * 数据删除后自动刷新
+     */
+    refreshAfterDataDelete() {
+        if (!this.config.enabledForOperations.dataDelete || this.isEditMode) {
+            return;
+        }
+        
+        console.log('数据删除成功，刷新当前页面数据');
+        
+        // 刷新当前页面的数据
+        setTimeout(() => {
+            this.refreshPageData(pageState.currentPage);
+        }, 500);
+    },
+    
+    /**
+     * 禁用自动刷新（临时）
+     */
+    disable() {
+        this.config.enabledForOperations.pageSwitch = false;
+        this.config.enabledForOperations.dataSubmit = false;
+        this.config.enabledForOperations.dataDelete = false;
+        console.log('自动刷新已禁用');
+    },
+    
+    /**
+     * 启用自动刷新
+     */
+    enable() {
+        this.config.enabledForOperations.pageSwitch = true;
+        this.config.enabledForOperations.dataSubmit = true;
+        this.config.enabledForOperations.dataDelete = true;
+        console.log('自动刷新已启用');
+    }
+};
+
+// ========================================
 // 导出到全局作用域
 // ========================================
 
 if (typeof window !== 'undefined') {
     // 主管理器
     window.AppManager = AppManager;
+    window.AutoRefreshManager = AutoRefreshManager;
     
     // 兼容性函数
     window.showPage = showPage;
@@ -425,5 +671,13 @@ if (typeof window !== 'undefined') {
 // ========================================
 
 console.log('✅ 主应用模块 (main.js) 已加载');
-console.log('📦 提供功能: 页面导航、侧边栏控制、应用状态管理');
+console.log('📦 提供功能: 页面导航、侧边栏控制、应用状态管理、智能数据刷新管理');
 console.log('🔗 依赖模块: auth.js');
+console.log('🔄 数据刷新功能: 页面切换时刷新数据、删除后重新加载数据（无需整页刷新）');
+
+// 开发者工具：在控制台中可以使用以下命令
+// AutoRefreshManager.config - 查看配置
+// AutoRefreshManager.disable() - 禁用自动刷新
+// AutoRefreshManager.enable() - 启用自动刷新
+// AutoRefreshManager.setEditMode(true/false) - 设置编辑模式
+// AutoRefreshManager.refreshPageData(pageId) - 手动刷新指定页面数据

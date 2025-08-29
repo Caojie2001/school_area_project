@@ -201,6 +201,14 @@ const DataEntryManager = {
         // 重置表单状态
         currentFormState = FormState.READY;
         
+        // 重置编辑模式（当页面初始化时，用户可能已经完成编辑）
+        if (typeof AutoRefreshManager !== 'undefined') {
+            // 延迟一点重置，避免与编辑填充冲突
+            setTimeout(() => {
+                AutoRefreshManager.setEditMode(false);
+            }, 2000);
+        }
+        
         // 初始化计算
         this.calculateTotalStudents();
         this.calculateTotalBuildingArea();
@@ -596,6 +604,7 @@ const DataEntryManager = {
             if (response.success) {
                 showAlert('success', '数据提交成功！');
                 console.log('数据提交成功:', response);
+                // 注意：根据需求，提交后不触发整页刷新，保持当前页面以便继续“计算分析”
             } else {
                 showAlert('error', `数据提交失败: ${response.message}`);
                 console.error('数据提交失败:', response);
@@ -722,6 +731,11 @@ const DataEntryManager = {
         
         // 更新按钮状态
         this.updateCalculateButtonState();
+        
+        // 重置编辑模式（用户手动清空表单时，结束编辑模式）
+        if (typeof AutoRefreshManager !== 'undefined') {
+            AutoRefreshManager.setEditMode(false);
+        }
         
         console.log('表单已清空');
         

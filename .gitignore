@@ -2,7 +2,7 @@
 .env
 
 # 依赖目录
-node_modules/
+/node_modules
 
 # 日志文件
 *.log

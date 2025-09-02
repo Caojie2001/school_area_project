@@ -59,19 +59,22 @@ const DataManagementManager = {
                 summarySection.style.display = 'none';
             }
             
-            await this.loadDataAvailableYears();
-            await this.loadDataAvailableUsers();
-            await this.loadSchoolOptions();
+            await this.loadDataAvailableYears(true); // 禁用缓存
+            await this.loadDataAvailableUsers(true); // 禁用缓存
+            await this.loadSchoolOptions(true); // 禁用缓存
             
-            // 如果是学校用户，自动锁定学校筛选器和用户筛选器
-            if (currentUser && currentUser.role === 'school') {
-                this.lockSchoolUserFilters();
-            }
+            // 等待DOM元素更新后再锁定筛选器
+            setTimeout(() => {
+                // 如果是学校用户，自动锁定学校筛选器和用户筛选器
+                if (currentUser && currentUser.role === 'school') {
+                    this.lockSchoolUserFilters();
+                }
+            }, 100);
             
             // 自动搜索加载所有数据
             setTimeout(() => {
                 this.searchDataRecords();
-            }, 100);
+            }, 200);
             
             console.log('数据管理模块初始化完成');
             
@@ -81,50 +84,99 @@ const DataManagementManager = {
     },
     
     /**
+     * 刷新页面数据（强制禁用缓存）
+     */
+    async refreshPageData() {
+        try {
+            console.log('开始刷新历史测算页面数据（禁用缓存）...');
+            
+            // 强制刷新所有筛选器数据，禁用缓存
+            await this.loadDataAvailableYears(true);
+            await this.loadDataAvailableUsers(true);
+            await this.loadSchoolOptions(true);
+            
+            // 等待DOM元素更新后再锁定筛选器
+            setTimeout(() => {
+                // 如果是学校用户，自动锁定学校筛选器和用户筛选器
+                if (currentUser && currentUser.role === 'school') {
+                    this.lockSchoolUserFilters();
+                }
+            }, 100);
+            
+            // 刷新数据记录
+            setTimeout(() => {
+                this.searchDataRecords();
+            }, 200);
+            
+            console.log('历史测算页面数据刷新完成');
+            
+        } catch (error) {
+            console.error('刷新历史测算页面数据失败:', error);
+        }
+    },
+    
+    /**
      * 锁定学校用户的筛选器
      */
     lockSchoolUserFilters() {
         if (!currentUser || currentUser.role !== 'school') return;
         
+        console.log('锁定学校用户筛选器，用户信息:', currentUser);
+        
         // 锁定学校筛选器
         const schoolFilter = document.getElementById('dataSchoolNameFilter');
         if (schoolFilter && currentUser.school_name) {
-            // 检查是否存在对应的学校选项
-            let schoolOptionExists = false;
-            for (let i = 0; i < schoolFilter.options.length; i++) {
-                if (schoolFilter.options[i].value === currentUser.school_name) {
-                    schoolOptionExists = true;
-                    break;
-                }
-            }
+            // 清空所有选项，只保留当前学校
+            schoolFilter.innerHTML = '';
+            const option = document.createElement('option');
+            option.value = currentUser.school_name;
+            option.textContent = currentUser.school_name;
+            option.selected = true;
+            schoolFilter.appendChild(option);
             
-            // 如果不存在，添加学校选项
-            if (!schoolOptionExists) {
-                const option = document.createElement('option');
-                option.value = currentUser.school_name;
-                option.textContent = currentUser.school_name;
-                schoolFilter.appendChild(option);
-            }
-            
-            // 设置选中当前学校
-            schoolFilter.value = currentUser.school_name;
             // 禁用筛选器，防止学校用户修改
             schoolFilter.disabled = true;
             // 添加样式提示这是被锁定的
             schoolFilter.style.backgroundColor = '#f5f5f5';
             schoolFilter.style.cursor = 'not-allowed';
+            schoolFilter.style.opacity = '0.8';
+            
+            // 显示锁定提示
+            const schoolHint = document.getElementById('schoolFilterLockHint');
+            if (schoolHint) {
+                schoolHint.style.display = 'inline';
+            }
+            
+            console.log('学校筛选器已锁定为:', currentUser.school_name);
         }
         
         // 锁定用户筛选器
         const userFilter = document.getElementById('dataUserFilter');
         if (userFilter) {
-            // 设置选中当前用户（使用真实姓名）
-            userFilter.value = currentUser.real_name || currentUser.username;
+            const userName = currentUser.real_name || currentUser.username;
+            
+            // 清空所有选项，只保留当前用户
+            userFilter.innerHTML = '';
+            const option = document.createElement('option');
+            option.value = userName;
+            option.textContent = userName;
+            option.selected = true;
+            userFilter.appendChild(option);
+            
             // 禁用筛选器，防止学校用户修改
             userFilter.disabled = true;
             // 添加样式提示这是被锁定的
             userFilter.style.backgroundColor = '#f5f5f5';
             userFilter.style.cursor = 'not-allowed';
+            userFilter.style.opacity = '0.8';
+            
+            // 显示锁定提示
+            const userHint = document.getElementById('userFilterLockHint');
+            if (userHint) {
+                userHint.style.display = 'inline';
+            }
+            
+            console.log('用户筛选器已锁定为:', userName);
         }
     },
     
@@ -262,18 +314,69 @@ const DataManagementManager = {
      * 解锁数据管理页面
      */
     unlockDataManagementPage() {
-        // 启用所有筛选下拉框
-        const filters = [
-            document.getElementById('dataYearFilter'),
-            document.getElementById('dataSchoolNameFilter'),
-            document.getElementById('dataUserFilter')
-        ];
-        filters.forEach(filter => {
-            if (filter) {
-                filter.disabled = false;
-                filter.style.opacity = '1';
+        // 启用所有筛选下拉框，但保持学校用户的限制
+        const yearFilter = document.getElementById('dataYearFilter');
+        const schoolFilter = document.getElementById('dataSchoolNameFilter');
+        const userFilter = document.getElementById('dataUserFilter');
+        
+        // 年份筛选器始终启用
+        if (yearFilter) {
+            yearFilter.disabled = false;
+            yearFilter.style.opacity = '1';
+        }
+        
+        // 学校和用户筛选器：如果是学校用户则保持锁定
+        if (currentUser && currentUser.role === 'school') {
+            // 学校用户的学校和用户筛选器保持锁定状态
+            if (schoolFilter) {
+                schoolFilter.disabled = true;
+                schoolFilter.style.backgroundColor = '#f5f5f5';
+                schoolFilter.style.cursor = 'not-allowed';
+                schoolFilter.style.opacity = '0.8';
+                // 显示锁定提示
+                const schoolHint = document.getElementById('schoolFilterLockHint');
+                if (schoolHint) schoolHint.style.display = 'inline';
             }
-        });
+            if (userFilter) {
+                userFilter.disabled = true;
+                userFilter.style.backgroundColor = '#f5f5f5';
+                userFilter.style.cursor = 'not-allowed';
+                userFilter.style.opacity = '0.8';
+                // 显示锁定提示
+                const userHint = document.getElementById('userFilterLockHint');
+                if (userHint) userHint.style.display = 'inline';
+            }
+        } else {
+            // 管理员和建设中心用户可以自由选择，需要重新加载完整选项
+            if (schoolFilter) {
+                schoolFilter.disabled = false;
+                schoolFilter.style.opacity = '1';
+                schoolFilter.style.backgroundColor = '';
+                schoolFilter.style.cursor = '';
+                // 隐藏锁定提示
+                const schoolHint = document.getElementById('schoolFilterLockHint');
+                if (schoolHint) schoolHint.style.display = 'none';
+                
+                // 重新加载学校选项（如果需要）
+                if (schoolFilter.options.length <= 1) {
+                    this.loadSchoolOptions();
+                }
+            }
+            if (userFilter) {
+                userFilter.disabled = false;
+                userFilter.style.opacity = '1';
+                userFilter.style.backgroundColor = '';
+                userFilter.style.cursor = '';
+                // 隐藏锁定提示
+                const userHint = document.getElementById('userFilterLockHint');
+                if (userHint) userHint.style.display = 'none';
+                
+                // 重新加载用户选项（如果需要）
+                if (userFilter.options.length <= 1) {
+                    this.loadDataAvailableUsers();
+                }
+            }
+        }
         
         // 恢复搜索按钮
         const searchButton = document.querySelector('button[onclick="searchDataRecords()"]');
@@ -405,9 +508,9 @@ const DataManagementManager = {
     /**
      * 加载可用年份
      */
-    async loadDataAvailableYears() {
+    async loadDataAvailableYears(disableCache = false) {
         try {
-            const result = await CommonAPI.getYears();
+            const result = await CommonAPI.getYears(disableCache ? { useCache: false } : {});
             
             if (result.success) {
                 const yearSelect = document.getElementById('dataYearFilter');
@@ -430,9 +533,9 @@ const DataManagementManager = {
     /**
      * 加载学校选项
      */
-    async loadSchoolOptions() {
+    async loadSchoolOptions(disableCache = false) {
         try {
-            const result = await DataEntryAPI.getSchools();
+            const result = await DataEntryAPI.getSchools(disableCache ? { useCache: false } : {});
             
             if (result.success && result.schools) {
                 const schoolSelect = document.getElementById('dataSchoolNameFilter');
@@ -456,9 +559,9 @@ const DataManagementManager = {
     /**
      * 加载可用的测算用户
      */
-    async loadDataAvailableUsers() {
+    async loadDataAvailableUsers(disableCache = false) {
         try {
-            const result = await CommonAPI.getUsers();
+            const result = await CommonAPI.getUsers(disableCache ? { useCache: false } : {});
             
             if (result.success) {
                 const userSelect = document.getElementById('dataUserFilter');

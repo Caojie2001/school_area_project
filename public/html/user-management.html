@@ -315,6 +315,20 @@
             color: #000;
         }
 
+        .username-cell {
+            max-width: 80px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .school-name-cell {
+            max-width: 80px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 0 15px;
@@ -351,7 +365,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>系统用户管理</h1>
+        <h1>用户管理</h1>
         <div class="header-actions">
             <button class="btn btn-primary" onclick="showCreateUserModal()">
                 <span>+</span>
@@ -364,7 +378,7 @@
     <div class="container">
         <div class="card">
             <div class="card-header">
-                <h2>系统用户列表</h2>
+                <h2>用户列表</h2>
             </div>
             <div class="card-body">
                 <div id="alert" style="display: none;"></div>
@@ -542,15 +556,15 @@
             users.forEach(user => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${user.username}</td>
-                    <td>${user.real_name || '-'}</td>
+                    <td class="username-cell" title="${user.username}">${user.username}</td>
+                    <td class="username-cell" title="${user.real_name || '-'}">${user.real_name || '-'}</td>
                     <td>${user.email || '-'}</td>
                     <td>
                         <span class="role-badge role-${user.role}">
                             ${getRoleDisplayName(user.role)}
                         </span>
                     </td>
-                    <td>${user.school_name || '-'}</td>
+                    <td class="school-name-cell" title="${user.school_name || '-'}">${user.school_name || '-'}</td>
                     <td>
                         <span class="status-badge status-${user.status}">
                             ${user.status === 'active' ? '激活' : '禁用'}

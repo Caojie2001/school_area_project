@@ -87,8 +87,8 @@ class StatisticsManager {
                 throw new Error('无权限访问统计功能');
             }
             
-            // 加载年份选项
-            await loadOverviewAvailableYears();
+            // 加载年份选项，初始化时禁用缓存
+            await loadOverviewAvailableYears(true);
             
             // 加载统计数据
             await this.loadAllStatistics();
@@ -138,6 +138,27 @@ class StatisticsManager {
         } catch (error) {
             console.error('加载统计数据失败:', error);
             throw error;
+        }
+    }
+
+    /**
+     * 刷新页面数据（强制禁用缓存）
+     */
+    async refreshPageData() {
+        try {
+            console.log('开始刷新测算统计页面数据（禁用缓存）...');
+            
+            // 强制刷新年份筛选器数据，禁用缓存
+            await loadOverviewAvailableYears(true);
+            
+            // 重新加载统计数据
+            await this.loadAllStatistics();
+            
+            console.log('测算统计页面数据刷新完成');
+            
+        } catch (error) {
+            console.error('刷新测算统计页面数据失败:', error);
+            this.showError('刷新数据失败: ' + error.message);
         }
     }
 
@@ -1037,10 +1058,10 @@ function updateOverviewSummary(data) {
 /**
  * 加载填报概览可用年份
  */
-async function loadOverviewAvailableYears() {
-    console.log('开始加载年份数据...');
+async function loadOverviewAvailableYears(disableCache = false) {
+    console.log('开始加载年份数据...', disableCache ? '（禁用缓存）' : '');
     try {
-        const result = await CommonAPI.getYears();
+        const result = await CommonAPI.getYears(disableCache ? { useCache: false } : {});
         console.log('API响应:', result);
         
         const yearFilter = document.getElementById('overviewYearFilter');

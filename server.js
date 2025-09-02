@@ -210,7 +210,7 @@ function safeRedirect(res, url) {
 // 认证相关路由
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { username, password, rememberMe } = req.body;
+        const { username, password } = req.body;
         
         // 输入验证和清理
         if (!username || !password) {
@@ -233,11 +233,6 @@ app.post('/api/auth/login', async (req, res) => {
         
         if (result.success) {
             req.session.user = result.user;
-            
-            // 如果选择记住我，延长cookie有效期
-            if (rememberMe) {
-                req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30天
-            }
             
             res.json({ success: true, message: result.message, user: result.user });
         } else {
@@ -332,7 +327,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 });
 
 // ========================================
-// 测算标准管理API（仅管理员可访问）
+// 标准管理API（仅管理员可访问）
 // ========================================
 
 // 获取当前测算标准配置
@@ -1393,7 +1388,30 @@ app.get('/api/schools/latest', requireAuth, async (req, res) => {
 // 获取可用年份
 app.get('/api/years', async (req, res) => {
     try {
-        const years = await dataService.getAvailableYears();
+        // 如果是未认证的请求，返回所有年份
+        if (!req.session.user) {
+            const years = await dataService.getAvailableYears();
+            res.json({ success: true, data: years });
+            return;
+        }
+
+        const userRole = req.session.user.role;
+        const userSchoolName = req.session.user.school_name;
+        
+        let years = [];
+        
+        if (userRole === 'admin' || userRole === 'construction_center') {
+            // 管理员和建设中心可以看到所有年份
+            years = await dataService.getAvailableYears();
+        } else if (userRole === 'school' && userSchoolName) {
+            // 学校用户只能看到该学校有测算数据的年份
+            years = await dataService.getAvailableYearsBySchool(userSchoolName);
+            console.log(`学校用户 ${req.session.user.username} (${userSchoolName}) 的可用年份:`, years);
+        } else {
+            // 其他情况返回空数组
+            years = [];
+        }
+        
         res.json({ success: true, data: years });
     } catch (error) {
         console.error('获取年份数据失败:', error);

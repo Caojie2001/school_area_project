@@ -568,6 +568,27 @@ async function getAvailableYears() {
     }
 }
 
+// 获取特定学校的可用年份
+async function getAvailableYearsBySchool(schoolName) {
+    const pool = await getPool();
+    
+    try {
+        const [rows] = await pool.execute(`
+            SELECT DISTINCT ch.year 
+            FROM calculation_history ch
+            INNER JOIN school_registry sr ON ch.school_registry_id = sr.id
+            WHERE ch.year IS NOT NULL 
+              AND sr.school_name = ?
+            ORDER BY ch.year DESC
+        `, [schoolName]);
+        
+        return rows.map(row => row.year);
+    } catch (error) {
+        console.error('获取学校可用年份失败:', error);
+        return [];
+    }
+}
+
 // 获取可用的测算用户列表
 async function getAvailableSubmitterUsers() {
     const pool = await getPool();
@@ -915,6 +936,7 @@ module.exports = {
     getLatestSchoolRecords,
     getAllSchoolRecords,
     getAvailableYears,
+    getAvailableYearsBySchool,
     getAvailableSubmitterUsers,
     getAvailableSubmitterUsersBySchool,
     getSpecialSubsidies,

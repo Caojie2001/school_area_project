@@ -146,24 +146,6 @@
             border-left: 4px solid #28a745;
         }
 
-        .remember-forgot {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            font-size: 14px;
-        }
-
-        .remember-me {
-            display: flex;
-            align-items: center;
-        }
-
-        .remember-me input {
-            margin-right: 8px;
-            width: auto;
-        }
-
         .forgot-password {
             color: #3498db;
             text-decoration: none;
@@ -233,13 +215,6 @@
                     <input type="password" id="password" name="password" required autocomplete="current-password">
                 </div>
                 
-                <div class="remember-forgot">
-                    <label class="remember-me">
-                        <input type="checkbox" id="rememberMe" name="rememberMe">
-                        记住我
-                    </label>
-                </div>
-                
                 <button type="submit" class="login-btn" id="loginBtn">登录</button>
                 
                 <div class="loading" id="loading">正在登录</div>
@@ -263,7 +238,6 @@
                 const formData = new FormData(loginForm);
                 const username = formData.get('username').trim();
                 const password = formData.get('password');
-                const rememberMe = formData.get('rememberMe') === 'on';
 
                 // 前端输入验证
                 if (!username || !password) {
@@ -302,8 +276,7 @@
                         },
                         body: JSON.stringify({
                             username,
-                            password,
-                            rememberMe
+                            password
                         })
                     });
 

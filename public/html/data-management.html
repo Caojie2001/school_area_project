@@ -26,13 +26,19 @@
                             <select id="dataYearFilter" class="search-input" style="width: 12%; min-width: 100px;">
                                 <option value="all">所有测算年份</option>
                             </select>
-                            <select id="dataSchoolNameFilter" class="search-input" style="width: 28%; min-width: 150px;">
-                                <option value="all">所有学校</option>
-                                <!-- 学校选项将通过JavaScript动态加载 -->
-                            </select>
-                            <select id="dataUserFilter" class="search-input" style="width: 15%; min-width: 100px;">
-                                <option value="all">所有测算用户</option>
-                            </select>
+                            <div style="position: relative; display: inline-block; width: 28%; min-width: 150px;">
+                                <select id="dataSchoolNameFilter" class="search-input" style="width: 100%;">
+                                    <option value="all">所有学校</option>
+                                    <!-- 学校选项将通过JavaScript动态加载 -->
+                                </select>
+                                <span id="schoolFilterLockHint" style="display: none; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 12px; pointer-events: none;">🔒 已锁定</span>
+                            </div>
+                            <div style="position: relative; display: inline-block; width: 15%; min-width: 100px;">
+                                <select id="dataUserFilter" class="search-input" style="width: 100%;">
+                                    <option value="all">所有测算用户</option>
+                                </select>
+                                <span id="userFilterLockHint" style="display: none; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 12px; pointer-events: none;">🔒 已锁定</span>
+                            </div>
 
                             <button class="btn btn-primary" onclick="searchDataRecords()" style="width: 10%; min-width: 70px; margin-left: 8px;">查找</button>
                             <button class="btn btn-secondary" onclick="batchDownloadSearchResults()" id="batchDownloadBtn" style="background: #28a745; color: white; width: 13%; min-width: 90px; margin-left: 8px;" disabled>批量下载</button>

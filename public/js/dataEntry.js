@@ -674,13 +674,10 @@ const DataEntryManager = {
     },
     
     /**
-     * 重置表单
+     * 清空页面内容（页面切换时使用，不需要用户确认）
      */
-    resetForm() {
-        // 显示确认弹窗
-        if (!confirm('确定要清空表单吗？此操作将清除所有已填写的数据，且无法撤销。')) {
-            return; // 用户取消，不执行清空操作
-        }
+    clearPageContent() {
+        console.log('正在清空高校测算页面内容...');
         
         // 重置所有数字输入字段
         const inputs = document.querySelectorAll('#page-data-entry input[type="number"]');
@@ -688,10 +685,21 @@ const DataEntryManager = {
             input.value = '0';
         });
         
-        // 重置学校选择
+        // 重置学校选择（学校用户不清空学校名称）
         const schoolSelect = document.getElementById('schoolName');
         if (schoolSelect) {
-            schoolSelect.value = '';
+            const currentUser = typeof AuthManager !== 'undefined' ? AuthManager.getCurrentUser() : null;
+            
+            // 如果是学校用户，保留当前学校名称；否则清空
+            if (currentUser && currentUser.role === 'school' && currentUser.school_name) {
+                // 学校用户保持学校名称不变
+                schoolSelect.value = currentUser.school_name;
+                console.log('学校用户清空页面：保留学校名称', currentUser.school_name);
+            } else {
+                // 管理员和建设中心用户清空学校选择
+                schoolSelect.value = '';
+                console.log('非学校用户清空页面：清空学校名称');
+            }
         }
         
         // 重置年份选择
@@ -706,10 +714,191 @@ const DataEntryManager = {
             remarksField.value = '';
         }
         
-        // 重置学校类型显示
+        // 重置学校类型显示（学校用户保留学校类型信息）
         const schoolTypeDisplay = document.getElementById('schoolTypeDisplay');
         if (schoolTypeDisplay) {
-            schoolTypeDisplay.textContent = '';
+            const currentUser = typeof AuthManager !== 'undefined' ? AuthManager.getCurrentUser() : null;
+            
+            // 如果是学校用户且选择了学校，触发学校变更事件来更新学校类型
+            if (currentUser && currentUser.role === 'school' && currentUser.school_name) {
+                // 触发学校选择器的change事件来更新学校类型
+                const schoolSelect = document.getElementById('schoolName');
+                if (schoolSelect) {
+                    this.updateSchoolType();
+                }
+            } else {
+                // 非学校用户清空学校类型显示
+                schoolTypeDisplay.textContent = '';
+            }
+        }
+        
+        // 清空特殊补助
+        const specialSubsidiesContainer = document.getElementById('specialSubsidies');
+        if (specialSubsidiesContainer) {
+            specialSubsidiesContainer.innerHTML = '';
+        }
+        
+        // 清空分析结果区域
+        this.clearAnalysisResults();
+        
+        // 重新计算所有字段
+        this.calculateTotalStudents();
+        this.calculateTotalBuildingArea();
+        this.calculateOtherLivingArea();
+        
+        // 清除所有错误状态
+        const errorInputs = document.querySelectorAll('.form-control.error');
+        errorInputs.forEach(input => {
+            this.clearFieldError(input);
+        });
+        
+        // 更新按钮状态
+        this.updateCalculateButtonState();
+        
+        // 重置编辑模式（页面切换时，结束编辑模式）
+        if (typeof AutoRefreshManager !== 'undefined') {
+            AutoRefreshManager.setEditMode(false);
+        }
+        
+        console.log('高校测算页面内容已清空');
+    },
+    
+    /**
+     * 清空分析结果区域
+     */
+    clearAnalysisResults() {
+        // 清空所有分析结果相关的容器内容，但不隐藏容器
+        const analysisContainers = [
+            'analysisResultsContent',
+            'onlineAnalysisResults',
+            'calculationResults',
+            'resultsSummary',
+            'resultsDetails',
+            'analysisOutput'
+        ];
+        
+        analysisContainers.forEach(containerId => {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = '';
+                // 注意：不设置 display = 'none'，让正常的显示逻辑来控制
+            }
+        });
+        
+        // 对于 analysisResultsSection，只清空内容，保持隐藏状态但不强制设置
+        const analysisSection = document.getElementById('analysisResultsSection');
+        if (analysisSection && analysisSection.style.display !== 'none') {
+            // 只有当前是显示状态时才隐藏，避免干扰正常显示逻辑
+            analysisSection.style.display = 'none';
+        }
+        
+        // 重置进度区域但不清空，保持功能完整
+        const progressSection = document.getElementById('progressSection');
+        if (progressSection) {
+            progressSection.style.display = 'none'; // 隐藏但不清空
+        }
+        
+        const progressFill = document.getElementById('progressFill');
+        if (progressFill) {
+            progressFill.style.width = '0%'; // 重置进度条宽度
+        }
+        
+        const progressText = document.getElementById('progressText');
+        if (progressText) {
+            progressText.textContent = '准备计算...'; // 重置进度文本
+        }
+        
+        // 清空任何可能存在的结果表格
+        const resultTables = document.querySelectorAll('#page-data-entry .results-table, #page-data-entry .analysis-table');
+        resultTables.forEach(table => {
+            table.remove();
+        });
+        
+        // 清空统计信息显示区域（但不包括进度条）
+        const statisticsElements = document.querySelectorAll('#page-data-entry .statistics-display, #page-data-entry .calculation-summary');
+        statisticsElements.forEach(element => {
+            element.remove();
+        });
+        
+        // 清空特殊补助汇总信息
+        const subsidySummaries = document.querySelectorAll('#page-data-entry .subsidy-summary');
+        subsidySummaries.forEach(summary => {
+            summary.remove();
+        });
+        
+        // 清空全局分析结果变量（如果存在）
+        if (typeof globalAnalysisResult !== 'undefined') {
+            globalAnalysisResult = null;
+        }
+        
+        // 清空window.globalAnalysisResult
+        if (typeof window !== 'undefined' && window.globalAnalysisResult) {
+            window.globalAnalysisResult = null;
+        }
+        
+        console.log('分析结果和统计信息已清空（保留进度条功能）');
+    },
+    
+    /**
+     * 重置表单
+     */
+    resetForm() {
+        // 显示确认弹窗
+        if (!confirm('确定要清空表单吗？此操作将清除所有已填写的数据，且无法撤销。')) {
+            return; // 用户取消，不执行清空操作
+        }
+        
+        // 重置所有数字输入字段
+        const inputs = document.querySelectorAll('#page-data-entry input[type="number"]');
+        inputs.forEach(input => {
+            input.value = '0';
+        });
+        
+        // 重置学校选择（学校用户不清空学校名称）
+        const schoolSelect = document.getElementById('schoolName');
+        if (schoolSelect) {
+            const currentUser = typeof AuthManager !== 'undefined' ? AuthManager.getCurrentUser() : null;
+            
+            // 如果是学校用户，保留当前学校名称；否则清空
+            if (currentUser && currentUser.role === 'school' && currentUser.school_name) {
+                // 学校用户保持学校名称不变
+                schoolSelect.value = currentUser.school_name;
+                console.log('学校用户重置表单：保留学校名称', currentUser.school_name);
+            } else {
+                // 管理员和建设中心用户清空学校选择
+                schoolSelect.value = '';
+                console.log('非学校用户重置表单：清空学校名称');
+            }
+        }
+        
+        // 重置年份选择
+        const yearInput = document.getElementById('year');
+        if (yearInput) {
+            yearInput.value = '2025';
+        }
+        
+        // 重置备注字段
+        const remarksField = document.getElementById('remarks');
+        if (remarksField) {
+            remarksField.value = '';
+        }
+        
+        // 重置学校类型显示（学校用户保留学校类型信息）
+        const schoolTypeDisplay = document.getElementById('schoolTypeDisplay');
+        if (schoolTypeDisplay) {
+            const currentUser = typeof AuthManager !== 'undefined' ? AuthManager.getCurrentUser() : null;
+            
+            // 如果是学校用户且选择了学校，触发学校变更事件来更新学校类型
+            if (currentUser && currentUser.role === 'school' && currentUser.school_name) {
+                // 触发学校选择器的change事件来更新学校类型
+                const schoolSelect = document.getElementById('schoolName');
+                if (schoolSelect) {
+                    this.updateSchoolType();
+                }
+            } else {
+                // 非学校用户清空学校类型显示
+                schoolTypeDisplay.textContent = '';
+            }
         }
         
         // 清空特殊补助
@@ -1618,12 +1807,10 @@ const DataEntryManager = {
         subsidyInputs.forEach((input, index) => {
             const value = parseFloat(input.value) || 0;
             total += value;
-            
-            // 计算有效的补助项目数量（有名称的项目）
-            if (nameInputs[index] && nameInputs[index].value.trim()) {
-                count++;
-            }
         });
+        
+        // 计算所有添加的补助项目数量（不论是否填写）
+        count = subsidyInputs.length;
         
         const totalInput = document.getElementById('subsidyTotalArea');
         if (totalInput) {

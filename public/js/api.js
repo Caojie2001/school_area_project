@@ -377,10 +377,11 @@ const AuthAPI = {
 const DataEntryAPI = {
     /**
      * 获取学校列表
+     * @param {object} options API调用选项，如 {useCache: false}
      * @returns {Promise} 学校列表数据
      */
-    async getSchools() {
-        return apiGet('/school-options');
+    async getSchools(options = {}) {
+        return apiGet('/school-options', {}, options);
     },
     
     /**
@@ -793,18 +794,20 @@ const UserManagementAPI = {
 const CommonAPI = {
     /**
      * 获取年份列表
+     * @param {object} options API调用选项，如 {useCache: false}
      * @returns {Promise} 年份列表
      */
-    async getYears() {
-        return apiGet(API_ENDPOINTS.OTHER.YEARS);
+    async getYears(options = {}) {
+        return apiGet(API_ENDPOINTS.OTHER.YEARS, {}, options);
     },
 
     /**
      * 获取用户列表
+     * @param {object} options API调用选项，如 {useCache: false}
      * @returns {Promise} 用户列表
      */
-    async getUsers() {
-        return apiGet(API_ENDPOINTS.OTHER.USERS);
+    async getUsers(options = {}) {
+        return apiGet(API_ENDPOINTS.OTHER.USERS, {}, options);
     },
 
     /**

@@ -162,10 +162,11 @@ const AppManager = {
         try {
             console.log(`切换到页面: ${pageId}`);
             
-            // 记录前一个页面，用于自动刷新判断
+            // 记录前一个页面，用于自动刷新判断和页面清空
             const previousPage = pageState.currentPage;
             
             // 更新页面状态
+            pageState.previousPage = previousPage;
             pageState.currentPage = pageId;
             
             // 隐藏所有页面
@@ -199,6 +200,24 @@ const AppManager = {
             if (previousPage && previousPage !== pageId && typeof AutoRefreshManager !== 'undefined') {
                 console.log(`[PageSwitch] 触发自动刷新: ${previousPage} -> ${pageId}`);
                 AutoRefreshManager.refreshAfterPageSwitch(previousPage, pageId);
+            } else if (pageId === 'data-entry' && typeof AutoRefreshManager !== 'undefined') {
+                // 特殊处理：每次切换到数据录入页面都清空内容（即使是第一次访问）
+                console.log(`[PageSwitch] 特殊处理：切换到数据录入页面，强制清空内容`);
+                setTimeout(() => {
+                    // 检查DataEntryManager是否准备好，如果没有就重试
+                    const checkAndClear = (retries = 0) => {
+                        if (typeof DataEntryManager !== 'undefined' && DataEntryManager.clearPageContent) {
+                            console.log(`[PageSwitch] DataEntryManager已准备好，执行清空`);
+                            AutoRefreshManager.refreshPageData('data-entry');
+                        } else if (retries < 5) {
+                            console.log(`[PageSwitch] DataEntryManager未准备好，500ms后重试 (${retries + 1}/5)`);
+                            setTimeout(() => checkAndClear(retries + 1), 500);
+                        } else {
+                            console.log(`[PageSwitch] 重试次数已达上限，停止尝试清空`);
+                        }
+                    };
+                    checkAndClear();
+                }, 100); // 初始延迟
             } else if (pageId === 'data-management' && typeof AutoRefreshManager !== 'undefined') {
                 // 特殊处理：每次切换到历史测算页面都刷新数据（即使是第一次访问）
                 console.log(`[PageSwitch] 特殊处理：切换到历史测算页面，强制刷新数据`);
@@ -274,6 +293,16 @@ const AppManager = {
                 // 初始化数据填报模块
                 if (typeof DataEntryManager !== 'undefined' && typeof DataEntryManager.initialize === 'function') {
                     DataEntryManager.initialize();
+                    
+                    // 检查是否从其他页面切换而来，如果是则清空页面内容
+                    const previousPage = pageState.previousPage;
+                    if (previousPage && previousPage !== 'data-entry' && typeof DataEntryManager.clearPageContent === 'function') {
+                        console.log(`[PageSwitch] 从 ${previousPage} 切换到 data-entry，清空页面内容`);
+                        // 延迟执行，确保初始化完成
+                        setTimeout(() => {
+                            DataEntryManager.clearPageContent();
+                        }, 100);
+                    }
                 }
                 break;
                 
@@ -521,8 +550,18 @@ const AutoRefreshManager = {
             switch (pageId) {
                 case 'data-entry':
                     // 刷新数据录入页面的数据
-                    if (typeof DataEntryManager !== 'undefined' && DataEntryManager.loadSchoolOptions) {
-                        await DataEntryManager.loadSchoolOptions();
+                    if (typeof DataEntryManager !== 'undefined') {
+                        // 强制清空页面内容（每次进入都清空）
+                        if (DataEntryManager.clearPageContent) {
+                            console.log('[AutoRefresh] 清空数据录入页面内容');
+                            DataEntryManager.clearPageContent();
+                        }
+                        
+                        // 重新加载学校选项
+                        if (DataEntryManager.loadSchoolOptions) {
+                            await DataEntryManager.loadSchoolOptions();
+                        }
+                        
                         console.log('数据录入页面数据已刷新');
                     }
                     break;
@@ -533,34 +572,41 @@ const AutoRefreshManager = {
                     console.log('[AutoRefresh] dataManagementManager 存在:', typeof dataManagementManager !== 'undefined');
                     
                     if (typeof dataManagementManager !== 'undefined') {
-                        console.log('[AutoRefresh] 准备重新加载筛选器数据');
-                        
-                        // 重新加载筛选器数据
-                        if (dataManagementManager.loadDataAvailableYears) {
-                            console.log('[AutoRefresh] 加载可用年份数据');
-                            await dataManagementManager.loadDataAvailableYears();
-                        }
-                        if (dataManagementManager.loadDataAvailableUsers) {
-                            console.log('[AutoRefresh] 加载可用用户数据');
-                            await dataManagementManager.loadDataAvailableUsers();
-                        }
-                        if (dataManagementManager.loadSchoolOptions) {
-                            console.log('[AutoRefresh] 加载学校选项数据');
-                            await dataManagementManager.loadSchoolOptions();
-                        }
-                        
-                        // 总是执行搜索以获取最新数据（无论之前是否有搜索结果）
-                        if (dataManagementManager.searchDataRecords) {
-                            console.log('[AutoRefresh] 执行搜索以获取最新数据');
-                            // 强制重置搜索状态，确保能够执行新的搜索
-                            if (dataManagementManager.isSearching) {
-                                console.log('[AutoRefresh] 重置搜索状态');
-                                dataManagementManager.isSearching = false;
-                            }
-                            await dataManagementManager.searchDataRecords();
-                            console.log('[AutoRefresh] 搜索完成，当前数据记录数:', dataManagementManager.allDataSchoolsData ? dataManagementManager.allDataSchoolsData.length : 0);
+                        // 使用专门的刷新方法，自动禁用缓存并重新锁定筛选器
+                        if (dataManagementManager.refreshPageData) {
+                            console.log('[AutoRefresh] 调用专门的刷新方法');
+                            await dataManagementManager.refreshPageData();
                         } else {
-                            console.log('[AutoRefresh] 警告: searchDataRecords 方法不存在');
+                            // 兼容旧版本：手动调用各个方法
+                            console.log('[AutoRefresh] 准备重新加载筛选器数据');
+                            
+                            // 重新加载筛选器数据，禁用缓存以获取最新数据
+                            if (dataManagementManager.loadDataAvailableYears) {
+                                console.log('[AutoRefresh] 加载可用年份数据（禁用缓存）');
+                                await dataManagementManager.loadDataAvailableYears(true);
+                            }
+                            if (dataManagementManager.loadDataAvailableUsers) {
+                                console.log('[AutoRefresh] 加载可用用户数据（禁用缓存）');
+                                await dataManagementManager.loadDataAvailableUsers(true);
+                            }
+                            if (dataManagementManager.loadSchoolOptions) {
+                                console.log('[AutoRefresh] 加载学校选项数据（禁用缓存）');
+                                await dataManagementManager.loadSchoolOptions(true);
+                            }
+                            
+                            // 总是执行搜索以获取最新数据（无论之前是否有搜索结果）
+                            if (dataManagementManager.searchDataRecords) {
+                                console.log('[AutoRefresh] 执行搜索以获取最新数据');
+                                // 强制重置搜索状态，确保能够执行新的搜索
+                                if (dataManagementManager.isSearching) {
+                                    console.log('[AutoRefresh] 重置搜索状态');
+                                    dataManagementManager.isSearching = false;
+                                }
+                                await dataManagementManager.searchDataRecords();
+                                console.log('[AutoRefresh] 搜索完成，当前数据记录数:', dataManagementManager.allDataSchoolsData ? dataManagementManager.allDataSchoolsData.length : 0);
+                            } else {
+                                console.log('[AutoRefresh] 警告: searchDataRecords 方法不存在');
+                            }
                         }
                         
                         console.log('[AutoRefresh] 历史测算页面数据刷新完成');
@@ -571,20 +617,42 @@ const AutoRefreshManager = {
                     
                 case 'statistics':
                     // 刷新统计页面的数据
-                    if (typeof statisticsManager !== 'undefined' && statisticsManager.loadAllStatistics) {
-                        await statisticsManager.loadAllStatistics();
-                        console.log('统计页面基础数据已刷新');
-                    }
-                    
-                    // 也刷新概览年份数据
-                    if (typeof loadOverviewAvailableYears === 'function') {
-                        await loadOverviewAvailableYears();
-                    }
-                    
-                    // 刷新概览记录数据
-                    if (typeof searchOverviewRecords === 'function') {
-                        console.log('刷新统计概览数据');
-                        await searchOverviewRecords();
+                    if (typeof statisticsManager !== 'undefined') {
+                        // 使用专门的刷新方法，自动禁用缓存并重新加载年份筛选器
+                        if (statisticsManager.refreshPageData) {
+                            console.log('[AutoRefresh] 调用统计页面专门的刷新方法');
+                            await statisticsManager.refreshPageData();
+                        } else {
+                            // 兼容旧版本：手动调用各个方法
+                            console.log('[AutoRefresh] 使用兼容方式刷新统计页面');
+                            
+                            // 刷新年份筛选器，禁用缓存
+                            if (typeof loadOverviewAvailableYears === 'function') {
+                                await loadOverviewAvailableYears(true);
+                                console.log('统计页面年份筛选器已刷新（禁用缓存）');
+                            }
+                            
+                            // 刷新基础统计数据
+                            if (statisticsManager.loadAllStatistics) {
+                                await statisticsManager.loadAllStatistics();
+                                console.log('统计页面基础数据已刷新');
+                            }
+                            
+                            // 刷新概览记录数据
+                            if (typeof searchOverviewRecords === 'function') {
+                                console.log('刷新统计概览数据');
+                                await searchOverviewRecords();
+                            }
+                        }
+                    } else {
+                        // 如果statisticsManager不存在，使用传统方法
+                        console.log('[AutoRefresh] statisticsManager不存在，使用传统方法刷新');
+                        if (typeof loadOverviewAvailableYears === 'function') {
+                            await loadOverviewAvailableYears(true);
+                        }
+                        if (typeof searchOverviewRecords === 'function') {
+                            await searchOverviewRecords();
+                        }
                     }
                     
                     console.log('统计页面数据已刷新');

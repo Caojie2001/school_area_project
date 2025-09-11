@@ -13,3 +13,4 @@ backups/*
 *.log
 coverage
 .nyc_output
+delete/*

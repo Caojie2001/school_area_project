@@ -1624,48 +1624,79 @@ const DataEntryManager = {
     /**
      * 更新学校类型显示
      */
-    updateSchoolType() {
+    async updateSchoolType() {
         const schoolSelect = document.getElementById('schoolName');
         const schoolTypeDisplay = document.getElementById('schoolTypeDisplay');
         
-        const schoolTypes = {
-            '上海大学': '综合院校',
-            '上海交通大学医学院': '医药院校',
-            '上海理工大学': '理工院校',
-            '上海师范大学': '师范院校',
-            '上海科技大学': '理工院校',
-            '华东政法大学': '政法院校',
-            '上海海事大学': '理工院校',
-            '上海海洋大学': '农业院校',
-            '上海中医药大学': '医药院校',
-            '上海体育大学': '体育院校',
-            '上海音乐学院': '艺术院校',
-            '上海戏剧学院': '艺术院校',
-            '上海电力大学': '理工院校',
-            '上海对外经贸大学': '财经院校',
-            '上海应用技术大学': '理工院校',
-            '上海立信会计金融学院': '财经院校',
-            '上海工程技术大学': '理工院校',
-            '上海第二工业大学': '理工院校',
-            '上海商学院': '财经院校',
-            '上海电机学院': '理工院校',
-            '上海政法学院': '政法院校',
-            '上海健康医学院': '医药院校',
-            '上海出版印刷高等专科学校': '理工院校',
-            '上海旅游高等专科学校': '师范院校',
-            '上海城建职业学院': '理工院校',
-            '上海电子信息职业技术学院': '理工院校',
-            '上海工艺美术职业学院': '理工院校',
-            '上海农林职业技术学院': '农业院校',
-            '上海健康医学院附属卫生学校(上海健康护理职业学院(筹))': '医药院校'
-        };
+        if (!schoolSelect || !schoolTypeDisplay) {
+            return;
+        }
         
-        if (schoolSelect && schoolTypeDisplay) {
-            const selectedSchool = schoolSelect.value;
-            if (selectedSchool && schoolTypes[selectedSchool]) {
-                schoolTypeDisplay.textContent = `学校类型: ${schoolTypes[selectedSchool]}`;
+        const selectedSchool = schoolSelect.value;
+        if (!selectedSchool) {
+            schoolTypeDisplay.textContent = '';
+            this.updateCalculateButtonState();
+            return;
+        }
+        
+        try {
+            // 从API获取学校类型映射
+            const response = await fetch('/api/schools/type-mapping');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            if (result.success && result.data) {
+                const schoolType = result.data[selectedSchool];
+                if (schoolType) {
+                    schoolTypeDisplay.textContent = `学校类型: ${schoolType}`;
+                } else {
+                    schoolTypeDisplay.textContent = '学校类型: 未知';
+                }
             } else {
-                schoolTypeDisplay.textContent = '';
+                throw new Error('获取学校类型映射失败');
+            }
+        } catch (error) {
+            console.error('获取学校类型失败:', error);
+            // 降级处理：使用硬编码的学校类型作为备选
+            const fallbackSchoolTypes = {
+                '上海大学': '综合院校',
+                '上海交通大学医学院': '医药院校',
+                '上海理工大学': '理工院校',
+                '上海师范大学': '师范院校',
+                '上海科技大学': '理工院校',
+                '华东政法大学': '政法院校',
+                '上海海事大学': '理工院校',
+                '上海海洋大学': '理工院校',
+                '上海中医药大学': '医药院校',
+                '上海体育大学': '体育院校',
+                '上海音乐学院': '艺术院校',
+                '上海戏剧学院': '艺术院校',
+                '上海电力大学': '理工院校',
+                '上海对外经贸大学': '财经院校',
+                '上海应用技术大学': '理工院校',
+                '上海立信会计金融学院': '财经院校',
+                '上海工程技术大学': '理工院校',
+                '上海第二工业大学': '理工院校',
+                '上海商学院': '财经院校',
+                '上海电机学院': '理工院校',
+                '上海政法学院': '政法院校',
+                '上海健康医学院': '医药院校',
+                '上海出版印刷高等专科学校': '理工院校',
+                '上海旅游高等专科学校': '师范院校',
+                '上海城建职业学院': '理工院校',
+                '上海电子信息职业技术学院': '理工院校',
+                '上海工艺美术职业学院': '理工院校',
+                '上海农林职业技术学院': '农业院校',
+                '上海健康医学院附属卫生学校(上海健康护理职业学院(筹))': '医药院校'
+            };
+            
+            const fallbackType = fallbackSchoolTypes[selectedSchool];
+            if (fallbackType) {
+                schoolTypeDisplay.textContent = `学校类型: ${fallbackType}`;
+            } else {
+                schoolTypeDisplay.textContent = '学校类型: 未知';
             }
         }
         

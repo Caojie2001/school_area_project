@@ -18,6 +18,38 @@ CREATE TABLE IF NOT EXISTS `school_registry` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 插入学校注册数据
+INSERT IGNORE INTO `school_registry` (`school_name`, `school_type`) VALUES
+('上海大学', '综合院校'),
+('上海交通大学医学院', '医药院校'),
+('上海理工大学', '理工院校'),
+('上海师范大学', '师范院校'),
+('上海科技大学', '理工院校'),
+('华东政法大学', '政法院校'),
+('上海海事大学', '理工院校'),
+('上海海洋大学', '理工院校'),
+('上海中医药大学', '医药院校'),
+('上海体育大学', '体育院校'),
+('上海音乐学院', '艺术院校'),
+('上海戏剧学院', '艺术院校'),
+('上海电力大学', '理工院校'),
+('上海对外经贸大学', '财经院校'),
+('上海应用技术大学', '理工院校'),
+('上海立信会计金融学院', '财经院校'),
+('上海工程技术大学', '理工院校'),
+('上海第二工业大学', '理工院校'),
+('上海商学院', '财经院校'),
+('上海电机学院', '理工院校'),
+('上海政法学院', '政法院校'),
+('上海健康医学院', '医药院校'),
+('上海出版印刷高等专科学校', '理工院校'),
+('上海旅游高等专科学校', '师范院校'),
+('上海城建职业学院', '理工院校'),
+('上海电子信息职业技术学院', '理工院校'),
+('上海工艺美术职业学院', '理工院校'),
+('上海农林职业技术学院', '农业院校'),
+('上海健康医学院附属卫生学校(上海健康护理职业学院(筹))', '医药院校');
+
 -- 创建计算历史表
 CREATE TABLE IF NOT EXISTS `calculation_history` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -123,9 +155,10 @@ CREATE INDEX `idx_subsidized_area_standards_room_type` ON `subsidized_area_stand
 CREATE INDEX `idx_subsidized_area_standards_subsidy_type` ON `subsidized_area_standards`(`subsidy_type`);
 
 -- 创建默认管理员账户
--- 密码: admin123 (请在生产环境中修改)
-INSERT IGNORE INTO `users` (`username`, `password`, `real_name`, `role`) 
-VALUES ('admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '系统管理员', 'admin');
+-- 用户名: admin, 密码: admin123456 (请在生产环境中修改)
+-- 加密后的密码hash值对应 "admin123456"
+INSERT IGNORE INTO `users` (`username`, `password`, `real_name`, `role`, `status`) VALUES 
+('admin', '$2b$10$eBpq4jsfIMlKK5KrOYAx8ucE2GZeTZoQzcoyx3UMS6sV0r8ach5i2', '系统管理员', 'admin', 'active');
 
 -- 插入基础面积标准数据（按院校类型分类）
 INSERT IGNORE INTO `basic_area_standards` (`school_type`, `room_type`, `standard_value`, `description`) VALUES
